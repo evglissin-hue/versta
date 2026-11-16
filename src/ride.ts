@@ -63,6 +63,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl()):
   source.start(
     (fix) => {
       if (!ride) return;
+      if (gpsError.value) gpsError.value = null;
       const events = engine.update(fix);
       nav.value = { ...engine.state };
       director.handle(events, engine.state);

@@ -25,6 +25,7 @@ async function ride(page: Page, query: string): Promise<Snapshot> {
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(`/?${query}`);
   await page.getByRole("button", { name: /^Ride/ }).first().click();
+  await page.waitForFunction(() => window.__versta?.pack.value != null && window.__versta.nav.value.status !== "idle", null, { timeout: 15_000 });
   // collect the log as the ride goes: the app keeps only the last few hundred entries
   const seen = new Map<string, LogEntry>();
   let last: Snapshot | null = null;
