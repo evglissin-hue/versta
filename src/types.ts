@@ -84,8 +84,38 @@ export interface Pack {
   segments: LngLat[][];
   cues: Cue[];
   asides: Aside[];
-  system: { arrive: string[]; offRoute: string; backOnRoute: string };
+  system: {
+    arrive: string[]; offRoute: string; backOnRoute: string;
+    /** Spoken when a way back to the route has been found. */
+    rerouting?: string;
+    /** Generic turn clips for detours, where street names are not recorded: "Turn left", "Bear right" and so on. */
+    turns?: Partial<Record<TurnKind, string>>;
+  };
+  /** Pack-relative path of the corridor road graph used to find a way back when off route. */
+  graph?: string;
   credits: string[];
+}
+
+/**
+ * Road graph of the corridor around a route. Built by tools/, loaded after the ride starts.
+ * edges: [from node, to node, metres, cost, name index, kind index, oneway (1 means from -> to only)].
+ * cost is metres times a comfort factor (cycle routes and quiet streets cheaper, main roads dearer, walking sections dearest).
+ */
+export interface RouteGraph {
+  nodes: LngLat[];
+  edges: [number, number, number, number, number, number, number][];
+  names: string[];
+  kinds: Cue["kind"][];
+}
+
+/** A way back to the route while off it. */
+export interface Detour {
+  /** From the rider to the point where it rejoins the route. */
+  line: LngLat[];
+  /** Metres left on the detour. */
+  toRejoin: number;
+  /** The next turn on the detour, if any before the rejoin. */
+  next: { turn: TurnKind; name: string; at: LngLat; dist: number } | null;
 }
 
 export interface PackIndexEntry {
@@ -155,6 +185,10 @@ export interface NavState {
   currentCue: Cue | null;
   /** Indexes of stops already arrived at. */
   arrived: number[];
+  /** Off route with a way back found: the line to follow. Null or absent otherwise. */
+  detour?: Detour | null;
+  /** While `to_start`: the nearest point of the route, for a rider who wants to join part way. */
+  nearest?: { at: LngLat; seg: number; dist: number } | null;
 }
 
 export type NavEvent =
@@ -164,6 +198,10 @@ export type NavEvent =
   | { type: "aside"; aside: Aside }
   | { type: "off_route" }
   | { type: "back_on_route" }
+  /** A way back was looked for after going off route. */
+  | { type: "detour"; found: boolean }
+  /** A turn on the detour is coming up. */
+  | { type: "detour_turn"; turn: TurnKind; name: string }
   | { type: "finished" };
 
 export interface NavOptions {
@@ -188,6 +226,8 @@ export interface NavEngine {
   readonly state: NavState;
   /** Start riding towards stop `seg` regardless of position (rider skipped ahead or back). */
   jumpToSegment(seg: number): void;
+  /** Give the engine the corridor graph so it can find a way back when off route. */
+  setGraph?(graph: RouteGraph | null): void;
   reset(): void;
 }
 
@@ -281,7 +321,7 @@ export interface DirectorLogEntry {
   at: number;
   what:
     | "cue_spoken" | "cue_shown" | "arrive" | "story_start" | "story_end" | "story_stopped"
-    | "aside_played" | "aside_skipped" | "off_route" | "back_on_route" | "finished";
+    | "aside_played" | "aside_skipped" | "off_route" | "back_on_route" | "detour" | "detour_turn" | "finished";
   id?: string;
   reason?: string;
 }
@@ -304,5 +344,7 @@ export interface Director {
   stopAll(): void;
   /** Story ids the rider has started. */
   readonly heard: ReadonlySet<string>;
+  /** Mark stories and asides as already heard (resuming an earlier ride). */
+  markHeard?(ids: string[]): void;
   dispose(): void;
 }

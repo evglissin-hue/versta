@@ -1,44 +1,223 @@
 [
-  {"id": "jacobs-island", "seg": 2, "street": "Wolseley Street", "frac": 0.5, "title": "Jacob's Island", "tags": [],
-   "text": "You are crossing Jacob's Island. In the 1840s this was the worst slum in London: rotting houses on stilts over tidal ditches that served as both sewer and drinking water. A newspaper called it the capital of cholera. Dickens chose it as the place where Bill Sikes dies, hunted across the rooftops, at the end of Oliver Twist."},
-  {"id": "kings-manor", "seg": 2, "street": "Bermondsey Wall East", "frac": 0.75, "title": "The king's lost manor", "tags": [],
-   "text": "Look for low stone walls in the grass beside the river. They are what is left of a moated manor house built here for King Edward the Third around 1350. Nobody is quite sure why he wanted a house in the Rotherhithe marshes. The best guess is falconry, out over the river."},
-  {"id": "temeraire", "seg": 2, "street": "cycle path", "frac": 0.5, "title": "The Temeraire's last berth", "tags": [],
-   "text": "In 1838 a worn out warship was towed up this reach to a breaker's yard in Rotherhithe. She was the Temeraire, which had come to the rescue of Nelson's Victory at Trafalgar. Turner painted her last journey, a pale ghost behind a black steam tug. It has been voted the nation's favourite painting. She was taken apart a few hundred yards from here."},
-  {"id": "thames-tunnel", "seg": 3, "street": "Railway Avenue", "frac": 0.4, "title": "The tunnel under your wheels", "tags": [],
-   "text": "Right under you runs the first tunnel ever dug beneath a navigable river. The Brunels, father and son, started it in 1825 and it took eighteen years. The river broke in again and again. One flood in 1828 killed six men and very nearly drowned Isambard, who was twenty one. Overground trains use it now."},
-  {"id": "norwegian-church", "seg": 3, "street": "Albion Street", "frac": 0.5, "title": "The king in exile", "tags": [],
-   "text": "The church with the Viking ship weathervane is Saint Olav's, built for Norwegian sailors when this was the timber port of London. During the Second World War, with Norway occupied, the exiled King Haakon came here to worship among his seamen. For five years this street in Rotherhithe was a small piece of free Norway."},
-  {"id": "russia-dock", "seg": 3, "street": "Russia Walk", "frac": 0.5, "title": "Russia Dock", "tags": ["Russia"],
-   "text": "Read the street names. Archangel Street. Russia Walk. Finland Street. Under these houses lay Russia Dock, where softwood from the Baltic and the White Sea was floated in great rafts. Men called deal porters carried the planks on their shoulders, running along bouncing gangways sixty feet up. The dock was filled in during the 1980s. The woodland is growing on top of it."},
-  {"id": "blitz-docks", "seg": 3, "street": "Waterman's Way", "frac": 0.6, "title": "The night the docks burned", "tags": [],
-   "text": "On the seventh of September 1940, the first night of the Blitz, the bombers came for these docks. Acres of stacked timber caught at once. It was the biggest fire London had seen since 1666, and it burned for days. The officer in charge is said to have sent one message: send every pump you have, the whole world is on fire."},
-  {"id": "victualling-yard", "seg": 4, "street": "Evelyn Street", "frac": 0.2, "title": "The navy's larder", "tags": [],
-   "text": "Between this road and the river stood the Royal Victualling Yard. For two centuries it fed the navy. It had its own bakery turning out ship's biscuit by the million, its own slaughterhouse, cooperage and brewery, and vaults holding rum for the whole fleet. Every sailor at Trafalgar ate food packed here."},
-  {"id": "evelyns-garden", "seg": 4, "street": "Evelyn Street", "frac": 0.6, "title": "The garden that started the National Trust", "tags": [],
-   "text": "This street is named for John Evelyn, the diarist, whose garden at Sayes Court on your left was one of the wonders of England. In 1884 his descendant offered what was left of it to the public. There was no organisation that could legally accept it, and the offer lapsed. The reformer Octavia Hill never forgot. Eleven years later she helped found the National Trust."},
-  {"id": "deptford-creek", "seg": 4, "street": "Creek Road", "frac": 0.6, "title": "The deep ford", "tags": [],
-   "text": "The bridge ahead crosses Deptford Creek, where the river Ravensbourne meets the Thames. Deptford simply means the deep ford. Somewhere near here Drake's Golden Hind sat in a dock for nearly a century after her voyage round the world, London's first tourist attraction, until she fell to pieces."},
-  {"id": "dreadnought", "seg": 5, "street": "Dreadnought Walk", "frac": 0.5, "title": "The hospital ship", "tags": [],
-   "text": "This path is named for a ship. For fifty years an old warship lay moored off Greenwich as a free hospital for sick sailors of every nation. The best known was the Dreadnought, which had fought at Trafalgar. In 1870 the patients finally moved ashore, and the hospital kept her name."},
-  {"id": "ferry-house", "seg": 7, "street": "Ferry Street", "frac": 0.5, "title": "The ferry", "tags": [],
-   "text": "Before the tunnel there was the ferry, and this street led down to it. The Ferry House pub has stood here since 1722. As for the Isle of Dogs, nobody knows where the name comes from. One old story says the kings at Greenwich kept their hunting hounds over here, where the barking would not disturb the palace."},
-  {"id": "millwall", "seg": 8, "street": "Westferry Road", "frac": 0.3, "title": "The mills on the wall", "tags": [],
-   "text": "This side of the island is Millwall. The river wall here once carried seven windmills, grinding corn in the west wind. Then came ironworks, shipyards and factories. In 1885 the workers at a jam and marmalade factory on this road started a football team. They called it Millwall Rovers."},
-  {"id": "island-independence", "seg": 8, "street": "Westferry Road", "frac": 0.75, "title": "The republic of the Isle of Dogs", "tags": [],
-   "text": "In March 1970 the people of the Isle of Dogs, fed up with being ignored, blocked the two bridges onto the island and declared independence. They had a president, a former lighterman named Ted Johns. The republic lasted a few hours. But the newspapers came, and so, eventually, did the buses and schools they had been asking for."},
-  {"id": "st-annes", "seg": 9, "street": "Three Colt Street", "frac": 0.6, "title": "The sailors' church", "tags": [],
-   "text": "Limehouse is named for the lime kilns that burned here from the fourteenth century. The white tower above the rooftops is Saint Anne's, built by Hawksmoor. Its clock is the highest church clock in London, set there so ships in the river could read it, and the church still has the right to fly the white ensign of the Royal Navy."},
-  {"id": "muscovy", "seg": 10, "street": "The Highway", "frac": 0.45, "title": "The road to Moscow", "tags": ["Russia"],
-   "text": "In May 1553 three small ships left this shore to find a northern passage to China. The commander, Sir Hugh Willoughby, was found the next year frozen at his desk in Lapland with all his crew. But the third ship, under Richard Chancellor, reached the White Sea. Chancellor travelled a thousand miles by sledge to Moscow and dined with Ivan the Terrible. English trade with Russia begins at this riverbank."},
-  {"id": "cable-street", "seg": 11, "street": "Cable Street", "frac": 0.35, "title": "They did not pass", "tags": [],
-   "text": "On the fourth of October 1936, Oswald Mosley's fascist Blackshirts tried to march through the Jewish East End. A hundred thousand people or more came out to stop them: Jewish tailors, Irish dockers, communists, housewives throwing things from windows. They built barricades across this street. The police could not clear a way, and the march was called off."},
-  {"id": "stake-crossroads", "seg": 11, "street": "Cannon Street Road", "frac": 0.08, "title": "The stake at the crossroads", "tags": [],
-   "text": "In December 1811 two households near here were slaughtered in their homes, seven people in twelve days, and London panicked. The suspect, a sailor named John Williams, was found hanged in his cell. They paraded his body past the houses on a cart and buried it at this crossroads with a stake through the heart, while thousands watched. Workmen laying a gas pipe found him again in 1886."},
-  {"id": "four-faiths", "seg": 12, "street": "Brick Lane", "frac": 0.55, "title": "One building, four faiths", "tags": [],
-   "text": "The big brick building on the corner of Fournier Street tells the whole story of this neighbourhood. It was built in 1743 as a church for French Protestant refugees. It became a Methodist chapel, then in 1898 a synagogue for Jews fleeing the Russian Empire, and in 1976 a mosque for the Bengali community. Same walls. Four congregations."},
-  {"id": "hog-lane", "seg": 12, "street": "Worship Street", "frac": 0.5, "title": "Marlowe's street fight", "tags": ["Spies"],
-   "text": "This street used to be called Hog Lane, and you have met one of its residents already. In September 1589 Christopher Marlowe, playwright and government agent, got into a sword fight here with an innkeeper's son. A friend of Marlowe's stepped in and ran the man through. Marlowe spent two weeks in Newgate prison. Four years later it was his turn, in Deptford."},
-  {"id": "defoe", "seg": 12, "street": "Old Street", "frac": 0.5, "title": "Robinson Crusoe's spymaster", "tags": ["Spies"],
-   "text": "A few hundred yards south of here, in Bunhill Fields, lies Daniel Defoe. Before he wrote Robinson Crusoe he was a secret agent. A minister got him out of prison in return for his services, and sent him to Edinburgh under false names to spy on the opponents of union with England and to turn opinion. He ran a network of informers across the whole country. He died in hiding, from his creditors."}
+ {
+  "id": "jacobs-island",
+  "seg": 2,
+  "street": "Wolseley Street",
+  "frac": 0.5,
+  "title": "Jacob's Island",
+  "tags": [],
+  "text": "You are crossing Jacob's Island. In the 1840s this was the worst slum in London: rotting houses on stilts over tidal ditches that served as both sewer and drinking water. A newspaper called it the capital of cholera. Dickens chose it as the place where Bill Sikes dies, hunted across the rooftops, at the end of Oliver Twist."
+ },
+ {
+  "id": "kings-manor",
+  "seg": 2,
+  "street": "Bermondsey Wall East",
+  "frac": 0.75,
+  "title": "The king's lost manor",
+  "tags": [],
+  "text": "Look for low stone walls in the grass beside the river. They are what is left of a moated manor house built here for King Edward the Third around 1350. Nobody is quite sure why he wanted a house in the Rotherhithe marshes. The best guess is falconry, out over the river."
+ },
+ {
+  "id": "temeraire",
+  "seg": 2,
+  "street": "cycle path",
+  "frac": 0.5,
+  "title": "The Temeraire's last berth",
+  "tags": [],
+  "text": "In 1838 a worn out warship was towed up this reach to a breaker's yard in Rotherhithe. She was the Temeraire, which had come to the rescue of Nelson's Victory at Trafalgar. Turner painted her last journey, a pale ghost behind a black steam tug. It has been voted the nation's favourite painting. She was taken apart a few hundred yards from here."
+ },
+ {
+  "id": "thames-tunnel",
+  "seg": 3,
+  "street": "Railway Avenue",
+  "frac": 0.4,
+  "title": "The tunnel under your wheels",
+  "tags": [],
+  "text": "Right under you runs the first tunnel ever dug beneath a navigable river. The Brunels, father and son, started it in 1825 and it took eighteen years. The river broke in again and again. One flood in 1828 killed six men and very nearly drowned Isambard, who was twenty one. Overground trains use it now."
+ },
+ {
+  "id": "norwegian-church",
+  "seg": 3,
+  "street": "Albion Street",
+  "frac": 0.5,
+  "title": "The king in exile",
+  "tags": [],
+  "text": "The church with the Viking ship weathervane is Saint Olav's, built for Norwegian sailors when this was the timber port of London. During the Second World War, with Norway occupied, the exiled King Haakon came here to worship among his seamen. For five years this street in Rotherhithe was a small piece of free Norway."
+ },
+ {
+  "id": "russia-dock",
+  "seg": 3,
+  "street": "Russia Walk",
+  "frac": 0.5,
+  "title": "Russia Dock",
+  "tags": [
+   "Russia"
+  ],
+  "text": "Read the street names. Archangel Street. Russia Walk. Finland Street. Under these houses lay Russia Dock, where softwood from the Baltic and the White Sea was floated in great rafts. Men called deal porters carried the planks on their shoulders, running along bouncing gangways sixty feet up. The dock was filled in during the 1980s. The woodland is growing on top of it."
+ },
+ {
+  "id": "blitz-docks",
+  "seg": 3,
+  "street": "Waterman's Way",
+  "frac": 0.6,
+  "title": "The night the docks burned",
+  "tags": [],
+  "text": "On the seventh of September 1940, the first night of the Blitz, the bombers came for these docks. Acres of stacked timber caught at once. It was the biggest fire London had seen since 1666, and it burned for days. The officer in charge is said to have sent one message: send every pump you have, the whole world is on fire."
+ },
+ {
+  "id": "victualling-yard",
+  "seg": 4,
+  "street": "Evelyn Street",
+  "frac": 0.2,
+  "title": "The navy's larder",
+  "tags": [],
+  "text": "Between this road and the river stood the Royal Victualling Yard. For two centuries it fed the navy. It had its own bakery turning out ship's biscuit by the million, its own slaughterhouse, cooperage and brewery, and vaults holding rum for the whole fleet. Every sailor at Trafalgar ate food packed here.",
+  "near": [
+   -0.0303,
+   51.4884
+  ]
+ },
+ {
+  "id": "evelyns-garden",
+  "seg": 4,
+  "street": "Evelyn Street",
+  "frac": 0.6,
+  "title": "The garden that started the National Trust",
+  "tags": [],
+  "text": "This street is named for John Evelyn, the diarist, whose garden at Sayes Court on your left was one of the wonders of England. In 1884 his descendant offered what was left of it to the public. There was no organisation that could legally accept it, and the offer lapsed. The reformer Octavia Hill never forgot. Eleven years later she helped found the National Trust.",
+  "near": [
+   -0.0296,
+   51.4843
+  ]
+ },
+ {
+  "id": "deptford-creek",
+  "seg": 4,
+  "street": "Creek Road",
+  "frac": 0.6,
+  "title": "The deep ford",
+  "tags": [],
+  "text": "The bridge ahead crosses Deptford Creek, where the river Ravensbourne meets the Thames. Deptford simply means the deep ford. Somewhere near here Drake's Golden Hind sat in a dock for nearly a century after her voyage round the world, London's first tourist attraction, until she fell to pieces.",
+  "near": [
+   -0.0203,
+   51.4832
+  ]
+ },
+ {
+  "id": "dreadnought",
+  "seg": 5,
+  "street": "Dreadnought Walk",
+  "frac": 0.5,
+  "title": "The hospital ship",
+  "tags": [],
+  "text": "This path is named for a ship. For fifty years an old warship lay moored off Greenwich as a free hospital for sick sailors of every nation. The best known was the Dreadnought, which had fought at Trafalgar. In 1870 the patients finally moved ashore, and the hospital kept her name."
+ },
+ {
+  "id": "ferry-house",
+  "seg": 7,
+  "street": "Ferry Street",
+  "frac": 0.5,
+  "title": "The ferry",
+  "tags": [],
+  "text": "Before the tunnel there was the ferry, and this street led down to it. The Ferry House pub has stood here since 1722. As for the Isle of Dogs, nobody knows where the name comes from. One old story says the kings at Greenwich kept their hunting hounds over here, where the barking would not disturb the palace."
+ },
+ {
+  "id": "millwall",
+  "seg": 8,
+  "street": "Westferry Road",
+  "frac": 0.3,
+  "title": "The mills on the wall",
+  "tags": [],
+  "text": "This side of the island is Millwall. The river wall here once carried seven windmills, grinding corn in the west wind. Then came ironworks, shipyards and factories. In 1885 the workers at a jam and marmalade factory on this road started a football team. They called it Millwall Rovers."
+ },
+ {
+  "id": "island-independence",
+  "seg": 8,
+  "street": "Westferry Road",
+  "frac": 0.75,
+  "title": "The republic of the Isle of Dogs",
+  "tags": [],
+  "text": "In March 1970 the people of the Isle of Dogs, fed up with being ignored, blocked the two bridges onto the island and declared independence. They had a president, a former lighterman named Ted Johns. The republic lasted a few hours. But the newspapers came, and so, eventually, did the buses and schools they had been asking for."
+ },
+ {
+  "id": "st-annes",
+  "seg": 9,
+  "street": "Three Colt Street",
+  "frac": 0.6,
+  "title": "The sailors' church",
+  "tags": [],
+  "text": "Limehouse is named for the lime kilns that burned here from the fourteenth century. The white tower above the rooftops is Saint Anne's, built by Hawksmoor. Its clock is the highest church clock in London, set there so ships in the river could read it, and the church still has the right to fly the white ensign of the Royal Navy."
+ },
+ {
+  "id": "muscovy",
+  "seg": 10,
+  "street": "The Highway",
+  "frac": 0.45,
+  "title": "The road to Moscow",
+  "tags": [
+   "Russia"
+  ],
+  "text": "In May 1553 three small ships left this shore to find a northern passage to China. The commander, Sir Hugh Willoughby, was found the next year frozen at his desk in Lapland with all his crew. But the third ship, under Richard Chancellor, reached the White Sea. Chancellor travelled a thousand miles by sledge to Moscow and dined with Ivan the Terrible. English trade with Russia begins at this riverbank.",
+  "near": [
+   -0.0445,
+   51.5088
+  ]
+ },
+ {
+  "id": "cable-street",
+  "seg": 11,
+  "street": "Cable Street",
+  "frac": 0.35,
+  "title": "They did not pass",
+  "tags": [],
+  "text": "On the fourth of October 1936, Oswald Mosley's fascist Blackshirts tried to march through the Jewish East End. A hundred thousand people or more came out to stop them: Jewish tailors, Irish dockers, communists, housewives throwing things from windows. They built barricades across this street. The police could not clear a way, and the march was called off.",
+  "near": [
+   -0.0585,
+   51.5107
+  ]
+ },
+ {
+  "id": "stake-crossroads",
+  "seg": 11,
+  "street": "Cannon Street Road",
+  "frac": 0.08,
+  "title": "The stake at the crossroads",
+  "tags": [],
+  "text": "In December 1811 two households near here were slaughtered in their homes, seven people in twelve days, and London panicked. The suspect, a sailor named John Williams, was found hanged in his cell. They paraded his body past the houses on a cart and buried it at this crossroads with a stake through the heart, while thousands watched. Workmen laying a gas pipe found him again in 1886.",
+  "near": [
+   -0.0603,
+   51.511
+  ]
+ },
+ {
+  "id": "four-faiths",
+  "seg": 12,
+  "street": "Brick Lane",
+  "frac": 0.55,
+  "title": "One building, four faiths",
+  "tags": [],
+  "text": "The big brick building on the corner of Fournier Street tells the whole story of this neighbourhood. It was built in 1743 as a church for French Protestant refugees. It became a Methodist chapel, then in 1898 a synagogue for Jews fleeing the Russian Empire, and in 1976 a mosque for the Bengali community. Same walls. Four congregations."
+ },
+ {
+  "id": "hog-lane",
+  "seg": 12,
+  "street": "Worship Street",
+  "frac": 0.5,
+  "title": "Marlowe's street fight",
+  "tags": [
+   "Spies"
+  ],
+  "text": "This street used to be called Hog Lane, and you have met one of its residents already. In September 1589 Christopher Marlowe, playwright and government agent, got into a sword fight here with an innkeeper's son. A friend of Marlowe's stepped in and ran the man through. Marlowe spent two weeks in Newgate prison. Four years later it was his turn, in Deptford."
+ },
+ {
+  "id": "defoe",
+  "seg": 12,
+  "street": "Old Street",
+  "frac": 0.5,
+  "title": "Robinson Crusoe's spymaster",
+  "tags": [
+   "Spies"
+  ],
+  "text": "A few hundred yards south of here, in Bunhill Fields, lies Daniel Defoe. Before he wrote Robinson Crusoe he was a secret agent. A minister got him out of prison in return for his services, and sent him to Edinburgh under false names to spy on the opponents of union with England and to turn opinion. He ran a network of informers across the whole country. He died in hiding, from his creditors."
+ }
 ]

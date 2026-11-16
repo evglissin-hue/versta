@@ -1,0 +1,56 @@
+{
+ "comment": "Segments listed here are planned again by tools/router.py. Every other segment keeps its current line. via points are [lng, lat], approximate: the router snaps each to the nearest rideable way within 200 m.",
+ "replan": {
+  "4": {
+   "why": "Follow the river and National Cycle Route 4 through Deptford: South Dock lock, Pepys Park, Deptford Strand, Sayes Court, Deptford Green, then the swing bridge at the mouth of Deptford Creek. Not Evelyn Street.",
+   "via": [
+    [
+     -0.033,
+     51.492
+    ],
+    [
+     -0.0296,
+     51.4888
+    ],
+    [
+     -0.0296,
+     51.4843
+    ],
+    [
+     -0.0235,
+     51.4827
+    ],
+    [
+     -0.0203,
+     51.4832
+    ]
+   ]
+  },
+  "8": {
+   "why": "Prefer the riverside path up the west side of the Isle of Dogs wherever cycling is allowed, in place of Westferry Road.",
+   "via": []
+  },
+  "10": {
+   "why": "Stay by the river: Narrow Street, then through King Edward Memorial Park, not along The Highway.",
+   "via": [
+    [
+     -0.0445,
+     51.5088
+    ]
+   ]
+  },
+  "11": {
+   "why": "See old Wapping: west along Wapping High Street, north up Wapping Lane, over The Highway into Cannon Street Road.",
+   "via": [
+    [
+     -0.056,
+     51.504
+    ],
+    [
+     -0.0577,
+     51.5066
+    ]
+   ]
+  }
+ }
+}
