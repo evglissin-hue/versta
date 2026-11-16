@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storied Routes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: an Admiralty chart turned into a strip map. One vertical rail of numbered
+   marks down the left, stops hang off it, a thumb-reach dock at the bottom drives the ride. */
+:root{
+  --paper:#F5F8F5;      /* chart paper */
+  --shoal:#D8E8F0;      /* shallow-water blue */
+  --land:#EDE0B2;       /* chart land buff */
+  --ink:#0E2233;        /* chart ink */
+  --muted:#566978;
+  --line:#B9C8CC;
+  --mark:#A61C6E;       /* chart magenta, used for lights and marks */
+  --on-mark:#FFFFFF;
+  --f-display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --f-body:"Newsreader",Georgia,"Times New Roman",serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0B1620; --shoal:#12283A; --land:#3A3418; --ink:#DDE7EA; --muted:#8FA3AF;
+    --line:#274052; --mark:#F07CC0; --on-mark:#1A0612; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0B1620; --shoal:#12283A; --land:#3A3418; --ink:#DDE7EA; --muted:#8FA3AF;
+  --line:#274052; --mark:#F07CC0; --on-mark:#1A0612; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.5;
+  padding:0 16px 190px;-webkit-text-size-adjust:100%}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.label{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+header.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-top:18px;border-bottom:2px solid var(--ink);padding-bottom:8px}
+header.top .brand{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase}
+.routes{display:flex;gap:8px;flex-wrap:wrap}
+.routes button{font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:.06em;text-transform:uppercase;
+  min-height:40px;padding:6px 14px;border:2px solid var(--ink);background:transparent;color:var(--ink);border-radius:2px;cursor:pointer}
+.routes button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.hero h1{font-family:var(--f-display);font-weight:700;font-size:clamp(54px,17vw,96px);line-height:.88;letter-spacing:-.01em;
+  text-transform:uppercase;margin:6px 0 10px;text-wrap:balance}
+.hero .bearing{font-family:var(--f-display);font-weight:500;font-size:16px;letter-spacing:.08em;color:var(--mark);font-variant-numeric:tabular-nums}
+.hero p{margin:10px 0 0;max-width:34em}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:2px solid var(--ink);margin-top:16px}
+.stats div{padding:8px 10px;border-right:1px solid var(--line)}
+.stats div:last-child{border-right:0}
+.stats b{display:block;font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.stats span{font-family:var(--f-display);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sound{background:var(--shoal);padding:14px;display:flex;flex-direction:column;gap:10px}
+.switches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.switches button{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+  min-height:48px;border:2px solid var(--ink);background:transparent;color:var(--ink);border-radius:2px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.switches button::before{content:"";width:12px;height:12px;border-radius:50%;border:2px solid currentColor}
+.switches button[aria-checked="true"]{background:var(--ink);color:var(--paper)}
+.switches button[aria-checked="true"]::before{background:var(--mark);border-color:var(--mark)}
+.switches button:disabled{opacity:.45;cursor:not-allowed}
+.sound small{font-size:15px;color:var(--muted);line-height:1.35}
+.progress{display:flex;align-items:center;gap:12px}
+.bar{flex:1;height:6px;background:var(--line)}
+.bar i{display:block;height:100%;width:0;background:var(--mark);transition:width .3s}
+.leg{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-top:2px solid var(--ink);padding-top:10px;margin-top:6px}
+.leg h2{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase;margin:0;line-height:1}
+ol.strip{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;position:relative}
+ol.strip::before{content:"";position:absolute;left:21px;top:0;bottom:0;width:2px;background:var(--ink)}
+.stop{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:14px 0 22px;position:relative;scroll-margin-top:12px}
+.dot{position:relative;z-index:1;width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);
+  display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.stop.visited .dot{background:var(--ink);color:var(--paper)}
+.stop.next .dot{border-color:var(--mark);box-shadow:0 0 0 4px var(--paper),0 0 0 6px var(--mark);color:var(--mark)}
+.stop.visited .body>h3{text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:var(--line)}
+.body{min-width:0;display:flex;flex-direction:column;gap:10px}
+.meta{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--f-display);font-size:14px;letter-spacing:.08em;color:var(--muted);font-variant-numeric:tabular-nums;text-transform:uppercase}
+.body>h3{font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1;margin:0;text-transform:uppercase;text-wrap:balance}
+.note{margin:0;font-size:17px}
+.chip{display:inline-block;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:2px}
+.chip.pint{background:var(--land);color:var(--ink)}
+.chip.core{background:var(--mark);color:var(--on-mark)}
+.chip.optional{border:1.5px solid var(--muted);color:var(--muted)}
+.chip.tag{background:var(--shoal);color:var(--ink)}
+.shead{flex-wrap:wrap}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;
+  min-height:48px;padding:10px 16px;border:2px solid var(--ink);border-radius:2px;background:var(--ink);color:var(--paper);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;line-height:1}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.play{background:var(--mark);border-color:var(--mark);color:var(--on-mark)}
+.btn.small{min-height:40px;font-size:15px;padding:6px 12px}
+.btn:focus-visible,.routes button:focus-visible,.switches button:focus-visible,summary:focus-visible{outline:3px solid var(--mark);outline-offset:3px}
+.story{border-left:4px solid var(--shoal);padding:4px 0 4px 12px;display:flex;flex-direction:column;gap:8px}
+.story.playing{border-left-color:var(--mark)}
+.shead{display:flex;gap:10px;align-items:center}
+.mins{font-family:var(--f-display);font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.story h4{font-family:var(--f-body);font-style:italic;font-weight:400;font-size:24px;line-height:1.15;margin:0;text-wrap:balance}
+.story .btn{align-self:flex-start}
+details summary{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);cursor:pointer;padding:6px 0;min-height:36px}
+.paras p{margin:0 0 .8em;font-size:19px;line-height:1.5;max-width:32em}
+.paras p.now{background:var(--shoal);box-shadow:-6px 0 0 var(--shoal),6px 0 0 var(--shoal)}
+.dock{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:2px solid var(--ink);padding:10px 16px 14px;z-index:10}
+.dock-in{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.dock-label{display:flex;gap:10px;align-items:baseline;min-width:0}
+.dock-label strong{font-family:var(--f-display);font-weight:700;font-size:22px;text-transform:uppercase;line-height:1.05;overflow-wrap:anywhere}
+.dock-btns{display:grid;grid-template-columns:1fr 1.2fr .8fr;gap:8px}
+.dock-btns .btn{padding:10px 6px;min-height:54px}
+.foot{font-size:15px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+@media (max-width:380px){.stats{grid-template-columns:repeat(2,1fr)}.stats div:nth-child(2){border-right:0}.stats div:nth-child(-n+2){border-bottom:1px solid var(--line)}.btn{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="brand">Storied Routes</span>
+    <nav class="routes" id="routes" aria-label="Routes"></nav>
+  </header>
+
+  <section class="hero" id="hero"></section>
+
+  <section class="sound" aria-label="Sound">
+    <span class="label">Sound for the stories</span>
+    <div class="switches">
+      <button type="button" role="switch" id="swVoice" aria-checked="true">Voice</button>
+      <button type="button" role="switch" id="swAmb" aria-checked="true">Ambience</button>
+      <button type="button" role="switch" id="swMusic" aria-checked="true">Music</button>
+    </div>
+    <small id="voiceNote">Checking which voice this viewer offers.</small>
+  </section>
+
+  <div class="progress"><span class="label" id="progText">0 of 0 stops</span><div class="bar"><i id="progBar"></i></div></div>
+
+  <ol class="strip" id="strip"></ol>
+
+  <p class="foot">Navigate opens Google Maps with directions from where you are. Your progress is kept on this device only.</p>
+</div>
+
+<div class="dock" role="region" aria-label="Next stop">
+  <div class="dock-in">
+    <div class="dock-label"><span class="label" id="dockState">Next stop</span><strong id="dockName"></strong></div>
+    <div class="dock-btns">
+      <a class="btn" id="dockNav" href="#" target="_blank" rel="noopener">Navigate</a>
+      <button type="button" class="btn play" id="dockPlay">Play story</button>
+      <button type="button" class="btn ghost" id="dockDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   ROUTES. To add a trip, add one object to this array.
+   mode: "bicycling" or "walking". amb: a soundscape name from AMB.
+   story.kind: "core" or "optional". story.mood: "minor" or "bright".
+   story.tags: optional labels such as "Spies" or "Russia".
+   House style for every route: history first, told in the present tense as if it
+   is happening now. Wherever it is true to the place, give priority to espionage
+   and intelligence stories and to Russian history, and make those core.
+---------------------------------------------------------------- */
+const ROUTES = [
+{
+  id: "thames-loop",
+  name: "Thames Loop",
+  mode: "bicycling",
+  km: 22,
+  ride: "1.5 h",
+  blurb: "Downriver on the south bank to Greenwich, under the Thames on foot, then home along the north bank through the old docks, Limehouse and Wapping. Ships, shipyards, pirates and three very old pubs.",
+  legs: [
+    { name: "Out: south bank", from: 0, to: 5 },
+    { name: "Back: north bank", from: 6, to: 12 }
+  ],
+  stops: [
+    { id:"tower-bridge", name:"Tower Bridge", q:"Tower Bridge, London", pid:"ChIJSdtli0MDdkgRLW9aCBpCeJ4", lat:51.5054564, lng:-0.0753565, amb:"river",
+      note:"Start here. Cross to the south side, then drop left to Shad Thames.",
+      stories:[{ title:"The richest water on earth", kind:"core", mood:"bright", paras:[
+        "It is the summer of 1894 and the bridge is six weeks old. The stone is still pale. The paint still smells.",
+        "Look downstream. The Pool of London is so thick with shipping that a man could almost cross the river from deck to deck. Colliers black with Newcastle coal. Tea ships home from China. Dutch eel boats on a mooring their grandfathers held. Between them, hundreds of flat lighters, each steered by one man with one long oar and a lifetime of knowing the tide.",
+        "Under the roadway, coal fires heat the boilers. Steam drives the pumps. Water under enormous pressure waits in six iron accumulators. Then a bell rings, the carts and horses stop, and a thousand tons of road on each side tilts up into the sky in about a minute, as quietly as a door.",
+        "It happens twenty times a day. Nobody on the river looks up. They are busy. This is the richest stretch of water on earth, and you are about to follow it towards the sea."
+      ]},
+      { title:"The chair in the rifle range", kind:"optional", mood:"minor", amb:"solemn", tags:["Spies"], paras:[
+        "Before you leave the Tower behind, one story from inside its walls.",
+        "In the autumn of 1914 a polite, well dressed American tourist called Charles Inglis is cycling round the Firth of Forth, admiring the warships. His real name is Carl Hans Lody. He is a German naval reserve officer, he has had almost no training, and he is posting his reports to Stockholm in plain language. A new and very small department in London, which will one day be called MI5, is reading every one of them.",
+        "He is tried in public and shot at dawn on the sixth of November, in the Tower's indoor rifle range. It is the first execution here in more than a hundred and fifty years. He walks to the chair unaided and thanks his guards. The officer in charge is said to have told him that he would not shake hands with a spy, but would gladly shake hands with a brave man.",
+        "Ten more follow him before the war ends.",
+        "The last comes in 1941. Josef Jakobs parachutes into a field in Huntingdonshire, breaks his ankle on landing, and lies there all night until he fires his pistol to call for help. He cannot stand to face the firing squad. So they seat him in an old brown Windsor chair, and that is how the last execution at the Tower of London is carried out."
+      ]}]},
+    { id:"shad-thames", name:"Shad Thames", q:"Shad Thames, London", pid:"ChIJFfwg0UUDdkgR3kr97Wa_N6A", lat:51.5019465, lng:-0.072381, amb:"wharf",
+      note:"Cobbled warehouse canyon with iron gantries overhead. Roll slowly.",
+      stories:[{ title:"The street that smelled of cinnamon", kind:"core", mood:"minor", paras:[
+        "Slow down. The cobbles want you to.",
+        "It is 1880 and this narrow street is the busiest larder in the world. The warehouses of Butler's Wharf rise on both sides like cliffs, and over your head the iron bridges are never still. Porters run barrels and chests across them, from the river side to the land side, six floors up, shouting warnings nobody below can hear.",
+        "Every doorway breathes something different. Tea from Assam. Coffee. Cloves, cinnamon, pepper, cardamom. Sugar and tapioca, dried fruit, rubber. A blind man could walk this street and tell you which ship came in last night.",
+        "The men who work here are hired by the half day. They wait at the gate at dawn, and the foreman points. If he does not point at you, your children do not eat.",
+        "When the warehouses finally closed, a century later, people said the brick still smelled of spice in the rain."
+      ]}]},
+    { id:"mayflower", name:"The Mayflower", q:"The Mayflower pub, Rotherhithe Street, London", pid:"ChIJo3GMMiQDdkgRLEL6Mu4LR8s", lat:51.5018403, lng:-0.0536173, amb:"ship", pint:true,
+      note:"Old Rotherhithe village. The jetty behind the pub sits right over the river.",
+      stories:[{ title:"Captain Jones goes home", kind:"core", mood:"minor", paras:[
+        "Lean on the rail and look at the water.",
+        "In the summer of 1620 a tired merchant ship lay on this mooring. She had spent years hauling wine from Bordeaux, and her timbers were said to smell sweet because of it. Her master, Christopher Jones, lived a few streets away.",
+        "That July she took on stores and passengers here and dropped down the river on the tide, bound for Southampton, and then for a coast most of her crew had never seen. There were a hundred and two passengers by the time she left Plymouth. The crossing took sixty six days. Half of them were dead before the spring.",
+        "Jones brought his ship back to this reach the following May. He never fully recovered from that winter. He died within a year, and they buried him in the churchyard across the lane, fifty paces from where you are standing.",
+        "The Mayflower herself was left to rot on the mud here. Nobody thought she was worth saving."
+      ]}]},
+    { id:"greenland-dock", name:"Greenland Dock", q:"Greenland Dock, London", pid:"ChIJb4zARt0CdkgR8X9Z7P1fojQ", lat:51.494728, lng:-0.0387495, amb:"arctic",
+      note:"Wide open water and one of the sunniest spots on the south bank.",
+      stories:[{ title:"The whalers come home", kind:"optional", mood:"minor", paras:[
+        "It is a September afternoon in 1770 and you can smell the fleet before you see it.",
+        "When this dock was dug, seventy years ago, it was the largest anyone had seen. Ten acres of still water, room for a hundred and twenty ships, with a wall of trees planted round it to break the wind.",
+        "Now it belongs to the whalers. They sail every spring for the ice off Greenland and Spitsbergen, forty or fifty men to a ship, and hunt the bowhead whale from open boats with hand harpoons. A whale can drag a boat for miles. A flick of its tail can put six men in the sea, and in that water a man lasts a few minutes.",
+        "The ones who come back come back here. The blubber is hacked out of the hold in grey slabs and boiled down in great copper pans along the quay. The smoke is black and greasy. The stink carries all the way to Deptford.",
+        "But that oil lights the lamps of London. Every lit window, every street lantern, every theatre. The whole bright city is burning what these men dragged out of the Arctic.",
+        "Walk along the edge. The water is quiet now. It was not a quiet place."
+      ]}]},
+    { id:"peter-the-great", name:"Deptford & the Tsar", q:"Peter the Great Statue, Glaisher Street, London", pid:"ChIJu3nNio0CdkgRY6Y5SzITMX4", lat:51.483369, lng:-0.0190625, amb:"yard",
+      note:"The statue stands at the mouth of Deptford Creek, with the old royal dockyard just upstream. Five minutes inland, St Nicholas church has skulls on its gateposts and Marlowe somewhere in its churchyard.",
+      stories:[{ title:"The tsar in the shipyard", kind:"core", mood:"bright", tags:["Russia"], paras:[
+        "In the winter of 1698 a young man nearly seven feet tall arrives in Deptford and asks to be taught how to build a ship.",
+        "He is twenty five. He is the Tsar of Russia. He is travelling as plain Peter Mikhailov, a disguise that fools nobody, at the head of a mission two hundred and fifty strong. Its orders are simple. Learn everything. Sketch everything. Hire everyone who will come.",
+        "He has rented the finest house in the village, Sayes Court, because its garden gate opens straight into the King's dockyard. That yard is why he is here. Henry the Eighth founded it. Drake was knighted in it, on the deck of the Golden Hind. Now it is the most advanced shipyard in the world, and Peter wants all of it.",
+        "He is in the yard at dawn. He handles the tools, sketches hulls, questions the shipwrights. He goes up the hill to the Observatory to learn navigation. He visits the Mint and the arsenal at Woolwich, and he watches Parliament in secret through a window in the roof.",
+        "In the evenings he and his companions drink, and the house pays for it. Three hundred window panes broken. Paintings used for target practice. Chairs burned as firewood. And through the owner's prized holly hedge, the pride of his life, somebody has been pushing somebody else in a wheelbarrow. For fun. Repeatedly.",
+        "Sir Christopher Wren is sent to add up the damage. The Treasury pays three hundred and fifty pounds.",
+        "He sails home with a head full of English hulls and some sixty hired British specialists: shipwrights, mathematicians, lock builders, seamen. Five years later he founds a city on the Baltic. Within a generation Russia has a navy that can beat Sweden's.",
+        "It started here, in the mud, with a borrowed adze."
+      ]},
+      { title:"The reckoning", kind:"core", mood:"minor", amb:"tavern", tags:["Spies"], paras:[
+        "A few hundred yards from here, on the thirtieth of May 1593, four men spend a whole day together in a private room in a widow's house on Deptford Strand.",
+        "One is Christopher Marlowe. He is twenty nine, the most famous playwright in England, and for years he has been something else as well. When Cambridge tried to refuse him his degree, the Queen's own council wrote to say he had done her good service in matters they would not name. That is how a government talks about a spy.",
+        "Look at the company he keeps today. Robert Poley, courier and agent, the man who wormed his way into the Babington plot and helped send Mary Queen of Scots to the block. Nicholas Skeres, another creature of the same trade. And Ingram Frizer, who works for the spymaster's family.",
+        "Marlowe is in trouble. He is under investigation for heresy and must report to the council every day. He knows a great many secrets, and he is known to talk.",
+        "They eat. They walk in the garden. They eat again. Then, the three survivors say, there is a quarrel about the bill. Marlowe snatches Frizer's dagger. Frizer turns it back on him. The blade goes in above the right eye.",
+        "The Queen's coroner hears three practised liars tell the same story and rules it self defence. Frizer is pardoned within a month.",
+        "Marlowe is buried two days later in the churchyard of St Nicholas, five minutes inland from here. Nobody marked the grave."
+      ]}]},
+    { id:"greenwich", name:"Cutty Sark & Greenwich", q:"Cutty Sark, Greenwich, London", pid:"ChIJAVlhMIUCdkgRCJEgHVbITq4", lat:51.4828646, lng:-0.0095917, amb:"sail",
+      note:"Loop through the Old Royal Naval College to the river wall, then come back. The tunnel entrance is the glass dome beside the ship.",
+      stories:[
+        { title:"The last of the racers", kind:"core", mood:"bright", paras:[
+          "Look up at the masts. A hundred and fifty feet of them, and once three quarters of an acre of canvas hung there.",
+          "She was built in 1869 for one purpose: to be first home from China with the new season's tea. The first chests into London each year sold for a fortune, so the clippers raced, fifteen thousand miles, and the whole country bet on them.",
+          "Her bad luck was her birthday. The Suez Canal opened the same week she was launched. Steamships could take the short cut. Sailing ships could not. Within a few years the tea trade was gone.",
+          "So she went south for Australian wool instead, and there, in the great winds below the Cape, she finally showed what she was. Seventeen knots. Sydney to London in seventy three days. She would overhaul steamers and leave them astern.",
+          "Her name is a joke from a Burns poem: a young witch dancing in a short shirt, a cutty sark, fast enough to catch a galloping horse by the tail. Find the figurehead. She is still holding it."
+        ]},
+        { title:"Nelson comes home", kind:"optional", mood:"minor", amb:"solemn", paras:[
+          "Walk to the river wall in front of the two domes and face the water.",
+          "It is Christmas Eve, 1805. A boat comes alongside in the dusk, and the old sailors who live in this hospital, men with one arm, one leg, one eye, line the steps without being told to.",
+          "The coffin they carry up was made from the mainmast of a French flagship that Nelson himself destroyed at the Nile. He had kept it in his cabin for years. He thought it was funny.",
+          "His body has come home from Trafalgar in a cask of brandy. For three days in January he lies in the Painted Hall behind you, and thousands upon thousands queue in the cold to file past. Many more are turned away.",
+          "Then, on a bitter morning with the wind against the tide, a black barge takes him upriver to London, with a long line of boats behind it. Every ship on the river lowers its flag. The guns fire once a minute.",
+          "The pensioners stand on this wall until the last boat is out of sight."
+        ]},
+        { title:"The secret agent", kind:"optional", mood:"minor", amb:"clock", tags:["Spies"], paras:[
+          "Look up the hill to the Observatory. Every clock in the world is set from that building.",
+          "On a cold afternoon in February 1894 a young Frenchman gets off the tram from Westminster and walks into the park with a parcel under his coat. His name is Martial Bourdin. He is twenty six, a tailor, and a member of an anarchist club off Tottenham Court Road that the police have watched for years.",
+          "A few minutes before five, the park keepers hear a bang on the zigzag path below the Observatory. They find him on his knees. His left hand is gone. He asks only to be taken home. He dies half an hour later without saying what he meant to do.",
+          "In his pockets is a good deal of money in gold. More than a tailor should have.",
+          "Nobody ever proved who sent him. But the rumour in the anarchist clubs was ugly: that the man who gave him the bomb, his own brother in law, was in the pay of the police.",
+          "Joseph Conrad heard the story and could not leave it alone. In his novel the bomber is a simple boy, and the man behind him is a shabby double agent taking money from a foreign embassy. The embassy is never named. Most readers in 1907 took it for the Russian one.",
+          "The clocks on the hill did not miss a second."
+        ]}
+      ]},
+    { id:"foot-tunnel", name:"Foot Tunnel & Island Gardens", q:"Island Gardens, Saunders Ness Road, London", pid:"ChIJnccAupsCdkgRuCnow3jPDuE", lat:51.4870307, lng:-0.0081588, amb:"tunnel",
+      note:"Walk the bike through. Lifts are sometimes out, then it is about 100 steps each end. Play this one as you go down.",
+      stories:[{ title:"Under the river", kind:"core", mood:"minor", paras:[
+        "You are about to walk under the Thames. Listen to your footsteps.",
+        "In 1902 the men of Greenwich and Deptford worked in the docks on the far bank, and the only way across was a ferry that stopped for fog, for ice, and whenever the ferryman felt like it. A missed boat was a missed day's pay. So the County Council dug them a tunnel.",
+        "It is twelve hundred feet long and fifty feet down. The walls are cast iron rings, lined with two hundred thousand white tiles. Above your head is the river bed, and above that, the keel of every ship that ever came up to London.",
+        "Near the north end the tunnel narrows. That is where a bomb fell in the Blitz and the roof had to be braced with steel.",
+        "When you come up into daylight, turn round. The view back across the water, the two domes, the park, the hill, has barely changed in three hundred years. Canaletto stood on this bank and painted it."
+      ]}]},
+    { id:"great-eastern", name:"Great Eastern Slipway", q:"Great Eastern Slipway, Napier Avenue, London", pid:"ChIJy3G4dpMCdkgRbfQJLH6NJAM", lat:51.4878235, lng:-0.0208247, amb:"yard",
+      note:"West side of the Isle of Dogs. The old launch timbers show in the mud at low tide.",
+      stories:[{ title:"The ship that would not move", kind:"optional", mood:"minor", paras:[
+        "Those blackened timbers in the mud are the launch ways of the biggest ship in the world.",
+        "It is the third of November, 1857. Isambard Kingdom Brunel has built an iron hull almost seven hundred feet long, five times the size of anything afloat. She is so long that she cannot be launched stern first. She would hit the other bank. So he has built her sideways to the river and means to slide twelve thousand tons of iron down these ramps, gently, on chains.",
+        "He begged for silence. Instead the company sold tickets. Thousands of people cover the yard, the rooftops, the boats.",
+        "The chocks are knocked away. The hull shudders, slips a few feet, and a winch handle spins backwards into the gang of men holding it. They are thrown into the air. One dies. The ship stops dead.",
+        "She sits there, stuck, for three months. It takes hydraulic rams and most of the company's money to push her into the water, a few feet at a time.",
+        "Brunel was photographed here in his tall hat, cigar in his mouth, in front of her great drum of chain. He looks exhausted. He was. Two years later, days before her first voyage, he collapsed on her deck. He did not live to see her cross an ocean.",
+        "But she did. And in 1866 she laid the telegraph cable that tied Europe to America."
+      ]}]},
+    { id:"canary-wharf", name:"Canary Wharf", q:"Cabot Square, Canary Wharf, London", pid:"ChIJcd84g7cCdkgREfkfv0cxVrs", lat:51.5049847, lng:-0.0229422, amb:"dock",
+      note:"A quick lap through the towers. The water between them is the old West India Docks.",
+      stories:[{ title:"The fortress of sugar", kind:"optional", mood:"minor", paras:[
+        "Stand among the glass and take it away. All of it.",
+        "It is 1802. In its place is the largest building project in the world: two vast basins of water, each half a mile long, dug by hand across the neck of the Isle of Dogs.",
+        "London's merchants paid for it because the river was robbing them. Ships waited weeks in the stream to unload, and every night a small army went to work on them: night plunderers, crooked watchmen, and the mudlarks who caught whatever was dropped over the side. Half a million pounds of cargo vanished every year.",
+        "So the West India merchants built a fortress. A brick wall twenty feet high. A moat outside it. Their own armed guard. Ships went in through a lock and came out empty, and nothing left by the gate without a signature.",
+        "Inside were warehouses five storeys high, stacked with sugar, rum, coffee and mahogany from the Caribbean. It is worth remembering who cut that sugar. The fortunes that built these docks were made on slave plantations.",
+        "And the name? Much later, in the 1930s, a shed here handled fruit from the Canary Islands. Bananas and tomatoes. That is all it took."
+      ]}]},
+    { id:"the-grapes", name:"The Grapes", q:"The Grapes, 76 Narrow Street, London", pid:"ChIJ05WkE84CdkgRH6RzB264YGE", lat:51.5088329, lng:-0.0339919, amb:"tavern", pint:true,
+      note:"Tiny, creaky sailors' pub on Narrow Street with a deck over the water.",
+      stories:[{ title:"The river's back door", kind:"optional", mood:"minor", paras:[
+        "Duck your head going in. There has been a tavern on this spot since before the Armada.",
+        "Limehouse was where London kept the people who actually sailed the ships. Rope makers, sail makers, caulkers, pilots, and seamen from every coast on earth waiting for their next berth. Narrow Street was one long line of yards and taverns with their backs to the water, and this is one of the last.",
+        "Go through to the deck over the river. At high tide the Thames slaps the timbers under your feet. At low tide there is a ladder down to the mud, and that ladder is how a great deal of business was done here without troubling the Customs.",
+        "Dickens knew this pub as a boy and put it in a novel, as a crooked old house leaning out over the water as if it might fall in.",
+        "The watermen told darker stories. That a man who drank too much here might be rowed out into the stream, tipped over the side, and fished out again further down, to be sold to the surgeons, who paid well for a fresh body and asked no questions.",
+        "Probably not true. Finish your pint anyway."
+      ]}]},
+    { id:"prospect-of-whitby", name:"Prospect of Whitby", q:"Prospect of Whitby, 57 Wapping Wall, London", pid:"ChIJDZPR4SgDdkgR2_djyaGslOM", lat:51.507066, lng:-0.0511105, amb:"tavern", pint:true,
+      note:"Flagstone floor, pewter bar, and a noose hanging over the foreshore.",
+      stories:[{ title:"Three tides", kind:"core", mood:"minor", paras:[
+        "Look at the floor. Those flagstones are said to date from the reign of Henry the Eighth, and they have been walked on by smugglers, thieves, press gangs, Samuel Pepys and Charles Dickens. For most of its life nobody called this place by its name. They called it the Devil's Tavern.",
+        "Now go out to the terrace and find the noose.",
+        "A short way upriver, at the low water mark, stood Execution Dock. The Admiralty hanged pirates there, because the sea belonged to the Admiralty and its justice had to be done below the tide line. They used a short rope, so the fall would not break the neck. Then they left the body chained to a post until three tides had washed over it.",
+        "In May 1701 it was the turn of Captain William Kidd. He was drunk. The crowd was enormous. And when the cart pulled away, the rope snapped. He fell into the mud alive, was hauled back up, and hanged again.",
+        "Afterwards they dipped him in tar, hung him in an iron cage at the mouth of the river, and left him there for years, so that every sailor leaving London would pass him on the way out.",
+        "They say the Hanging Judge, Jeffreys, liked to watch from a window here over his dinner.",
+        "Enjoy yours."
+      ]}]},
+    { id:"whitechapel", name:"Whitechapel", q:"Tower House, 81 Fieldgate Street, London E1", lat:51.5165, lng:-0.0652, amb:"sailortown",
+      note:"North from Wapping via Cannon Street Road and New Road. Tower House is the turreted red brick block on Fieldgate Street.",
+      stories:[{ title:"The doss house delegates", kind:"core", mood:"minor", amb:"tavern", tags:["Russia","Spies"], paras:[
+        "Stand on Fieldgate Street and look up at the red brick block with the turrets. Today it is flats. In 1907 it is Tower House, a hostel for working men, sixpence a night for a cubicle with a bed and a door that locks.",
+        "In May of that year one of the cubicles is taken by a pockmarked Georgian of twenty eight who signs himself Ivanovich. His friends call him Koba. The world will call him Stalin.",
+        "He is one of more than three hundred Russian revolutionaries who have come to London because no other capital in Europe will let them meet. Lenin is here. Trotsky is here. Gorky. Rosa Luxemburg. Each morning they travel north to a plain chapel on Southgate Road and argue, for three weeks, about how to bring down the Tsar.",
+        "They are not alone. Detectives from Special Branch stand across the road, noting every face. Newspaper men photograph them through the railings. And the Tsar's own secret police, the Okhrana, have no need to wait outside. One of the delegates, a man Lenin trusts, is their agent, and his reports go to St Petersburg.",
+        "The revolutionaries run out of money. To get home they borrow seventeen hundred pounds from an American soap millionaire, and every delegate signs the note. It is repaid after the revolution.",
+        "The quiet Georgian barely speaks at the congress. A month later, in the main square of Tiflis, a bank coach is blown apart with grenades and a fortune vanishes. He is widely believed to have planned it."
+      ]},
+      { title:"Sailortown", kind:"optional", mood:"bright", paras:[
+        "As you climb away from the river you cross the old Ratcliffe Highway. For two hundred years this was Sailortown: the first street a seaman reached with six months of wages in his pocket, and the last one he saw before he woke up penniless on an outbound ship.",
+        "Dance halls, gin shops, tattooists, pawnbrokers, and lodging houses run by men called crimps, who would sell a drunk sailor to a short handed captain. And shops that sold what the ships brought home: parrots, monkeys, shells, snakes.",
+        "The grandest of those belonged to Charles Jamrach, dealer in wild beasts to zoos and circuses. One morning in 1857 a Bengal tiger, just landed, burst its crate outside his door and strolled off down the road. A small boy who had never seen a big cat reached out to stroke it. The tiger picked him up by the shoulder and carried him away.",
+        "Jamrach ran after it, got his hands round its throat, and beat it with a crowbar until it let go. The boy lived. His father sued.",
+        "A few streets north, in Whitechapel itself, a foundry was casting bells the whole time. It made the Liberty Bell. It made Big Ben, thirteen tons of it, dragged to Westminster by sixteen horses with crowds cheering all the way."
+      ]}]},
+    { id:"home", name:"Wenlock Basin, home", q:"Wenlock Basin, London", pid:"ChIJa1MDR18bdkgRx2_zQZspkCI", lat:51.531585, lng:-0.095309, amb:"canal",
+      note:"Brick Lane, Shoreditch, Hoxton, done.",
+      stories:[{ title:"Where the cargo went", kind:"core", mood:"bright", paras:[
+        "One last piece of water.",
+        "This quiet basin was dug in the 1820s, off a new canal that ran from the docks at Limehouse round the top of London. Everything you have ridden past today ended up coming this way. Coal, timber, grain, ice. Pulled by a single horse on a towpath, at walking pace.",
+        "The tea in Shad Thames. The timber in Greenland Dock. The sugar behind that fortress wall. The ships brought it to the river. The barges brought it here, to the back doors of the city.",
+        "You have followed the whole journey in an afternoon. Log closed."
+      ]}]}
+  ]
+}
+];
+
+/* ------------------------- helpers ------------------------- */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const enc = encodeURIComponent;
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function coord(lat, lng){
+  const f = (v, pos, neg) => { const a = Math.abs(v), d = Math.floor(a), m = ((a - d) * 60).toFixed(2).padStart(5, "0");
+    return d + "°" + m + "′" + (v >= 0 ? pos : neg); };
+  return f(lat, "N", "S") + " " + f(lng, "E", "W");
+}
+function kmBetween(a, b){
+  const R = 6371, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h)) * 1.3;   // rough road factor
+}
+function mins(story){ const w = story.paras.join(" ").split(/\s+/).length; return Math.max(1, Math.round(w / 140)); }
+function navUrl(route, s){
+  return "https://www.google.com/maps/dir/?api=1&destination=" + enc(s.q) + (s.pid ? "&destination_place_id=" + enc(s.pid) : "") + "&travelmode=" + route.mode;
+}
+function legUrl(route, leg){
+  const ss = route.stops.slice(leg.from, leg.to + 1), a = ss[0], z = ss[ss.length - 1], mid = ss.slice(1, -1);
+  const ids = ss.every(s => s.pid);            // place ids only when every stop on the leg has one
+  let u = "https://www.google.com/maps/dir/?api=1&origin=" + enc(a.q) + (ids ? "&origin_place_id=" + enc(a.pid) : "") +
+    "&destination=" + enc(z.q) + (ids ? "&destination_place_id=" + enc(z.pid) : "") + "&travelmode=" + route.mode;
+  if (mid.length) u += "&waypoints=" + enc(mid.map(s => s.q).join("|")) + (ids ? "&waypoint_place_ids=" + enc(mid.map(s => s.pid).join("|")) : "");
+  return u;
+}
+
+/* ------------------------- state ------------------------- */
+let route = ROUTES[0];
+let visited = [];
+const prefs = store.get("sr:prefs", { voice:true, amb:true, music:true });
+let playing = null;          // {si, ki}
+let playToken = 0;
+
+/* ------------------------- voice ------------------------- */
+let claudeTts = null;
+let voiceMode = ("speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") ? "browser" : "none";
+function voiceNote(){
+  const n = $("#voiceNote"), sw = $("#swVoice");
+  if (voiceMode === "claude") n.textContent = "Narration uses a Claude voice. No sound? Check the phone is not on silent.";
+  else if (voiceMode === "browser") n.textContent = "Narration uses this device's built-in voice. No sound? Check the phone is not on silent.";
+  else n.textContent = "This viewer offers no voice, so stories are for reading here. Ambience and music still play.";
+  sw.disabled = voiceMode === "none";
+  if (voiceMode === "none") sw.setAttribute("aria-checked", "false");
+}
+if (window.claude && typeof window.claude.use === "function"){
+  window.claude.use("tts").then(t => {
+    if (t){ claudeTts = t; voiceMode = "claude";
+      try{ t.onLine(({ id }) => markPara(id)); }catch(e){} }
+    voiceNote();
+  }).catch(() => voiceNote());
+}
+function pickVoice(){
+  let vs = []; try{ vs = speechSynthesis.getVoices() || []; }catch(e){}
+  const want = ["Daniel", "Google UK English Male", "Arthur", "Serena", "Google UK English Female"];
+  for (const w of want){ const v = vs.find(x => x.name.indexOf(w) >= 0); if (v) return v; }
+  return vs.find(x => /en[-_]GB/i.test(x.lang)) || vs.find(x => /^en/i.test(x.lang)) || null;
+}
+function speak(paras, token){
+  if (voiceMode === "claude" && claudeTts){
+    return claudeTts.speak(paras.map((text, i) => ({ text, id: String(i), rate: 0.95 })));
+  }
+  if (voiceMode === "browser"){
+    return new Promise((resolve, reject) => {
+      try{
+        speechSynthesis.cancel();
+        const v = pickVoice();
+        paras.forEach((text, i) => {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = v ? v.lang : "en-GB"; if (v) u.voice = v; u.rate = 0.93; u.pitch = 0.95;
+          u.onstart = () => { if (token === playToken) markPara(String(i)); };
+          if (i === paras.length - 1){ u.onend = () => resolve(); }
+          u.onerror = ev => { if (ev && (ev.error === "interrupted" || ev.error === "canceled")) reject({ code:"stopped" }); else reject({ code:"voice_error" }); };
+          speechSynthesis.speak(u);
+        });
+      }catch(e){ reject({ code:"voice_error" }); }
+    });
+  }
+  return Promise.reject({ code:"no_voice" });
+}
+function stopVoice(){
+  try{ if (claudeTts) claudeTts.stop(); }catch(e){}
+  try{ if ("speechSynthesis" in window) speechSynthesis.cancel(); }catch(e){}
+}
+
+/* ------------------------- generated sound ------------------------- */
+const AX = { ctx:null, master:null, noise:null, amb:null, mus:null };
+function audio(){
+  if (!AX.ctx){
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+    try{
+      AX.ctx = new C(); AX.master = AX.ctx.createGain(); AX.master.gain.value = 0.85; AX.master.connect(AX.ctx.destination);
+      const b = AX.ctx.createBuffer(1, AX.ctx.sampleRate * 3, AX.ctx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      AX.noise = b;
+    }catch(e){ AX.ctx = null; return null; }
+  }
+  if (AX.ctx.state === "suspended"){ try{ AX.ctx.resume(); }catch(e){} }
+  return AX.ctx;
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+function G(v){ const g = AX.ctx.createGain(); g.gain.value = v; return g; }
+function F(type, f, q){ const n = AX.ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; if (q) n.Q.value = q; return n; }
+function session(level){
+  const s = { bus: G(0), srcs: [], timers: [], dead: false, level };
+  s.bus.connect(AX.master); s.bus.gain.setTargetAtTime(level, AX.ctx.currentTime, 0.6);
+  return s;
+}
+function endSession(s, fade){
+  if (!s || s.dead) return; s.dead = true; s.timers.forEach(clearTimeout);
+  const t = AX.ctx.currentTime; s.bus.gain.cancelScheduledValues(t); s.bus.gain.setTargetAtTime(0, t, fade || 0.5);
+  setTimeout(() => { s.srcs.forEach(n => { try{ n.stop(); }catch(e){} }); try{ s.bus.disconnect(); }catch(e){} }, ((fade || 0.5) * 5 + 0.3) * 1000);
+}
+function noise(s){ const n = AX.ctx.createBufferSource(); n.buffer = AX.noise; n.loop = true; n.start(0, Math.random() * 2); s.srcs.push(n); return n; }
+function lfo(s, hz, depth, target){ const o = AX.ctx.createOscillator(); o.frequency.value = hz; const g = G(depth); o.connect(g); g.connect(target); o.start(); s.srcs.push(o); }
+function every(s, a, b, fn, first){
+  const tick = () => { if (s.dead) return; try{ fn(); }catch(e){} s.timers.push(setTimeout(tick, rnd(a, b) * 1000)); };
+  s.timers.push(setTimeout(tick, (first === undefined ? rnd(0.5, a) : first) * 1000));
+}
+const L = {
+  water(s, lv){ const n = noise(s), lp = F("lowpass", 430), g = G(lv * 0.5); n.connect(lp); lp.connect(g); g.connect(s.bus); lfo(s, 0.11, lv * 0.3, g.gain);
+    const n2 = noise(s), bp = F("bandpass", 1700, 0.6), g2 = G(lv * 0.05); n2.connect(bp); bp.connect(g2); g2.connect(s.bus); lfo(s, 0.27, lv * 0.04, g2.gain); },
+  wind(s, lv){ const n = noise(s), bp = F("bandpass", 520, 1.4), g = G(lv * 0.3); n.connect(bp); bp.connect(g); g.connect(s.bus); lfo(s, 0.06, 260, bp.frequency); lfo(s, 0.09, lv * 0.15, g.gain); },
+  rumble(s, lv){ const n = noise(s), lp = F("lowpass", 95), g = G(lv * 0.9); n.connect(lp); lp.connect(g); g.connect(s.bus); },
+  murmur(s, lv){ const mk = (f, q, base) => { const n = noise(s), bp = F("bandpass", f, q), g = G(lv * base); n.connect(bp); bp.connect(g); g.connect(s.bus);
+      every(s, 0.3, 0.8, () => g.gain.setTargetAtTime(lv * base * rnd(0.5, 1.6), AX.ctx.currentTime, 0.25), 0.2); };
+    mk(360, 0.8, 0.22); mk(880, 1.1, 0.09); },
+  creak(s, lv){ every(s, 4, 11, () => { const t = AX.ctx.currentTime, o = AX.ctx.createOscillator(), f0 = rnd(70, 120); o.type = "sawtooth";
+      o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f0 * 1.5, t + 0.35); o.frequency.linearRampToValueAtTime(f0 * 0.9, t + 0.95);
+      const bp = F("bandpass", rnd(600, 1100), 9), g = G(0); g.gain.linearRampToValueAtTime(lv * 0.13, t + 0.15); g.gain.linearRampToValueAtTime(lv * 0.05, t + 0.5); g.gain.linearRampToValueAtTime(0, t + 1.0);
+      o.connect(bp); bp.connect(g); g.connect(s.bus); o.start(t); o.stop(t + 1.1); }); },
+  gulls(s, lv){ every(s, 9, 22, () => { const n = 2 + Math.floor(Math.random() * 3), base = rnd(0.9, 1.15);
+      for (let i = 0; i < n; i++){ const t = AX.ctx.currentTime + i * 0.42, o = AX.ctx.createOscillator(), g = G(0);
+        o.frequency.setValueAtTime(1300 * base, t); o.frequency.linearRampToValueAtTime(2100 * base, t + 0.08); o.frequency.linearRampToValueAtTime(1100 * base, t + 0.34);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lv * 0.045, t + 0.05); g.gain.linearRampToValueAtTime(0, t + 0.36);
+        o.connect(g); g.connect(s.bus); o.start(t); o.stop(t + 0.4); } }, rnd(3, 7)); },
+  hammer(s, lv){ every(s, 1.6, 5, () => { const n = 1 + Math.floor(Math.random() * 3), ring = rnd(480, 620);
+      for (let i = 0; i < n; i++){ const t = AX.ctx.currentTime + i * 0.3;
+        const b = AX.ctx.createBufferSource(); b.buffer = AX.noise; const bp = F("bandpass", 2300, 4), g = G(0);
+        g.gain.setValueAtTime(lv * 0.22, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.09); b.connect(bp); bp.connect(g); g.connect(s.bus); b.start(t, Math.random()); b.stop(t + 0.12);
+        const o = AX.ctx.createOscillator(), g2 = G(0); o.frequency.value = ring; g2.gain.setValueAtTime(lv * 0.06, t); g2.gain.exponentialRampToValueAtTime(0.0008, t + 0.5);
+        o.connect(g2); g2.connect(s.bus); o.start(t); o.stop(t + 0.55); } }); },
+  clink(s, lv){ every(s, 5, 14, () => { const t = AX.ctx.currentTime, f = rnd(2700, 3700);
+      [1, 1.52].forEach(r => { const o = AX.ctx.createOscillator(), g = G(0); o.frequency.value = f * r; g.gain.setValueAtTime(lv * 0.035, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.3);
+        o.connect(g); g.connect(s.bus); o.start(t); o.stop(t + 0.35); }); }); },
+  drips(s, lv){ const d = AX.ctx.createDelay(1); d.delayTime.value = 0.33; const fb = G(0.5); d.connect(fb); fb.connect(d); d.connect(s.bus);
+    every(s, 1.2, 4, () => { const t = AX.ctx.currentTime, o = AX.ctx.createOscillator(), g = G(0), f = rnd(1400, 2000);
+      o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.6, t + 0.07); g.gain.setValueAtTime(lv * 0.1, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.1);
+      o.connect(g); g.connect(s.bus); g.connect(d); o.start(t); o.stop(t + 0.12); }, 0.8); },
+  foghorn(s, lv){ every(s, 35, 60, () => { const t = AX.ctx.currentTime, o = AX.ctx.createOscillator(), lp = F("lowpass", 260), g = G(0); o.type = "sawtooth"; o.frequency.value = 98;
+      g.gain.linearRampToValueAtTime(lv * 0.1, t + 0.4); g.gain.setValueAtTime(lv * 0.1, t + 2.2); g.gain.linearRampToValueAtTime(0, t + 2.9);
+      o.connect(lp); lp.connect(g); g.connect(s.bus); o.start(t); o.stop(t + 3); }, rnd(8, 14)); },
+  bell(s, lv, f, when){ const t = AX.ctx.currentTime + (when || 0);
+    [1, 2.01, 2.74, 4.1, 5.43].forEach((r, i) => { const o = AX.ctx.createOscillator(), g = G(0); o.frequency.value = f * r;
+      g.gain.setValueAtTime(lv * [0.16, 0.1, 0.07, 0.035, 0.02][i], t); g.gain.exponentialRampToValueAtTime(0.0006, t + 3.4 / (1 + i * 0.45));
+      o.connect(g); g.connect(s.bus); o.start(t); o.stop(t + 3.6); }); },
+  toll(s, lv, f, a, b){ every(s, a, b, () => L.bell(s, lv, f), 2.5); },
+  tick(s, lv){ every(s, 1, 1, () => { const t = AX.ctx.currentTime, b = AX.ctx.createBufferSource(); b.buffer = AX.noise; const bp = F("bandpass", 3200, 6), g = G(0);
+      g.gain.setValueAtTime(lv * 0.12, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.03); b.connect(bp); bp.connect(g); g.connect(s.bus); b.start(t, Math.random()); b.stop(t + 0.05); }, 1); },
+  bells(s, lv){ const set = [392, 440, 523.25, 587.33, 659.25]; every(s, 4, 9, () => L.bell(s, lv * 0.7, set[Math.floor(Math.random() * set.length)]), 3); }
+};
+const AMB = {
+  river(s){ L.water(s, 0.8); L.gulls(s, 0.8); L.foghorn(s, 1); L.creak(s, 0.4); },
+  wharf(s){ L.water(s, 0.4); L.creak(s, 0.9); L.gulls(s, 0.6); },
+  ship(s){ L.water(s, 0.7); L.wind(s, 0.4); L.creak(s, 1); },
+  arctic(s){ L.wind(s, 1); L.water(s, 0.8); L.creak(s, 0.7); },
+  yard(s){ L.water(s, 0.4); L.hammer(s, 1); L.gulls(s, 0.5); },
+  sail(s){ L.wind(s, 0.9); L.water(s, 0.6); L.creak(s, 0.8); },
+  solemn(s){ L.water(s, 0.5); L.wind(s, 0.3); L.toll(s, 1, 220, 6, 7); },
+  tunnel(s){ L.rumble(s, 1); L.drips(s, 1); },
+  dock(s){ L.water(s, 0.6); L.creak(s, 0.6); L.gulls(s, 0.5); },
+  tavern(s){ L.murmur(s, 1); L.clink(s, 1); L.water(s, 0.25); L.creak(s, 0.4); },
+  sailortown(s){ L.murmur(s, 0.7); L.bells(s, 1); },
+  canal(s){ L.water(s, 0.35); L.wind(s, 0.15); },
+  clock(s){ L.wind(s, 0.45); L.tick(s, 1); }
+};
+function startAmbience(name, ducked){
+  if (!audio()) return; endSession(AX.amb, 0.4);
+  const s = session(ducked ? 0.5 : 0.9); AX.amb = s;
+  L.bell(s, 1, 660, 0.15); L.bell(s, 1, 660, 0.75);          // two strokes of the ship's bell open every story
+  (AMB[name] || AMB.river)(s);
+}
+function startMusic(mood, ducked){
+  if (!audio()) return; endSession(AX.mus, 0.4);
+  const s = session(ducked ? 0.45 : 0.8); AX.mus = s;
+  const third = mood === "bright" ? 185.0 : 174.61;
+  const lp = F("lowpass", 900); lp.connect(s.bus); lfo(s, 0.05, 320, lp.frequency);
+  [73.42, 110, 146.83, third, 220].forEach((f, i) => {
+    [-4, 4].forEach((c, j) => { const o = AX.ctx.createOscillator(); o.type = j ? "triangle" : "sine"; o.frequency.value = f; o.detune.value = c;
+      const g = G(0.02 - i * 0.0018); o.connect(g); g.connect(lp); lfo(s, 0.03 + i * 0.011, 0.008, g.gain); o.start(); s.srcs.push(o); });
+  });
+  const d = AX.ctx.createDelay(1); d.delayTime.value = 0.42; const fb = G(0.38); d.connect(fb); fb.connect(d); d.connect(s.bus);
+  const scale = mood === "bright" ? [293.66, 329.63, 369.99, 440, 493.88, 587.33] : [293.66, 329.63, 392, 440, 523.25, 587.33];
+  every(s, 4.5, 9, () => { const t = AX.ctx.currentTime, o = AX.ctx.createOscillator(), g = G(0); o.type = "triangle"; o.frequency.value = scale[Math.floor(Math.random() * scale.length)];
+    g.gain.linearRampToValueAtTime(0.03, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0006, t + 3.5); o.connect(g); g.connect(s.bus); g.connect(d); o.start(t); o.stop(t + 3.7); }, 3);
+}
+function duck(on){
+  if (!AX.ctx) return; const t = AX.ctx.currentTime;
+  if (AX.amb && !AX.amb.dead) AX.amb.bus.gain.setTargetAtTime(on ? 0.5 : 0.9, t, 0.5);
+  if (AX.mus && !AX.mus.dead) AX.mus.bus.gain.setTargetAtTime(on ? 0.45 : 0.8, t, 0.5);
+}
+function stopSound(fade){ endSession(AX.amb, fade); endSession(AX.mus, fade); AX.amb = AX.mus = null; }
+
+/* ------------------------- playback ------------------------- */
+const played = {};
+function pickStory(si){   // the dock plays core stories first, then optional ones, skipping any already heard
+  const ss = route.stops[si].stories, order = ss.map((s, k) => k).sort((a, b) => (ss[a].kind === "core" ? 0 : 1) - (ss[b].kind === "core" ? 0 : 1));
+  for (const k of order) if (!played[route.id + ":" + si + ":" + k]) return k;
+  return order[0];
+}
+function markPara(id){
+  $$(".paras p.now").forEach(p => p.classList.remove("now"));
+  if (!playing || id === null) return;
+  const p = $("#d-" + playing.si + "-" + playing.ki + ' p[data-p="' + id + '"]');
+  if (p){ p.classList.add("now"); try{ p.scrollIntoView({ block:"center", behavior:"smooth" }); }catch(e){} }
+}
+function stopStory(fade){
+  playToken++; stopVoice(); stopSound(fade === undefined ? 0.4 : fade); playing = null; markPara(null); syncPlaying();
+}
+function playStory(si, ki){
+  if (playing && playing.si === si && playing.ki === ki){ stopStory(); return; }
+  stopStory(0.2);
+  const token = ++playToken, stop = route.stops[si], story = stop.stories[ki];
+  playing = { si, ki }; played[route.id + ":" + si + ":" + ki] = true;
+  const det = $("#d-" + si + "-" + ki); if (det) det.open = true;
+  const useVoice = prefs.voice && voiceMode !== "none";
+  if (prefs.amb) startAmbience(story.amb || stop.amb, useVoice);
+  if (prefs.music) startMusic(story.mood, useVoice);
+  syncPlaying();
+  const sec = $("#s-" + si + "-" + ki); if (sec){ try{ sec.scrollIntoView({ block:"start", behavior:"smooth" }); }catch(e){} }
+  const finish = linger => { if (token !== playToken) return; duck(false);
+    setTimeout(() => { if (token === playToken) stopStory(1.4); }, linger); };
+  if (!useVoice){ finish(Math.max(60, mins(story) * 75) * 1000); return; }
+  const go = () => { if (token !== playToken) return;
+    speak(story.paras, token).then(() => finish(7000)).catch(err => {
+      if (token !== playToken) return;
+      const code = err && err.code;
+      if (voiceMode === "claude" && (code === "not_granted" || code === "unavailable")){
+        claudeTts = null; voiceMode = ("speechSynthesis" in window) ? "browser" : "none"; voiceNote();
+      }
+      finish(code === "stopped" ? 0 : 60000);
+    }); };
+  if (voiceMode === "browser") go(); else setTimeout(go, 1700);   // device voices must start inside the tap
+}
+
+/* ------------------------- rendering ------------------------- */
+function nextIndex(){ for (let i = 0; i < route.stops.length; i++) if (visited.indexOf(route.stops[i].id) < 0) return i; return -1; }
+function renderRoutes(){
+  $("#routes").innerHTML = ROUTES.map(r => '<button type="button" data-route="' + r.id + '" aria-pressed="' + (r === route) + '">' + r.name + "</button>").join("");
+}
+function renderHero(){
+  const a = route.stops[0], far = route.stops.reduce((m, s) => kmBetween(a, s) > kmBetween(a, m) ? s : m, a);
+  const core = route.stops.reduce((n, s) => n + s.stories.filter(x => x.kind === "core").length, 0);
+  const all = route.stops.reduce((n, s) => n + s.stories.length, 0);
+  $("#hero").innerHTML =
+    '<span class="label">' + (route.mode === "walking" ? "Walking route" : "Bike route") + "</span>" +
+    "<h1>" + route.name + "</h1>" +
+    '<div class="bearing">' + coord(a.lat, a.lng) + " to " + coord(far.lat, far.lng) + " and back</div>" +
+    "<p>" + route.blurb + "</p>" +
+    '<div class="stats"><div><b>' + route.km + "</b><span>km</span></div><div><b>" + route.ride + "</b><span>moving</span></div><div><b>" +
+    route.stops.length + "</b><span>stops</span></div><div><b>" + core + "+" + (all - core) + "</b><span>stories</span></div></div>";
+}
+function renderStrip(){
+  let html = "";
+  route.stops.forEach((s, i) => {
+    const leg = route.legs.find(l => l.from === i);
+    if (leg) html += '<li class="leg"><h2>' + leg.name + '</h2><a class="btn ghost small" target="_blank" rel="noopener" href="' + legUrl(route, leg) + '">Whole leg in Maps</a></li>';
+    const dist = i ? "about " + kmBetween(route.stops[i - 1], s).toFixed(1) + " km on" : "start";
+    const stories = s.stories.map((st, k) =>
+      '<section class="story" id="s-' + i + "-" + k + '">' +
+        '<div class="shead"><span class="chip ' + st.kind + '">' + (st.kind === "core" ? "Core story" : "Optional") + "</span>" +
+          (st.tags || []).map(t => '<span class="chip tag">' + t + "</span>").join("") + '<span class="mins">' + mins(st) + " min</span></div>" +
+        "<h4>" + st.title + "</h4>" +
+        '<button type="button" class="btn play" data-play="' + i + ":" + k + '">Play story</button>' +
+        '<details id="d-' + i + "-" + k + '"><summary>Read it</summary><div class="paras">' + st.paras.map((p, j) => '<p data-p="' + j + '">' + p + "</p>").join("") + "</div></details>" +
+      "</section>").join("");
+    html += '<li class="stop" id="stop-' + s.id + '" data-i="' + i + '">' +
+      '<div><span class="dot">' + String(i + 1).padStart(2, "0") + "</span></div>" +
+      '<div class="body">' +
+        '<div class="meta"><span>' + coord(s.lat, s.lng) + "</span><span>" + dist + "</span></div>" +
+        "<h3>" + s.name + "</h3>" +
+        (s.pint ? '<div><span class="chip pint">Pint stop</span></div>' : "") +
+        '<p class="note">' + s.note + "</p>" +
+        '<div class="acts"><a class="btn" target="_blank" rel="noopener" href="' + navUrl(route, s) + '">Navigate</a>' +
+        '<button type="button" class="btn ghost" data-visit="' + i + '">Mark visited</button></div>' +
+        stories +
+      "</div></li>";
+  });
+  $("#strip").innerHTML = html;
+}
+function syncProgress(){
+  const n = route.stops.filter(s => visited.indexOf(s.id) >= 0).length, ni = nextIndex();
+  $("#progText").textContent = n + " of " + route.stops.length + " stops";
+  $("#progBar").style.width = (100 * n / route.stops.length) + "%";
+  $$(".stop").forEach(li => { const i = +li.dataset.i, v = visited.indexOf(route.stops[i].id) >= 0;
+    li.classList.toggle("visited", v); li.classList.toggle("next", i === ni);
+    $("[data-visit]", li).textContent = v ? "Visited. Undo" : "Mark visited"; });
+  syncDock();
+}
+function syncDock(){
+  const ni = nextIndex(), nav = $("#dockNav"), play = $("#dockPlay"), done = $("#dockDone");
+  if (playing){
+    const st = route.stops[playing.si].stories[playing.ki];
+    $("#dockState").textContent = "Playing"; $("#dockName").textContent = st.title; play.textContent = "Stop";
+  } else if (ni < 0){
+    $("#dockState").textContent = "Route complete"; $("#dockName").textContent = "Log closed"; play.textContent = "Play story";
+  } else {
+    $("#dockState").textContent = "Next stop " + String(ni + 1).padStart(2, "0"); $("#dockName").textContent = route.stops[ni].name; play.textContent = "Play story";
+  }
+  const t = ni < 0 ? route.stops[route.stops.length - 1] : route.stops[ni];
+  nav.href = navUrl(route, t); play.disabled = !playing && ni < 0; done.disabled = ni < 0;
+  done.textContent = ni < 0 ? "Done" : "Done";
+}
+function syncPlaying(){
+  $$(".story").forEach(s => s.classList.remove("playing"));
+  $$("[data-play]").forEach(b => { b.textContent = "Play story"; });
+  if (playing){
+    const sec = $("#s-" + playing.si + "-" + playing.ki);
+    if (sec){ sec.classList.add("playing"); $("[data-play]", sec).textContent = "Stop"; }
+  }
+  syncDock();
+}
+function syncSwitches(){
+  $("#swVoice").setAttribute("aria-checked", String(prefs.voice && voiceMode !== "none"));
+  $("#swAmb").setAttribute("aria-checked", String(prefs.amb));
+  $("#swMusic").setAttribute("aria-checked", String(prefs.music));
+}
+function loadRoute(id){
+  route = ROUTES.find(r => r.id === id) || ROUTES[0];
+  visited = store.get("sr:visited:" + route.id, []);
+  stopStory(0.2); renderRoutes(); renderHero(); renderStrip(); syncProgress(); syncPlaying();
+}
+
+/* ------------------------- events ------------------------- */
+document.addEventListener("click", e => {
+  const r = e.target.closest("[data-route]");
+  if (r){ if (location.hash !== "#" + r.dataset.route) location.hash = r.dataset.route; else loadRoute(r.dataset.route); return; }
+  const p = e.target.closest("[data-play]");
+  if (p){ const a = p.dataset.play.split(":"); playStory(+a[0], +a[1]); return; }
+  const v = e.target.closest("[data-visit]");
+  if (v){ const id = route.stops[+v.dataset.visit].id, k = visited.indexOf(id);
+    if (k >= 0) visited.splice(k, 1); else visited.push(id);
+    store.set("sr:visited:" + route.id, visited); syncProgress(); return; }
+});
+$("#dockPlay").addEventListener("click", () => {
+  if (playing){ stopStory(); return; }
+  const ni = nextIndex(); if (ni < 0) return;
+  playStory(ni, pickStory(ni));
+});
+$("#dockDone").addEventListener("click", () => {
+  const ni = nextIndex(); if (ni < 0) return;
+  if (playing && playing.si === ni) stopStory(0.8);
+  visited.push(route.stops[ni].id); store.set("sr:visited:" + route.id, visited); syncProgress();
+  const nx = nextIndex(); if (nx >= 0){ const el = $("#stop-" + route.stops[nx].id); if (el){ try{ el.scrollIntoView({ block:"start", behavior:"smooth" }); }catch(e){} } }
+});
+[["swVoice", "voice"], ["swAmb", "amb"], ["swMusic", "music"]].forEach(pair => {
+  $("#" + pair[0]).addEventListener("click", () => {
+    prefs[pair[1]] = !prefs[pair[1]]; store.set("sr:prefs", prefs); syncSwitches();
+    if (playing){
+      if (pair[1] === "amb"){ if (prefs.amb) startAmbience(route.stops[playing.si].stories[playing.ki].amb || route.stops[playing.si].amb, true); else { endSession(AX.amb, 0.4); AX.amb = null; } }
+      if (pair[1] === "music"){ if (prefs.music) startMusic(route.stops[playing.si].stories[playing.ki].mood, true); else { endSession(AX.mus, 0.4); AX.mus = null; } }
+      if (pair[1] === "voice" && !prefs.voice) stopVoice();
+    }
+  });
+});
+window.addEventListener("hashchange", () => loadRoute(location.hash.slice(1)));
+
+voiceNote(); syncSwitches(); loadRoute(location.hash.slice(1));
+</script>
+</body>
+</html>

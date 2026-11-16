@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storied Routes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: an Admiralty chart turned into a strip map. A picture-led hero, the route chart,
+   then one vertical rail of numbered marks. A thumb-reach dock drives the ride, and stories open
+   as a full-screen scene: period picture, one paragraph at a time, sound underneath. */
+:root{
+  --paper:#F5F8F5; --shoal:#D8E8F0; --land:#EDE0B2; --ink:#0E2233; --muted:#566978; --line:#B9C8CC;
+  --mark:#A61C6E; --on-mark:#FFFFFF;
+  --c-land:#F1E6BE; --c-water:#BCD8E6; --c-park:#DCE3B0; --c-road:#7A6F4E; --c-road2:#C2B58A;
+  --f-display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --f-body:"Newsreader",Georgia,"Times New Roman",serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0B1620; --shoal:#12283A; --land:#3A3418; --ink:#DDE7EA; --muted:#8FA3AF; --line:#274052;
+    --mark:#F07CC0; --on-mark:#1A0612;
+    --c-land:#1A2320; --c-water:#0E3149; --c-park:#22321F; --c-road:#A29C7C; --c-road2:#4A4D3F; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0B1620; --shoal:#12283A; --land:#3A3418; --ink:#DDE7EA; --muted:#8FA3AF; --line:#274052;
+  --mark:#F07CC0; --on-mark:#1A0612;
+  --c-land:#1A2320; --c-water:#0E3149; --c-park:#22321F; --c-road:#A29C7C; --c-road2:#4A4D3F; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.5;
+  padding:0 16px 190px;-webkit-text-size-adjust:100%}
+img{max-width:100%;display:block}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.label{font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+header.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-top:18px;border-bottom:2px solid var(--ink);padding-bottom:8px}
+header.top .brand{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase}
+.routes{display:flex;gap:8px;flex-wrap:wrap}
+.routes button{font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:.06em;text-transform:uppercase;
+  min-height:40px;padding:6px 14px;border:2px solid var(--ink);background:transparent;color:var(--ink);border-radius:2px;cursor:pointer}
+.routes button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+/* hero */
+.hero{display:flex;flex-direction:column;gap:12px}
+.hero-pic{position:relative;margin:0 -16px;overflow:hidden;background:#0B1620;min-height:300px;display:flex;align-items:flex-end}
+.hero-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hero-pic::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,16,24,.05) 30%,rgba(8,16,24,.86) 100%)}
+.hero-words{position:relative;z-index:1;padding:20px 16px 16px;color:#F4EFE2;width:100%}
+.hero-words .label{color:#E9D9A6}
+.hero h1{font-family:var(--f-display);font-weight:700;font-size:clamp(56px,18vw,104px);line-height:.86;letter-spacing:-.01em;text-transform:uppercase;margin:4px 0 8px;text-wrap:balance}
+.hero .bearing{font-family:var(--f-display);font-weight:500;font-size:16px;letter-spacing:.08em;font-variant-numeric:tabular-nums;color:#F4EFE2}
+.hero p{margin:0;max-width:34em}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:2px solid var(--ink)}
+.stats div{padding:8px 10px;border-right:1px solid var(--line)}
+.stats div:last-child{border-right:0}
+.stats b{display:block;font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.stats span{font-family:var(--f-display);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* chart */
+.chart{border:2px solid var(--ink);background:var(--c-land);line-height:0;overflow:hidden}
+.chart svg{width:100%;height:auto;display:block}
+.chart-cap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.chart-cap small{font-size:14px;color:var(--muted)}
+svg .stopdot{cursor:pointer}
+
+/* sound */
+.sound{background:var(--shoal);padding:14px;display:flex;flex-direction:column;gap:10px}
+.switches{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.switches button{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.06em;text-transform:uppercase;
+  min-height:48px;border:2px solid var(--ink);background:transparent;color:var(--ink);border-radius:2px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.switches button::before{content:"";width:12px;height:12px;border-radius:50%;border:2px solid currentColor}
+.switches button[aria-checked="true"]{background:var(--ink);color:var(--paper)}
+.switches button[aria-checked="true"]::before{background:var(--mark);border-color:var(--mark)}
+.sound small{font-size:15px;color:var(--muted);line-height:1.35}
+.progress{display:flex;align-items:center;gap:12px}
+.bar{flex:1;height:6px;background:var(--line)}
+.bar i{display:block;height:100%;width:0;background:var(--mark);transition:width .3s}
+
+/* strip */
+.leg{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-top:2px solid var(--ink);padding-top:10px;margin-top:6px}
+.leg h2{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase;margin:0;line-height:1}
+.leg span{font-family:var(--f-display);font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+ol.strip{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;position:relative}
+ol.strip::before{content:"";position:absolute;left:21px;top:0;bottom:0;width:2px;background:var(--ink)}
+.stop{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:14px 0 22px;position:relative;scroll-margin-top:12px}
+.dot{position:relative;z-index:1;width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);
+  display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.stop.visited .dot{background:var(--ink);color:var(--paper)}
+.stop.next .dot{border-color:var(--mark);box-shadow:0 0 0 4px var(--paper),0 0 0 6px var(--mark);color:var(--mark)}
+.stop.visited .body>h3{text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:var(--line)}
+.body{min-width:0;display:flex;flex-direction:column;gap:10px}
+.meta{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--f-display);font-size:14px;letter-spacing:.08em;color:var(--muted);font-variant-numeric:tabular-nums;text-transform:uppercase}
+.body>h3{font-family:var(--f-display);font-weight:700;font-size:32px;line-height:1;margin:0;text-transform:uppercase;text-wrap:balance}
+.note{margin:0;font-size:17px}
+.chip{display:inline-block;font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:2px}
+.chip.pint{background:var(--land);color:var(--ink)}
+.chip.core{background:var(--mark);color:var(--on-mark)}
+.chip.optional{border:1.5px solid var(--muted);color:var(--muted)}
+.chip.tag{background:var(--shoal);color:var(--ink)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;
+  min-height:48px;padding:10px 16px;border:2px solid var(--ink);border-radius:2px;background:var(--ink);color:var(--paper);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;line-height:1}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.play{background:var(--mark);border-color:var(--mark);color:var(--on-mark)}
+.btn.small{min-height:40px;font-size:15px;padding:6px 12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.routes button:focus-visible,.switches button:focus-visible,summary:focus-visible{outline:3px solid var(--mark);outline-offset:3px}
+.story{display:grid;grid-template-columns:84px 1fr;gap:12px;align-items:start;border-top:1px solid var(--line);padding-top:12px}
+.story.nopic{grid-template-columns:1fr}
+.story .thumb{width:84px;height:84px;object-fit:cover;border:2px solid var(--ink);background:var(--shoal);cursor:pointer;padding:0}
+.story .thumb img{width:100%;height:100%;object-fit:cover}
+.sbody{min-width:0;display:flex;flex-direction:column;gap:8px}
+.shead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mins{font-family:var(--f-display);font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.story h4{font-family:var(--f-body);font-style:italic;font-weight:400;font-size:24px;line-height:1.15;margin:0;text-wrap:balance}
+.story .btn{align-self:flex-start}
+.story details{grid-column:1/-1}
+details summary{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);cursor:pointer;padding:6px 0;min-height:36px}
+.paras p{margin:0 0 .8em;font-size:19px;line-height:1.5;max-width:32em}
+
+/* dock */
+.dock{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:2px solid var(--ink);padding:10px 16px 14px;z-index:10}
+.dock-in{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.dock-label{display:flex;gap:10px;align-items:baseline;min-width:0}
+.dock-label strong{font-family:var(--f-display);font-weight:700;font-size:22px;text-transform:uppercase;line-height:1.05;overflow-wrap:anywhere}
+.dock-btns{display:grid;grid-template-columns:.9fr 1.3fr .8fr;gap:8px}
+.dock-btns .btn{padding:10px 6px;min-height:54px}
+.foot{font-size:15px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+
+/* way sheet: in-page directions to one stop */
+.sheet{position:fixed;inset:0;z-index:30;background:var(--paper);overflow-y:auto;padding:14px 16px 28px}
+.sheet[hidden],.scene[hidden]{display:none}
+.sheet-in{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.sheet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sheet h2{font-family:var(--f-display);font-weight:700;font-size:36px;line-height:.95;text-transform:uppercase;margin:2px 0 0;text-wrap:balance}
+ol.cues{list-style:none;margin:0;padding:0;border-top:2px solid var(--ink)}
+ol.cues li{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+ol.cues .arrow{font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1;text-align:center;color:var(--mark)}
+ol.cues .road{font-family:var(--f-display);font-weight:600;font-size:22px;line-height:1.1;text-transform:uppercase}
+ol.cues .dist{font-family:var(--f-display);font-size:17px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sheet a.plain{color:var(--muted);font-size:15px}
+
+/* scene: the immersive story view. One committed dark world, whatever the theme. */
+.scene{position:fixed;inset:0;z-index:40;background:#070D13;color:#F4EFE2;display:flex;flex-direction:column;overflow:hidden}
+.scene-bg{position:absolute;inset:-6%;background-size:cover;background-position:center;animation:drift 46s ease-in-out infinite alternate;will-change:transform}
+.scene-bg.none{background:radial-gradient(120% 80% at 30% 20%,#17344A 0%,#0A1622 60%,#070D13 100%);animation:none}
+@keyframes drift{from{transform:scale(1) translate3d(-1.5%,-1%,0)}to{transform:scale(1.14) translate3d(2%,1.5%,0)}}
+.scene-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,13,19,.55) 0%,rgba(7,13,19,.12) 26%,rgba(7,13,19,.62) 52%,rgba(7,13,19,.94) 100%)}
+.scene>*:not(.scene-bg):not(.scene-shade){position:relative;z-index:1}
+.scene-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px}
+.scene-top .label{color:#E9D9A6}
+.scene .sbtn{font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.08em;text-transform:uppercase;min-height:48px;padding:8px 16px;
+  border:2px solid #F4EFE2;background:rgba(7,13,19,.35);color:#F4EFE2;border-radius:2px;cursor:pointer}
+.scene .sbtn.main{background:#F4EFE2;color:#070D13}
+.scene .sbtn:focus-visible{outline:3px solid #F07CC0;outline-offset:3px}
+.scene-body{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:0 20px 14px;min-height:0;max-width:680px;width:100%;margin:0 auto}
+.scene-tags{display:flex;gap:8px;flex-wrap:wrap}
+.scene-tags .chip{background:#F07CC0;color:#1A0612}
+.scene h2{font-family:var(--f-body);font-style:italic;font-weight:400;font-size:34px;line-height:1.05;margin:0;text-wrap:balance}
+.scene-text{font-size:22px;line-height:1.42;margin:0;min-height:7.2em;max-height:46vh;overflow-y:auto;text-shadow:0 1px 12px rgba(0,0,0,.7);transition:opacity .35s}
+.scene-text.swap{opacity:0}
+.scene-foot{padding:0 20px 20px;display:flex;flex-direction:column;gap:12px;max-width:680px;width:100%;margin:0 auto}
+.ticks{display:flex;gap:4px}
+.ticks i{flex:1;height:4px;background:rgba(244,239,226,.28)}
+.ticks i.on{background:#F07CC0}
+.scene-btns{display:grid;grid-template-columns:1.3fr 1fr;gap:10px}
+.scene-cap{font-size:13.5px;line-height:1.3;color:rgba(244,239,226,.72)}
+
+@media (max-width:380px){.stats{grid-template-columns:repeat(2,1fr)}.stats div:nth-child(2){border-right:0}.stats div:nth-child(-n+2){border-bottom:1px solid var(--line)}.btn{font-size:16px}.story{grid-template-columns:64px 1fr}.story .thumb{width:64px;height:64px}}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}.scene-bg{animation:none}.scene-text{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="brand">Storied Routes</span>
+    <nav class="routes" id="routes" aria-label="Routes"></nav>
+  </header>
+
+  <section class="hero" id="hero"></section>
+
+  <section id="chartBox" aria-label="Route chart"></section>
+
+  <section class="sound" aria-label="Sound">
+    <span class="label">Sound for the stories</span>
+    <div class="switches">
+      <button type="button" role="switch" id="swVoice" aria-checked="true">Voice</button>
+      <button type="button" role="switch" id="swAmb" aria-checked="true">Ambience</button>
+      <button type="button" role="switch" id="swMusic" aria-checked="true">Music</button>
+    </div>
+    <small id="voiceNote">Stories are narrated from recordings stored with this page. No sound? Check the phone is not on silent.</small>
+  </section>
+
+  <div class="progress"><span class="label" id="progText">0 of 0 stops</span><div class="bar"><i id="progBar"></i></div></div>
+
+  <ol class="strip" id="strip"></ol>
+
+  <p class="foot">Pictures are public domain works from Wikimedia Commons. Map data &copy; OpenStreetMap contributors. Your progress is kept on this device only.</p>
+</div>
+
+<div class="dock" role="region" aria-label="Next stop">
+  <div class="dock-in">
+    <div class="dock-label"><span class="label" id="dockState">Next stop</span><strong id="dockName"></strong></div>
+    <div class="dock-btns">
+      <button type="button" class="btn" id="dockWay">Way</button>
+      <button type="button" class="btn play" id="dockPlay">Play story</button>
+      <button type="button" class="btn ghost" id="dockDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="way" hidden role="dialog" aria-label="Way to the next stop">
+  <div class="sheet-in">
+    <div class="sheet-top">
+      <div><span class="label" id="wayKicker"></span><h2 id="wayTitle"></h2></div>
+      <button type="button" class="btn ghost small" id="wayClose">Close</button>
+    </div>
+    <div class="chart" id="wayChart"></div>
+    <ol class="cues" id="wayCues"></ol>
+    <p class="note" id="wayNote"></p>
+    <a class="plain" id="wayMaps" href="#" target="_blank" rel="noopener">Fallback: open this stop in Google Maps</a>
+  </div>
+</div>
+
+<div class="scene" id="scene" hidden role="dialog" aria-label="Story">
+  <div class="scene-bg" id="sceneBg"></div>
+  <div class="scene-shade"></div>
+  <div class="scene-top"><span class="label" id="sceneStop"></span><button type="button" class="sbtn" id="sceneClose">Close</button></div>
+  <div class="scene-body">
+    <div class="scene-tags" id="sceneTags"></div>
+    <h2 id="sceneTitle"></h2>
+    <p class="scene-text" id="sceneText"></p>
+  </div>
+  <div class="scene-foot">
+    <div class="ticks" id="sceneTicks"></div>
+    <div class="scene-btns">
+      <button type="button" class="sbtn main" id="scenePause">Pause</button>
+      <button type="button" class="sbtn" id="sceneSkip">Skip</button>
+    </div>
+    <div class="scene-cap" id="sceneCap"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   ROUTES. To add a trip, add one object to this array.
+   mode: "bicycling" or "walking". amb: a soundscape name from AMB.
+   story.kind: "core" or "optional". story.mood: "minor" or "bright".
+   story.tags: optional labels such as "Spies" or "Russia".
+   House style for every route: history first, told in the present tense as if it
+   is happening now. Wherever it is true to the place, give priority to espionage
+   and intelligence stories and to Russian history, and make those core.
+   Each route also gets: recorded narration (AUDIO), a period picture per story (PICS),
+   and a chart with street-by-street cues built from open map data (CHARTS).
+---------------------------------------------------------------- */
+/*__ROUTES__*/
+
+const PICS = /*__PICS__*/{};
+const AUDIO = /*__AUDIO__*/{};
+const CHARTS = /*__CHARTS__*/{};
+
+/* ------------------------- helpers ------------------------- */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const enc = encodeURIComponent;
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const nn = i => String(i + 1).padStart(2, "0");
+function coord(lat, lng){
+  const f = (v, pos, neg) => { const a = Math.abs(v), d = Math.floor(a), m = ((a - d) * 60).toFixed(2).padStart(5, "0");
+    return d + "°" + m + "′" + (v >= 0 ? pos : neg); };
+  return f(lat, "N", "S") + " " + f(lng, "E", "W");
+}
+function kmBetween(a, b){
+  const R = 6371, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h)) * 1.3;
+}
+function legKm(i){ const C = CHARTS[route.id]; return C && C.len[i] ? C.len[i] / 1000 : kmBetween(route.stops[i - 1], route.stops[i]); }
+function fmtM(m){ return m >= 1000 ? (m / 1000).toFixed(1) + " km" : m + " m"; }
+function mins(story, key){ const a = AUDIO[key]; if (a) return Math.max(1, Math.round(a.dur / 60)); const w = story.paras.join(" ").split(/\s+/).length; return Math.max(1, Math.round(w / 140)); }
+function navUrl(s){ return "https://www.google.com/maps/dir/?api=1&destination=" + enc(s.q) + (s.pid ? "&destination_place_id=" + enc(s.pid) : "") + "&travelmode=" + route.mode; }
+const keyOf = (si, ki) => route.id + "/" + route.stops[si].id + "-" + ki;
+
+/* ------------------------- state ------------------------- */
+let route = ROUTES[0];
+let visited = [];
+const prefs = store.get("sr:prefs", { voice:true, amb:true, music:true });
+const played = {};
+let playing = null;          // {si, ki, para, paused}
+let playToken = 0;
+let mode = "idle";           // "audio" recorded file, "tts" live voice, "manual" read by tapping
+
+/* ------------------------- live voice fallbacks ------------------------- */
+let claudeTts = null;
+let liveVoice = ("speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") ? "browser" : "none";
+if (window.claude && typeof window.claude.use === "function"){
+  window.claude.use("tts").then(t => { if (t){ claudeTts = t; liveVoice = "claude"; try{ t.onLine(({ id }) => { if (mode === "tts") setPara(+id); }); }catch(e){} } }).catch(() => {});
+}
+function pickVoice(){
+  let vs = []; try{ vs = speechSynthesis.getVoices() || []; }catch(e){}
+  const want = ["Daniel", "Google UK English Male", "Arthur", "Serena", "Google UK English Female"];
+  for (const w of want){ const v = vs.find(x => x.name.indexOf(w) >= 0); if (v) return v; }
+  return vs.find(x => /en[-_]GB/i.test(x.lang)) || vs.find(x => /^en/i.test(x.lang)) || null;
+}
+function speak(paras, token){
+  if (liveVoice === "claude" && claudeTts) return claudeTts.speak(paras.map((text, i) => ({ text, id: String(i), rate: 0.95 })));
+  if (liveVoice === "browser"){
+    return new Promise((resolve, reject) => {
+      try{
+        speechSynthesis.cancel(); const v = pickVoice();
+        paras.forEach((text, i) => {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = v ? v.lang : "en-GB"; if (v) u.voice = v; u.rate = 0.93; u.pitch = 0.95;
+          u.onstart = () => { if (token === playToken) setPara(i); };
+          if (i === paras.length - 1) u.onend = () => resolve();
+          u.onerror = () => reject({ code:"voice_error" });
+          speechSynthesis.speak(u);
+        });
+      }catch(e){ reject({ code:"voice_error" }); }
+    });
+  }
+  return Promise.reject({ code:"no_voice" });
+}
+function stopLive(){
+  try{ if (claudeTts) claudeTts.stop(); }catch(e){}
+  try{ if ("speechSynthesis" in window) speechSynthesis.cancel(); }catch(e){}
+}
+
+/*__SOUND__*/
+
+/* ------------------------- story playback ------------------------- */
+const player = new Audio(); player.preload = "auto";
+let upNextTimer = null;
+function curStory(){ return playing ? route.stops[playing.si].stories[playing.ki] : null; }
+function nextUnheard(si){
+  const ss = route.stops[si].stories, order = ss.map((s, k) => k).sort((a, b) => (ss[a].kind === "core" ? 0 : 1) - (ss[b].kind === "core" ? 0 : 1));
+  for (const k of order) if (!played[keyOf(si, k)]) return k;
+  return -1;
+}
+function pickStory(si){ const k = nextUnheard(si); return k < 0 ? 0 : k; }
+function setPara(i){
+  if (!playing) return; const st = curStory(); if (i < 0 || i >= st.paras.length || i === playing.para) return;
+  playing.para = i; const el = $("#sceneText");
+  el.classList.add("swap");
+  setTimeout(() => { el.textContent = st.paras[i]; el.scrollTop = 0; el.classList.remove("swap"); }, 200);
+  $$("#sceneTicks i").forEach((t, k) => t.classList.toggle("on", k <= i));
+}
+function openScene(si, ki){
+  const stop = route.stops[si], st = stop.stories[ki], pic = PICS[keyOf(si, ki)], bg = $("#sceneBg");
+  if (pic){ bg.className = "scene-bg"; bg.style.backgroundImage = 'url("' + pic.src + '")'; } else { bg.className = "scene-bg none"; bg.style.backgroundImage = ""; }
+  $("#sceneStop").textContent = nn(si) + " " + stop.name;
+  $("#sceneTags").innerHTML = '<span class="chip">' + (st.kind === "core" ? "Core story" : "Optional") + "</span>" + (st.tags || []).map(t => '<span class="chip">' + t + "</span>").join("");
+  $("#sceneTitle").textContent = st.title;
+  $("#sceneText").textContent = ""; $("#sceneText").classList.remove("swap");
+  $("#sceneTicks").innerHTML = st.paras.map(() => "<i></i>").join("");
+  $("#sceneCap").textContent = pic ? pic.cap : "";
+  $("#scene").hidden = false; document.body.style.overflow = "hidden";
+}
+function sceneButtons(){
+  const p = $("#scenePause"), s = $("#sceneSkip"); if (!playing) return;
+  p.textContent = mode === "manual" ? (playing.para >= curStory().paras.length - 1 ? "Finish" : "Next") : (playing.paused ? "Resume" : "Pause");
+  s.textContent = nextUnheard(playing.si) >= 0 ? "Next story" : "End";
+}
+function stopStory(fade, keepScene){
+  playToken++; clearTimeout(upNextTimer);
+  try{ player.pause(); }catch(e){}
+  stopLive(); stopSound(fade === undefined ? 0.4 : fade);
+  playing = null; mode = "idle";
+  if (!keepScene){ $("#scene").hidden = true; document.body.style.overflow = ""; }
+  syncPlaying();
+}
+function manual(token){ if (token !== playToken) return; mode = "manual"; duck(false); setPara(0); sceneButtons(); }
+function liveOrManual(token, story){
+  if (token !== playToken) return;
+  if (liveVoice === "none"){ manual(token); return; }
+  mode = "tts"; sceneButtons();
+  speak(story.paras, token).then(() => finished(token)).catch(() => { stopLive(); manual(token); });
+}
+function playStory(si, ki){
+  stopStory(0.2, true);
+  const token = ++playToken, stop = route.stops[si], story = stop.stories[ki], key = keyOf(si, ki), rec = AUDIO[key];
+  playing = { si, ki, para: -1, paused: false }; played[key] = true;
+  openScene(si, ki);
+  if (prefs.amb) startAmbience(story.amb || stop.amb, prefs.voice);
+  if (prefs.music) startMusic(story.mood, prefs.voice);
+  syncPlaying();
+  if (!prefs.voice){ manual(token); return; }
+  if (rec){
+    mode = "audio"; sceneButtons();
+    try{
+      player.src = rec.src;
+      const pr = player.play();
+      if (pr && pr.catch) pr.catch(() => liveOrManual(token, story));
+    }catch(e){ liveOrManual(token, story); }
+    if ("mediaSession" in navigator){
+      try{
+        navigator.mediaSession.metadata = new MediaMetadata({ title: story.title, artist: stop.name, album: route.name + ", Storied Routes" });
+        navigator.mediaSession.setActionHandler("pause", () => togglePause());
+        navigator.mediaSession.setActionHandler("play", () => togglePause());
+      }catch(e){}
+    }
+    return;
+  }
+  liveOrManual(token, story);
+}
+function finished(token){
+  if (token !== playToken || !playing) return;
+  duck(false);
+  const si = playing.si, k = nextUnheard(si);
+  $$("#sceneTicks i").forEach(t => t.classList.add("on"));
+  if (k >= 0){
+    const el = $("#sceneText"); el.classList.add("swap");
+    setTimeout(() => { el.textContent = "Next at this stop: " + route.stops[si].stories[k].title + "."; el.classList.remove("swap"); }, 200);
+    upNextTimer = setTimeout(() => { if (token === playToken) playStory(si, k); }, 5000);
+  } else {
+    upNextTimer = setTimeout(() => { if (token === playToken) stopStory(1.4); }, 7000);
+  }
+}
+function togglePause(){
+  if (!playing) return;
+  if (mode === "manual"){
+    const st = curStory();
+    if (playing.para >= st.paras.length - 1) finished(playToken); else setPara(playing.para + 1);
+    sceneButtons(); return;
+  }
+  playing.paused = !playing.paused;
+  try{
+    if (mode === "audio"){ if (playing.paused) player.pause(); else player.play(); }
+    else if (liveVoice === "claude" && claudeTts){ if (playing.paused) claudeTts.pause(); else claudeTts.resume(); }
+    else if (liveVoice === "browser"){ if (playing.paused) speechSynthesis.pause(); else speechSynthesis.resume(); }
+  }catch(e){}
+  duck(!playing.paused); sceneButtons();
+}
+player.addEventListener("timeupdate", () => {
+  if (!playing || mode !== "audio") return;
+  const m = AUDIO[keyOf(playing.si, playing.ki)].marks; let i = -1;
+  for (let k = 0; k < m.length; k++) if (player.currentTime >= m[k] - 0.15) i = k;
+  if (i >= 0) setPara(i);
+});
+player.addEventListener("ended", () => { if (playing && mode === "audio") finished(playToken); });
+player.addEventListener("error", () => { if (playing && mode === "audio") liveOrManual(playToken, curStory()); });
+
+/* ------------------------- chart ------------------------- */
+function flatPath(a, from, close){ let d = "M" + a[from] + " " + a[from + 1]; for (let i = from + 2; i < a.length; i += 2) d += "L" + a[i] + " " + a[i + 1]; return d + (close ? "Z" : ""); }
+function proj(C, s){ return [(s.lng - C.o[1]) * C.o[2], (C.o[0] - s.lat) * C.o[3]]; }
+function chartSvg(seg){
+  const C = CHARTS[route.id]; if (!C) return "";
+  const detail = seg != null, ni = nextIndex();
+  let box = C.box.slice();
+  if (detail){
+    const t = seg > 0 && C.t[seg].length ? C.t[seg] : proj(C, route.stops[seg]);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let i = 0; i < t.length; i += 2){ x0 = Math.min(x0, t[i]); x1 = Math.max(x1, t[i]); y0 = Math.min(y0, t[i + 1]); y1 = Math.max(y1, t[i + 1]); }
+    const pad = 150; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+    let w = Math.max(x1 - x0, 620), h = Math.max(y1 - y0, 520);
+    if (w / h > 1.15) h = w / 1.15; else if (w / h < 0.8) w = h * 0.8;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; box = [cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2];
+  }
+  const W = box[2] - box[0], H = box[3] - box[1], u = W / 360;
+  const hit = a => { for (let i = 1; i < a.length; i += 2) if (a[i] >= box[0] && a[i] <= box[2] && a[i + 1] >= box[1] && a[i + 1] <= box[3]) return true; return false; };
+  let o = '<svg viewBox="' + box[0].toFixed(0) + " " + box[1].toFixed(0) + " " + W.toFixed(0) + " " + H.toFixed(0) + '" role="img" aria-label="Chart of the route">';
+  o += '<rect x="' + box[0] + '" y="' + box[1] + '" width="' + W + '" height="' + H + '" fill="var(--c-land)"/>';
+  o += '<path fill="var(--c-park)" d="' + C.k.map(a => flatPath(a, 0, true)).join("") + '"/>';
+  o += '<path fill="var(--c-water)" d="' + C.w.filter(a => !a[0]).map(a => flatPath(a, 1, true)).join("") + '"/>';
+  o += '<path fill="var(--c-land)" d="' + C.w.filter(a => a[0]).map(a => flatPath(a, 1, true)).join("") + '"/>';
+  let r1 = "", r2 = "", r3 = "";
+  for (const a of C.r){ if (!detail && a[0] !== 1) continue; if (detail && !hit(a)) continue; const d = flatPath(a, 1, false); if (a[0] === 1) r1 += d; else if (a[0] === 2) r2 += d; else r3 += d; }
+  if (detail){
+    o += '<path fill="none" stroke="var(--c-road2)" stroke-width="' + (2.2 * u) + '" stroke-linecap="round" d="' + r2 + '"/>';
+    o += '<path fill="none" stroke="var(--c-road2)" stroke-width="' + (1.2 * u) + '" stroke-dasharray="' + (3 * u) + " " + (3 * u) + '" d="' + r3 + '"/>';
+  }
+  o += '<path fill="none" stroke="var(--c-road)" stroke-width="' + ((detail ? 3.2 : 1.1) * u) + '" stroke-linecap="round" opacity="' + (detail ? 0.75 : 0.55) + '" d="' + r1 + '"/>';
+  // the route
+  C.t.forEach((t, i) => {
+    if (i === 0 || !t.length) return;
+    const cur = detail ? i === seg : i === ni, done = !detail && ni >= 0 ? i < ni : !detail && ni < 0;
+    const wdt = (cur ? 5 : 3) * u, dash = route.stops[i].id === "foot-tunnel" ? ' stroke-dasharray="' + (4 * u) + " " + (4 * u) + '"' : "";
+    o += '<path fill="none" stroke="var(--c-land)" stroke-width="' + (wdt + 2.5 * u) + '" stroke-linecap="round" stroke-linejoin="round" d="' + flatPath(t, 0, false) + '"/>';
+    o += '<path fill="none" stroke="' + (done ? "var(--muted)" : "var(--mark)") + '" stroke-width="' + wdt + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + (cur || done ? 1 : detail ? 0.35 : 0.6) + '"' + dash + ' d="' + flatPath(t, 0, false) + '"/>';
+  });
+  // street names along this leg
+  if (detail && C.cues[seg]){
+    const seen = {};
+    for (const c of C.cues[seg]){
+      if (c.m < 90 || seen[c.n] || /path|walk|unnamed/.test(c.n)) continue; seen[c.n] = 1;
+      let a = c.a; if (a > 90) a -= 180; if (a < -90) a += 180;
+      o += '<text x="' + c.x + '" y="' + c.y + '" transform="rotate(' + a + " " + c.x + " " + c.y + ')" dy="' + (-5 * u) + '" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="600" font-size="' + (12.5 * u) + '" fill="var(--ink)" stroke="var(--c-land)" stroke-width="' + (3 * u) + '" paint-order="stroke" letter-spacing="' + (0.4 * u) + '">' + c.n.toUpperCase() + "</text>";
+    }
+  }
+  // stops
+  route.stops.forEach((s, i) => {
+    const p = proj(C, s); if (p[0] < box[0] || p[0] > box[2] || p[1] < box[1] || p[1] > box[3]) return;
+    const v = visited.indexOf(s.id) >= 0, isNext = i === ni, r = (detail ? 12 : 9.5) * u;
+    o += '<g class="stopdot" data-goto="' + i + '"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + r + '" fill="' + (isNext ? "var(--mark)" : v ? "var(--ink)" : "var(--paper)") + '" stroke="' + (isNext ? "var(--mark)" : "var(--ink)") + '" stroke-width="' + (1.8 * u) + '"/>' +
+      '<text x="' + p[0] + '" y="' + p[1] + '" dy="' + (r * 0.36) + '" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="' + (r * 1.1) + '" fill="' + (isNext ? "var(--on-mark)" : v ? "var(--paper)" : "var(--ink)") + '">' + (i + 1) + "</text></g>";
+  });
+  // scale bar and north mark
+  const nice = [100, 200, 500, 1000, 2000].find(n => n / u >= 54) || 2000, bx = box[0] + 12 * u, by = box[3] - 12 * u;
+  o += '<path d="M' + bx + " " + (by - 4 * u) + "V" + by + "H" + (bx + nice) + "V" + (by - 4 * u) + '" fill="none" stroke="var(--ink)" stroke-width="' + (1.5 * u) + '"/>' +
+    '<text x="' + (bx + nice / 2) + '" y="' + (by - 6 * u) + '" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="600" font-size="' + (11 * u) + '" fill="var(--ink)" stroke="var(--c-land)" stroke-width="' + (3 * u) + '" paint-order="stroke">' + fmtM(nice) + "</text>";
+  const nx = box[2] - 18 * u, ny = box[1] + 30 * u;
+  o += '<path d="M' + nx + " " + (ny - 16 * u) + "l" + (5 * u) + " " + (16 * u) + "h" + (-10 * u) + 'z" fill="var(--ink)"/><text x="' + nx + '" y="' + (ny + 12 * u) + '" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="' + (12 * u) + '" fill="var(--ink)">N</text>';
+  return o + "</svg>";
+}
+function renderChart(){
+  const C = CHARTS[route.id], el = $("#chartBox");
+  if (!C){ el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="chart-cap"><span class="label">Chart of the route</span><small>Tap a number to jump to that stop</small></div><div class="chart" style="margin-top:8px">' + chartSvg(null) + "</div>";
+}
+const ARROW = { L:"←", R:"→", S:"↑" };
+function openWay(i){
+  const C = CHARTS[route.id], s = route.stops[i];
+  $("#wayKicker").textContent = i === 0 ? "Start of the route" : "From " + nn(i - 1) + " " + route.stops[i - 1].name + ", about " + legKm(i).toFixed(1) + " km";
+  $("#wayTitle").textContent = "To " + nn(i) + " " + s.name;
+  $("#wayChart").innerHTML = C ? chartSvg(i) : ""; $("#wayChart").hidden = !C;
+  const cues = C && C.cues[i] ? C.cues[i] : [];
+  $("#wayCues").innerHTML = cues.map((c, k) => '<li><span class="arrow">' + (k === 0 ? "•" : ARROW[c.t]) + '</span><span class="road">' + c.n + '</span><span class="dist">' + fmtM(c.m) + "</span></li>").join("");
+  $("#wayNote").textContent = s.note;
+  $("#wayMaps").href = navUrl(s);
+  $("#way").hidden = false; $("#way").scrollTop = 0; document.body.style.overflow = "hidden";
+}
+function closeWay(){ $("#way").hidden = true; if ($("#scene").hidden) document.body.style.overflow = ""; }
+
+/* ------------------------- rendering ------------------------- */
+function nextIndex(){ for (let i = 0; i < route.stops.length; i++) if (visited.indexOf(route.stops[i].id) < 0) return i; return -1; }
+function renderRoutes(){
+  $("#routes").innerHTML = ROUTES.map(r => '<button type="button" data-route="' + r.id + '" aria-pressed="' + (r === route) + '">' + r.name + "</button>").join("");
+}
+function renderHero(){
+  const a = route.stops[0], far = route.stops.reduce((m, s) => kmBetween(a, s) > kmBetween(a, m) ? s : m, a);
+  const core = route.stops.reduce((n, s) => n + s.stories.filter(x => x.kind === "core").length, 0);
+  const all = route.stops.reduce((n, s) => n + s.stories.length, 0), pic = PICS[route.id];
+  let listen = 0; route.stops.forEach((s, i) => s.stories.forEach((st, k) => { listen += mins(st, keyOf(i, k)); }));
+  $("#hero").innerHTML =
+    '<div class="hero-pic">' + (pic ? '<img src="' + pic.src + '" alt="' + pic.cap + '">' : "") +
+      '<div class="hero-words"><span class="label">' + (route.mode === "walking" ? "Walking route" : "Bike route") + "</span><h1>" + route.name + "</h1>" +
+      '<div class="bearing">' + coord(a.lat, a.lng) + " to " + coord(far.lat, far.lng) + " and back</div></div></div>" +
+    "<p>" + route.blurb + "</p>" +
+    '<div class="stats"><div><b>' + route.km + "</b><span>km</span></div><div><b>" + route.stops.length + "</b><span>stops</span></div><div><b>" +
+    core + "+" + (all - core) + "</b><span>stories</span></div><div><b>" + listen + "</b><span>min to hear</span></div></div>";
+}
+function renderStrip(){
+  let html = "";
+  route.stops.forEach((s, i) => {
+    const leg = route.legs.find(l => l.from === i);
+    if (leg){ let km = 0; for (let k = leg.from + 1; k <= leg.to; k++) km += legKm(k);
+      html += '<li class="leg"><h2>' + leg.name + "</h2><span>about " + km.toFixed(1) + " km</span></li>"; }
+    const dist = i ? "about " + legKm(i).toFixed(1) + " km on" : "start";
+    const stories = s.stories.map((st, k) => { const key = keyOf(i, k), pic = PICS[key];
+      return '<section class="story' + (pic ? "" : " nopic") + '" id="s-' + i + "-" + k + '">' +
+        (pic ? '<button type="button" class="thumb" data-play="' + i + ":" + k + '" aria-label="Play ' + st.title + '"><img loading="lazy" src="' + pic.src + '" alt=""></button>' : "") +
+        '<div class="sbody"><div class="shead"><span class="chip ' + st.kind + '">' + (st.kind === "core" ? "Core story" : "Optional") + "</span>" +
+          (st.tags || []).map(t => '<span class="chip tag">' + t + "</span>").join("") + '<span class="mins">' + mins(st, key) + " min</span></div>" +
+        "<h4>" + st.title + "</h4>" +
+        '<button type="button" class="btn play" data-play="' + i + ":" + k + '">Play story</button></div>' +
+        '<details id="d-' + i + "-" + k + '"><summary>Read it</summary><div class="paras">' + st.paras.map(p => "<p>" + p + "</p>").join("") + "</div></details>" +
+      "</section>"; }).join("");
+    html += '<li class="stop" id="stop-' + s.id + '" data-i="' + i + '">' +
+      '<div><span class="dot">' + nn(i) + "</span></div>" +
+      '<div class="body">' +
+        '<div class="meta"><span>' + coord(s.lat, s.lng) + "</span><span>" + dist + "</span></div>" +
+        "<h3>" + s.name + "</h3>" +
+        (s.pint ? '<div><span class="chip pint">Pint stop</span></div>' : "") +
+        '<p class="note">' + s.note + "</p>" +
+        '<div class="acts"><button type="button" class="btn" data-way="' + i + '">Way here</button>' +
+        '<button type="button" class="btn ghost" data-visit="' + i + '">Mark visited</button></div>' +
+        stories +
+      "</div></li>";
+  });
+  $("#strip").innerHTML = html;
+}
+function syncProgress(){
+  const n = route.stops.filter(s => visited.indexOf(s.id) >= 0).length, ni = nextIndex();
+  $("#progText").textContent = n + " of " + route.stops.length + " stops";
+  $("#progBar").style.width = (100 * n / route.stops.length) + "%";
+  $$(".stop").forEach(li => { const i = +li.dataset.i, v = visited.indexOf(route.stops[i].id) >= 0;
+    li.classList.toggle("visited", v); li.classList.toggle("next", i === ni);
+    $("[data-visit]", li).textContent = v ? "Visited. Undo" : "Mark visited"; });
+  renderChart(); syncDock();
+}
+function syncDock(){
+  const ni = nextIndex(), play = $("#dockPlay"), done = $("#dockDone"), way = $("#dockWay");
+  if (ni < 0){ $("#dockState").textContent = "Route complete"; $("#dockName").textContent = "Log closed"; }
+  else { $("#dockState").textContent = "Next stop " + nn(ni); $("#dockName").textContent = route.stops[ni].name; }
+  play.disabled = ni < 0; done.disabled = ni < 0; way.disabled = ni < 0;
+}
+function syncPlaying(){ sceneButtons(); }
+function syncSwitches(){
+  $("#swVoice").setAttribute("aria-checked", String(prefs.voice));
+  $("#swAmb").setAttribute("aria-checked", String(prefs.amb));
+  $("#swMusic").setAttribute("aria-checked", String(prefs.music));
+}
+function loadRoute(id){
+  route = ROUTES.find(r => r.id === id) || ROUTES[0];
+  visited = store.get("sr:visited:" + route.id, []);
+  stopStory(0.2); closeWay(); renderRoutes(); renderHero(); renderStrip(); syncProgress();
+}
+
+/* ------------------------- events ------------------------- */
+document.addEventListener("click", e => {
+  const r = e.target.closest("[data-route]");
+  if (r){ if (location.hash !== "#" + r.dataset.route) location.hash = r.dataset.route; else loadRoute(r.dataset.route); return; }
+  const p = e.target.closest("[data-play]");
+  if (p){ const a = p.dataset.play.split(":"); playStory(+a[0], +a[1]); return; }
+  const w = e.target.closest("[data-way]");
+  if (w){ openWay(+w.dataset.way); return; }
+  const g = e.target.closest("[data-goto]");
+  if (g){ closeWay(); const el = $("#stop-" + route.stops[+g.dataset.goto].id); if (el){ try{ el.scrollIntoView({ block:"start", behavior:"smooth" }); }catch(err){} } return; }
+  const v = e.target.closest("[data-visit]");
+  if (v){ const id = route.stops[+v.dataset.visit].id, k = visited.indexOf(id);
+    if (k >= 0) visited.splice(k, 1); else visited.push(id);
+    store.set("sr:visited:" + route.id, visited); syncProgress(); return; }
+});
+$("#dockPlay").addEventListener("click", () => { const ni = nextIndex(); if (ni >= 0) playStory(ni, pickStory(ni)); });
+$("#dockWay").addEventListener("click", () => { const ni = nextIndex(); if (ni >= 0) openWay(ni); });
+$("#dockDone").addEventListener("click", () => {
+  const ni = nextIndex(); if (ni < 0) return;
+  visited.push(route.stops[ni].id); store.set("sr:visited:" + route.id, visited); syncProgress();
+  const nx = nextIndex(); if (nx >= 0) openWay(nx);
+});
+$("#wayClose").addEventListener("click", closeWay);
+$("#sceneClose").addEventListener("click", () => stopStory(0.6));
+$("#scenePause").addEventListener("click", togglePause);
+$("#sceneSkip").addEventListener("click", () => {
+  if (!playing) return; const si = playing.si, k = nextUnheard(si);
+  if (k >= 0) playStory(si, k); else stopStory(0.6);
+});
+[["swVoice", "voice"], ["swAmb", "amb"], ["swMusic", "music"]].forEach(pair => {
+  $("#" + pair[0]).addEventListener("click", () => { prefs[pair[1]] = !prefs[pair[1]]; store.set("sr:prefs", prefs); syncSwitches(); });
+});
+window.addEventListener("hashchange", () => loadRoute(location.hash.slice(1)));
+
+syncSwitches(); loadRoute(location.hash.slice(1));
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+/* Versta design tokens. An Admiralty chart: paper, shoal blue, land buff, chart magenta for marks.
+   Light is for riding in sunlight, dark for dusk. Every colour in the app comes from these. */
+:root {
+  --paper: #F5F8F5; --shoal: #D8E8F0; --land: #EDE0B2; --ink: #0E2233; --muted: #566978; --line: #B9C8CC;
+  --mark: #A61C6E; --on-mark: #FFFFFF; --ok: #1F7A4D; --warn: #B4540A;
+  --scene-ink: #F4EFE2; --scene-bg: #070D13; --scene-accent: #F07CC0;
+  --f-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  --f-body: "Newsreader", Georgia, "Times New Roman", serif;
+  --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0B1620; --shoal: #12283A; --land: #3A3418; --ink: #DDE7EA; --muted: #8FA3AF; --line: #274052;
+    --mark: #F07CC0; --on-mark: #1A0612; --ok: #5FC08F; --warn: #F0A050;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 18px; line-height: 1.5; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
