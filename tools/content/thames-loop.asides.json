@@ -71,7 +71,7 @@
   "frac": 0.2,
   "title": "The navy's larder",
   "tags": [],
-  "text": "Between this road and the river stood the Royal Victualling Yard. For two centuries it fed the navy. It had its own bakery turning out ship's biscuit by the million, its own slaughterhouse, cooperage and brewery, and vaults holding rum for the whole fleet. Every sailor at Trafalgar ate food packed here.",
+  "text": "This stretch of riverside was the Royal Victualling Yard. For two centuries it fed the navy. It had its own bakery turning out ship's biscuit by the million, its own slaughterhouse, cooperage and brewery, and vaults holding rum for the whole fleet. Every sailor at Trafalgar ate food packed here.",
   "near": [
    -0.0303,
    51.4884
@@ -84,7 +84,7 @@
   "frac": 0.6,
   "title": "The garden that started the National Trust",
   "tags": [],
-  "text": "This street is named for John Evelyn, the diarist, whose garden at Sayes Court on your left was one of the wonders of England. In 1884 his descendant offered what was left of it to the public. There was no organisation that could legally accept it, and the offer lapsed. The reformer Octavia Hill never forgot. Eleven years later she helped found the National Trust.",
+  "text": "You are passing Sayes Court, where John Evelyn, the diarist, made a garden that was one of the wonders of England. In 1884 his descendant offered what was left of it to the public. There was no organisation that could legally accept it, and the offer lapsed. The reformer Octavia Hill never forgot. Eleven years later she helped found the National Trust.",
   "near": [
    -0.0296,
    51.4843
@@ -180,7 +180,7 @@
   "id": "stake-crossroads",
   "seg": 11,
   "street": "Cannon Street Road",
-  "frac": 0.08,
+  "frac": 0.85,
   "title": "The stake at the crossroads",
   "tags": [],
   "text": "In December 1811 two households near here were slaughtered in their homes, seven people in twelve days, and London panicked. The suspect, a sailor named John Williams, was found hanged in his cell. They paraded his body past the houses on a cart and buried it at this crossroads with a stake through the heart, while thousands watched. Workmen laying a gas pipe found him again in 1886.",
