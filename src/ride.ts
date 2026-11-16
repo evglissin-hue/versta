@@ -4,6 +4,7 @@
  */
 import { createNavEngine } from "./nav/engine";
 import { createGpsSource, createSimSource } from "./nav/sources";
+import { geoDistance } from "./geo";
 import { createMixer } from "./audio/mixer";
 import { createDirector } from "./story/director";
 import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, screen, settings, simulated } from "./state";
@@ -47,8 +48,10 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl()):
     pack: p, mixer, settings: () => settings.value, clock: () => (source.now ? source.now() : Date.now()), timeScale: sim?.scale ?? 1,
     onNowPlaying: (now) => {
       nowPlaying.value = now;
-      // the simulated rider stands still while a story plays at a stop, as a real one would
-      source.hold?.(now?.kind === "story" && engine.state.status === "at_stop");
+      // the simulated rider stands still while a story plays at the stop it belongs to, as a real one would
+      const fix = engine.state.fix;
+      const atItsStop = now?.kind === "story" && fix !== null && geoDistance([fix.lng, fix.lat], p.stops[now.stop]!.at) < 120;
+      source.hold?.(atItsStop);
     },
     onLog: (entry) => { directorLog.value = [...directorLog.value.slice(-400), entry]; },
   });

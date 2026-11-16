@@ -10,7 +10,9 @@ const JOIN_MIN_FROM_START = 150;
 const JOIN_MAX_FROM_LINE = 60;
 const END_ARRIVE = 20;
 const LEAVE_EXTRA = 15;
-const LEAVE_ALONG = 40;
+/** Along-the-line fallback for leaving a stop. Large on purpose: where a route doubles back past its own stop
+ *  (Deptford), the approach already lies some way "along" the next segment, so distance from the stop decides. */
+const LEAVE_ALONG = 150;
 const MISSED_ARRIVAL_LINE = 30;
 const WINDOW_BEHIND = 30;
 const WINDOW_AHEAD = 400;

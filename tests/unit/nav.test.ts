@@ -89,6 +89,9 @@ function run(fixes: Fix[]): Run {
 const arrivals = (events: NavEvent[]): number[] => events.flatMap((e) => (e.type === "arrive" ? [e.stop] : []));
 const cueEvents = (events: NavEvent[]) => events.flatMap((e) => (e.type === "cue" ? [e] : []));
 
+/** Turns so close to a stop that they are announced as the rider sets off, with no earlier warning. */
+const EXPECTED_NOW_ONLY = ["s03-003", "s09-002", "s11-003"];
+
 describe("navigation engine on the Thames Loop", () => {
   it("1. a noiseless ride arrives at every stop in order and speaks every cue once, in order", () => {
     const r = run(fixesAlong(line()));
@@ -101,7 +104,7 @@ describe("navigation engine on the Thames Loop", () => {
     expect(now.map((e) => e.cue.id)).toEqual(pack.cues.map((c) => c.id));
     expect(new Set(now.map((e) => e.cue.id)).size).toBe(pack.cues.length);
     // Approach comes before now for every manoeuvre except the depart cues, and except a cue that is already inside
-    // the "now" distance when it becomes next (the rider leaves a stop about 44 m along, so a cue within ~60 m of a
+    // the "now" distance when it becomes next (the rider leaves a stop about 60 m from it, so a cue within ~80 m of a
     // segment start gets "now" only, as the brief says for a cue already past its approach point).
     const approached = new Set<string>();
     for (const e of cues) {
@@ -113,9 +116,9 @@ describe("navigation engine on the Thames Loop", () => {
     const withoutApproach = pack.cues.filter((c) => c.turn !== "depart" && !approached.has(c.id));
     for (const c of withoutApproach) {
       const cum = cumulative(at(pack.segments, c.seg).map((q) => project(proj, q)));
-      expect(at(cum, c.i)).toBeLessThan(60);
+      expect(at(cum, c.i)).toBeLessThan(80);
     }
-    expect(withoutApproach.map((c) => c.id)).toEqual(["s11-003"]);
+    expect(withoutApproach.map((c) => c.id)).toEqual(EXPECTED_NOW_ONLY);
     // and an approach never comes after the cue's own now
     const nowSeen = new Set<string>();
     for (const e of cues) {
