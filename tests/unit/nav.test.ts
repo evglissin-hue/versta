@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import packJson from "../../public/packs/thames-loop/pack.json";
+// A frozen copy of the first Thames Loop pack: these tests are about the engine, and their scenarios are tuned to
+// this geometry. The pack that ships is ridden end to end in ride.integration.test.ts and reroute.real.test.ts.
+import packJson from "../fixtures/pack-v1.json";
 import { cumulative, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../../src/geo";
 import { createNavEngine } from "../../src/nav/engine";
 import { createSimSource } from "../../src/nav/sources";

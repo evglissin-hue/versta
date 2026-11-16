@@ -416,7 +416,7 @@ describe("way back after going off route", () => {
     quiet.d.handle(detour(true), nav({ offRoute: true }));
     quiet.d.handle(turn("left"), nav({ offRoute: true }));
     expect(quiet.playNav).not.toHaveBeenCalled();
-    const bare = rig();
+    const bare = rig({}, { ...pack, system: { arrive: pack.system.arrive, offRoute: pack.system.offRoute, backOnRoute: pack.system.backOnRoute } });
     bare.d.handle(detour(true), nav({ offRoute: true }));
     bare.d.handle(turn("left"), nav({ offRoute: true }));
     expect(bare.playNav).not.toHaveBeenCalled();
