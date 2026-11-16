@@ -5,6 +5,10 @@ import { type Clip, type ClipFactory, elementClipFactory, silentWavUri, virtualC
 /** The mixer plus a view of the bed, so tests can see what the director asked for. */
 export interface MixerWithBed extends Mixer {
   readonly bed: { ambience: string | null; mood: Story["mood"] | null } | null;
+  /** How many times `tick` has been called (any mode), for tests. */
+  readonly ticks: number;
+  /** The level last given to `setBedLevel`; 1 until then. */
+  readonly bedLevel: number;
 }
 
 interface Deferred { promise: Promise<void>; resolve(): void; reject(reason: "stopped" | "error"): void; settled: boolean }
@@ -43,6 +47,8 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   const real = !opts.virtual && typeof Audio !== "undefined";
   const bed = createBed();
   let bedState: { ambience: string | null; mood: Story["mood"] | null } | null = null;
+  let tickCount = 0;
+  let bedLevel = 1;
 
   const resolveUrl = (src: string): string => (/^([a-z][a-z0-9+.-]*:|\/)/i.test(src) ? src : opts.baseUrl + src);
   let routed = false;
@@ -202,6 +208,19 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
       return new Promise<void>((res) => setTimeout(res, 1200));
     },
 
+    tick() {
+      tickCount++;
+      if (real) bed.tick();
+    },
+    seekVoice(deltaSeconds) {
+      if (!Number.isFinite(deltaSeconds)) return;
+      voice?.clip?.seek?.(deltaSeconds);
+    },
+    setBedLevel(level) {
+      bedLevel = Math.max(0, level);
+      if (real) bed.setBedLevel(bedLevel);
+    },
+
     startBed(ambience, mood) {
       bedState = ambience === null && mood === null ? null : { ambience, mood };
       if (real) bed.start(ambience, mood);
@@ -214,6 +233,8 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
     get navBusy() { return navCurrent !== null; },
     get voiceBusy() { return voice !== null; },
     get bed() { return bedState; },
+    get ticks() { return tickCount; },
+    get bedLevel() { return bedLevel; },
   };
   return mixer;
 }

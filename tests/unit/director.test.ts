@@ -473,3 +473,160 @@ describe("way back after going off route", () => {
     expect(q.mixer.bed).toBeNull();
   });
 });
+
+describe("spoken guidance", () => {
+  const cue = pack.cues.find((c) => c.turn === "left")!;
+  const cue2 = pack.cues.filter((c) => c.turn !== "depart")[5]!;
+  const sys = pack.system;
+  const approach = (c: Cue): NavEvent[] => [{ type: "cue", cue: c, phase: "approach" }];
+  const turnNow = (c: Cue): NavEvent[] => [{ type: "cue", cue: c, phase: "now" }];
+  const spoken = (r: Rig): string[] => r.playNav.mock.calls.map((c) => c[0]);
+
+  it("a 110 m approach plays the 100 m clip then the cue, in that order", () => {
+    const r = rig();
+    r.d.handle(approach(cue), nav({ toCue: 110, nextCue: cue }));
+    expect(spoken(r)).toEqual([sys.distances!["100"], cue.audio]);
+    expect(whats(r)).toEqual([`cue_spoken:${cue.id}`]);
+  });
+
+  it("picks the largest distance not above the turn distance plus 15 m", () => {
+    const pick = (toCue: number): string[] => {
+      const r = rig();
+      r.d.handle(approach(cue), nav({ toCue }));
+      return spoken(r);
+    };
+    expect(pick(40)).toEqual([sys.distances!["50"], cue.audio]);
+    expect(pick(136)).toEqual([sys.distances!["150"], cue.audio]);
+    expect(pick(120)).toEqual([sys.distances!["100"], cue.audio]);
+    expect(pick(330)).toEqual([sys.distances!["300"], cue.audio]);
+  });
+
+  it("a 30 m approach, or a pack with no distance clips, plays only the cue", () => {
+    const r = rig();
+    r.d.handle(approach(cue), nav({ toCue: 30 }));
+    expect(spoken(r)).toEqual([cue.audio]);
+    const bare = { ...pack, system: { ...pack.system, distances: undefined } } as Pack;
+    const q = rig({}, bare);
+    q.d.handle(approach(cue), nav({ toCue: 110 }));
+    expect(spoken(q)).toEqual([cue.audio]);
+  });
+
+  it("the now phase ticks and stays silent after a spoken approach", () => {
+    const r = rig();
+    r.d.handle(approach(cue), nav({ toCue: 110 }));
+    r.playNav.mockClear();
+    r.d.handle(turnNow(cue), nav({ toCue: 10 }));
+    expect(r.playNav).not.toHaveBeenCalled();
+    expect(r.mixer.ticks).toBe(1);
+    expect(whats(r)).toEqual([`cue_spoken:${cue.id}`]);
+  });
+
+  it("an unannounced cue is spoken at now, with no tick and no distance", () => {
+    const r = rig();
+    r.d.handle(turnNow(cue), nav({ toCue: 10 }));
+    expect(spoken(r)).toEqual([cue.audio]);
+    expect(r.mixer.ticks).toBe(0);
+    r.d.handle(turnNow(cue), nav({ toCue: 5 }));
+    expect(spoken(r)).toEqual([cue.audio]);
+    expect(whats(r)).toEqual([`cue_spoken:${cue.id}`]);
+  });
+
+  it("a depart cue is spoken, and a quiet cue or navVoice off is shown without sound or tick", () => {
+    const depart = pack.cues.find((c) => c.turn === "depart")!;
+    const r = rig();
+    r.d.handle(turnNow(depart), nav());
+    expect(spoken(r)).toEqual([depart.audio]);
+    const q = rig({ navVoice: false });
+    q.d.handle(approach(cue), nav({ toCue: 110 }));
+    q.d.handle(turnNow(cue), nav({ toCue: 5 }));
+    expect(q.playNav).not.toHaveBeenCalled();
+    expect(q.mixer.ticks).toBe(0);
+    expect(whats(q)).toEqual([`cue_shown:${cue.id}`]);
+  });
+
+  it("every spoken cue logs cue_spoken exactly once across approach and now", () => {
+    const r = rig();
+    for (const c of [cue, cue2]) {
+      r.d.handle(approach(c), nav({ toCue: 120 }));
+      r.d.handle(turnNow(c), nav({ toCue: 8 }));
+    }
+    expect(whats(r)).toEqual([`cue_spoken:${cue.id}`, `cue_spoken:${cue2.id}`]);
+  });
+
+  it("rerouting is not repeated within 60 s, and is spoken again after", async () => {
+    const r = rig();
+    const found: NavEvent[] = [{ type: "detour", found: true }];
+    r.d.handle(found, nav());
+    await ms(20_000);
+    r.d.handle(found, nav());
+    await ms(30_000);
+    r.d.handle(found, nav());
+    expect(spoken(r)).toEqual([sys.rerouting]);
+    await ms(15_000);
+    r.d.handle(found, nav());
+    expect(spoken(r)).toEqual([sys.rerouting, sys.rerouting]);
+  });
+
+  it("speaks the wrong way clip once per event and logs it; silent with navVoice off", () => {
+    const r = rig();
+    r.d.handle([{ type: "wrong_way" }], nav());
+    expect(spoken(r)).toEqual([sys.wrongWay]);
+    expect(whats(r)).toEqual(["wrong_way"]);
+    const q = rig({ navVoice: false });
+    q.d.handle([{ type: "wrong_way" }], nav());
+    expect(q.playNav).not.toHaveBeenCalled();
+    expect(whats(q)).toEqual(["wrong_way"]);
+  });
+});
+
+describe("rewind", () => {
+  const story = pack.stops[DEPTFORD]!.stories.find((s) => s.id === "peter-the-great-0")!;
+  const paraNow = (r: Rig): number => {
+    const n = r.now.at(-1);
+    return n?.kind === "story" ? n.para : -1;
+  };
+
+  it("moves the playhead back and the paragraph follows", async () => {
+    const r = rig();
+    r.d.playStory(DEPTFORD, story.id);
+    await ms(35_000);
+    expect(paraNow(r)).toBe(2); // marks 30.14 and 51.06
+    r.d.rewind!(15);
+    expect(paraNow(r)).toBe(1);
+    await ms(1000);
+    expect(paraNow(r)).toBe(1); // the clip really is at about 21 s, so the paragraph stays
+    await ms(10_000);
+    expect(paraNow(r)).toBe(2); // and carries on from there
+    r.d.rewind!(1000);
+    expect(paraNow(r)).toBe(0);
+    await ms(500);
+    expect(paraNow(r)).toBe(0);
+  });
+
+  it("does nothing in read-by-tapping mode, with nothing playing, or after the story ended", async () => {
+    const r = rig({ storyVoice: false });
+    const seek = vi.spyOn(r.mixer, "seekVoice");
+    r.d.playStory(DEPTFORD, story.id);
+    r.d.nextParagraph();
+    r.d.rewind!(15);
+    expect(seek).not.toHaveBeenCalled();
+    expect(paraNow(r)).toBe(1);
+    const q = rig();
+    const seekQ = vi.spyOn(q.mixer, "seekVoice");
+    q.d.rewind!(15);
+    expect(seekQ).not.toHaveBeenCalled();
+  });
+
+  it("seeks the passing-by story that is playing", async () => {
+    const r = rig();
+    const seek = vi.spyOn(r.mixer, "seekVoice");
+    const aside = pack.asides[0]!;
+    r.d.handle([], nav({ toStop: 2000, toCue: 500 }));
+    await ms(61_000);
+    r.d.handle([{ type: "aside", aside }], nav({ toStop: 2000, toCue: 500 }));
+    await ms(2000);
+    expect(r.now.at(-1)?.kind).toBe("aside");
+    r.d.rewind!(10);
+    expect(seek).toHaveBeenCalledWith(-10);
+  });
+});

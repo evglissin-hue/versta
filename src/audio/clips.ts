@@ -10,6 +10,8 @@ export interface Clip {
   /** Start, or resume after `pause`. */
   play(): void;
   pause(): void;
+  /** Move the playhead by this many seconds, clamped to the clip, whether playing or paused. */
+  seek?(deltaSeconds: number): void;
   /** Silence and detach. No callback fires after this. */
   dispose(): void;
 }
@@ -33,21 +35,33 @@ export function virtualClipFactory(timeScale: number): ClipFactory {
     let tick: ReturnType<typeof setInterval> | undefined;
     const clear = (): void => { clearTimeout(endTimer); clearInterval(tick); endTimer = tick = undefined; };
     const head = (): number => Math.min(total, ((elapsedMs + (playing ? Date.now() - startedAt : 0)) / 1000) * scale);
+    const arm = (): void => {
+      startedAt = Date.now();
+      endTimer = setTimeout(() => {
+        if (dead) return;
+        clear();
+        playing = false;
+        elapsedMs = totalMs;
+        cb.onTime?.(total);
+        dead = true;
+        cb.onEnd();
+      }, Math.max(0, totalMs - elapsedMs));
+      if (cb.onTime) tick = setInterval(() => { if (!dead) cb.onTime?.(head()); }, TICK_MS);
+    };
     return {
       play() {
         if (dead || playing) return;
         playing = true;
-        startedAt = Date.now();
-        endTimer = setTimeout(() => {
-          if (dead) return;
-          clear();
-          playing = false;
-          elapsedMs = totalMs;
-          cb.onTime?.(total);
-          dead = true;
-          cb.onEnd();
-        }, Math.max(0, totalMs - elapsedMs));
-        if (cb.onTime) tick = setInterval(() => { if (!dead) cb.onTime?.(head()); }, TICK_MS);
+        arm();
+      },
+      seek(delta) {
+        if (dead) return;
+        const now = elapsedMs + (playing ? Date.now() - startedAt : 0);
+        const to = Math.min(totalMs, Math.max(0, now + (delta * 1000) / scale));
+        if (playing) clear();
+        elapsedMs = to;
+        if (playing) arm();
+        cb.onTime?.(head());
       },
       pause() {
         if (dead || !playing) return;
@@ -98,6 +112,12 @@ export function elementClipFactory(el: HTMLAudioElement, resolve: (src: string) 
         clearInterval(tick);
         tick = undefined;
         try { el.pause(); } catch {}
+      },
+      seek(delta) {
+        if (dead || !started) return;
+        const length = Number.isFinite(el.duration) ? el.duration : Infinity;
+        try { el.currentTime = Math.min(length, Math.max(0, el.currentTime + delta)); } catch { return; }
+        cb.onTime?.(el.currentTime);
       },
       dispose,
     };

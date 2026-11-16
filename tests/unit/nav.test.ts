@@ -5,7 +5,7 @@ import packJson from "../fixtures/pack-v1.json";
 import { cumulative, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../../src/geo";
 import { createNavEngine } from "../../src/nav/engine";
 import { createSimSource } from "../../src/nav/sources";
-import type { Fix, LngLat, NavEvent, NavState, Pack, RouteGraph } from "../../src/types";
+import type { Cue, Fix, LngLat, NavEvent, NavState, Pack, RouteGraph } from "../../src/types";
 
 const pack = packJson as unknown as Pack;
 const proj = makeProjection(pack.stops[0]!.at);
@@ -532,5 +532,225 @@ describe("the nearest point of the route while guiding to the start", () => {
     engine.update(at(fixesAlong(line(4, 300)), 0));
     expect(engine.state.status).toBe("riding");
     expect(engine.state.nearest ?? null).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ guidance (iteration 3) */
+
+/** A straight pack: stop 0 at the origin, segment 1 runs 2000 m east, stop 2 sits beside its middle. */
+function straightPack(): Pack {
+  const origin = pack.stops[0]!.at;
+  const east = (m: number, north = 0): LngLat => unproject(proj, [m, north]);
+  const poly = (from: LngLat, to: LngLat): LngLat[] => Array.from({ length: 201 }, (_, i) => [from[0] + ((to[0] - from[0]) * i) / 200, from[1] + ((to[1] - from[1]) * i) / 200] as LngLat);
+  const seg1 = poly(origin, east(2000));
+  const seg2 = poly(east(2000), east(1000, 25));
+  const cue = (id: string, along: number, turn: Cue["turn"]): Cue => ({
+    id, seg: 1, i: Math.round(along / 10), at: east(along), turn, name: id, kind: "road", len: 100, say: id, audio: `cues/${id}.mp3`,
+  });
+  const stop = (id: string, at: LngLat, radius: number): Pack["stops"][number] => ({ id, name: id, at, note: "", ambience: "river", arriveRadius: radius, stories: [] });
+  return {
+    ...pack,
+    stops: [stop("a", origin, 45), stop("b", east(2000), 20), stop("c", east(1000, 25), 20)],
+    segments: [[], seg1, seg2],
+    cues: [cue("A", 400, "left"), cue("B", 480, "right"), cue("C", 1000, "left"), cue("D", 1300, "right")],
+    asides: [],
+  };
+}
+
+interface Step { d: number; offset?: number }
+
+/** One fix a second along the straight pack. Heading and speed come from the step before. */
+function straightFixes(steps: Step[], opts: { headingNull?: boolean } = {}): Fix[] {
+  return steps.map((st, k) => {
+    const ll = unproject(proj, [st.d, st.offset ?? 0]);
+    // the first fix takes its speed and direction from the step after it
+    const delta = k > 0 ? st.d - steps[k - 1]!.d : (steps[1]?.d ?? st.d) - st.d;
+    return {
+      lng: ll[0], lat: ll[1], accuracy: 5, time: T0 + k * 1000, speed: Math.abs(delta),
+      heading: opts.headingNull ? null : delta < 0 ? 270 : 90,
+    };
+  });
+}
+
+const range = (from: number, to: number, step: number): number[] => {
+  const out: number[] = [];
+  for (let d = from; step > 0 ? d <= to : d >= to; d += step) out.push(d);
+  return out;
+};
+
+describe("speed average", () => {
+  it("settles near 5 on a 5 m/s ride, stays null for the first 5 s, and settles near 0 when standing", () => {
+    const sp = straightPack();
+    const engine = createNavEngine(sp);
+    const seen: (number | null | undefined)[] = [];
+    for (const f of straightFixes(range(300, 1100, 5).map((d) => ({ d })))) { engine.update(f); seen.push(engine.state.speedAvg); }
+    expect(seen.slice(0, 5).every((v) => v === null)).toBe(true);
+    expect(seen[6]).not.toBeNull();
+    expect(engine.state.speedAvg!).toBeGreaterThan(4.9);
+    expect(engine.state.speedAvg!).toBeLessThan(5.1);
+
+    const still = createNavEngine(sp);
+    for (const f of straightFixes(Array.from({ length: 60 }, () => ({ d: 600 })))) still.update(f);
+    expect(still.state.speedAvg!).toBeGreaterThanOrEqual(0);
+    expect(still.state.speedAvg!).toBeLessThan(0.1);
+  });
+
+  it("falls back to distance over time when the fix has no speed, and ignores poor fixes", () => {
+    const sp = straightPack();
+    const engine = createNavEngine(sp);
+    const fixes = straightFixes(range(300, 700, 4).map((d) => ({ d }))).map((f) => ({ ...f, speed: null }));
+    for (const f of fixes) engine.update(f);
+    expect(engine.state.speedAvg!).toBeGreaterThan(3.8);
+    expect(engine.state.speedAvg!).toBeLessThan(4.2);
+    const before = engine.state.speedAvg;
+    const last = fixes[fixes.length - 1]!;
+    engine.update({ ...last, time: last.time + 1000, accuracy: 500, speed: 30 });
+    expect(engine.state.speedAvg).toBe(before);
+  });
+});
+
+describe("approach distance", () => {
+  /** Rides cue A and B at a steady speed; returns the distance to each cue when its approach fired. */
+  function approaches(speed: number): { id: string; toCue: number | null; index: number }[] {
+    const sp = straightPack();
+    const engine = createNavEngine(sp);
+    const out: { id: string; toCue: number | null; index: number }[] = [];
+    let n = 0;
+    for (const f of straightFixes(range(160, 1100, speed).map((d) => ({ d })))) {
+      for (const e of engine.update(f)) {
+        if (e.type === "cue") out.push({ id: `${e.cue.id}:${e.phase}`, toCue: e.phase === "approach" ? engine.state.toCue : null, index: n++ });
+      }
+    }
+    return out;
+  }
+
+  it("grows with speed: about 70 m at 3 m/s and about 120 m at 8 m/s, with the state already updated", () => {
+    const slow = approaches(3).find((a) => a.id === "A:approach")!;
+    const fast = approaches(8).find((a) => a.id === "A:approach")!;
+    expect(slow.toCue!).toBeGreaterThanOrEqual(64);
+    expect(slow.toCue!).toBeLessThanOrEqual(73);
+    expect(fast.toCue!).toBeGreaterThanOrEqual(110);
+    expect(fast.toCue!).toBeLessThanOrEqual(128);
+  });
+
+  it("never announces a turn before the one in front of it has been reached", () => {
+    for (const speed of [3, 8, 14]) {
+      const a = approaches(speed);
+      const aNow = a.find((x) => x.id === "A:now")!;
+      const bApproach = a.find((x) => x.id === "B:approach");
+      if (bApproach) {
+        expect(bApproach.index).toBeGreaterThan(aNow.index);
+        expect(bApproach.toCue!).toBeLessThanOrEqual(80 - 15 + 0.001);
+      }
+      // every cue is still spoken at least once, in order
+      expect(a.filter((x) => x.id.endsWith(":now")).map((x) => x.id)).toEqual(["A:now", "B:now", "C:now", "D:now"].slice(0, a.filter((x) => x.id.endsWith(":now")).length));
+    }
+  });
+
+  it("is capped at 320 m however fast the rider goes", () => {
+    const sp = straightPack();
+    const engine = createNavEngine(sp);
+    let d = 0;
+    for (const f of straightFixes(range(500, 1100, 30).map((x) => ({ d: x })))) {
+      for (const e of engine.update(f)) if (e.type === "cue" && e.phase === "approach" && e.cue.id === "C") d = engine.state.toCue!;
+    }
+    expect(d).toBeGreaterThan(0);
+    expect(d).toBeLessThanOrEqual(320);
+  });
+});
+
+describe("the cue after next", () => {
+  it("is set for two cues 80 m apart and null for two 300 m apart", () => {
+    const sp = straightPack();
+    const engine = createNavEngine(sp);
+    const at300 = [] as NavState[];
+    for (const f of straightFixes(range(300, 1250, 10).map((d) => ({ d })))) {
+      engine.update(f);
+      at300.push({ ...engine.state });
+    }
+    const near = at300.find((s) => s.nextCue?.id === "A")!;
+    expect(near.thenCue?.id).toBe("B");
+    expect(near.toThen!).toBeCloseTo(80, 0);
+    const far = at300.find((s) => s.nextCue?.id === "C")!;
+    expect(far.thenCue).toBeNull();
+    expect(far.toThen).toBeNull();
+    const last = at300.find((s) => s.nextCue?.id === "D")!;
+    expect(last.thenCue).toBeNull();
+  });
+});
+
+describe("wrong way", () => {
+  const count = (events: NavEvent[]): number => events.filter((e) => e.type === "wrong_way").length;
+  function ride(sp: Pack, steps: Step[], opts: { headingNull?: boolean } = {}): { events: NavEvent[]; states: NavState[] } {
+    const engine = createNavEngine(sp);
+    const events: NavEvent[] = [];
+    const states: NavState[] = [];
+    for (const f of straightFixes(steps, opts)) { events.push(...engine.update(f)); states.push({ ...engine.state }); }
+    return { events, states };
+  }
+  const forward = range(300, 400, 5);
+  const back = (n: number, from = 400, v = 5): number[] => Array.from({ length: n }, (_, i) => from - (i + 1) * v);
+
+  it("riding the line backwards for 15 s gives one wrong_way and sets the flag; turning round clears it", () => {
+    const sp = straightPack();
+    const turnedRound = Array.from({ length: 12 }, (_, i) => 325 + i * 5);
+    const r = ride(sp, [...forward, ...back(15), ...turnedRound].map((d) => ({ d })));
+    expect(count(r.events)).toBe(1);
+    const first = r.states.findIndex((s) => s.wrongWay);
+    expect(first).toBeGreaterThan(forward.length + 8);
+    expect(r.states[r.states.length - 1]!.wrongWay).toBe(false);
+    // it stays set until the rider has been right for 5 s
+    const cleared = r.states.findIndex((s, i) => i > first && !s.wrongWay);
+    expect(cleared - (forward.length + 15)).toBeGreaterThanOrEqual(4);
+  });
+
+  it("also works from the bearing between fixes when the device gives no heading", () => {
+    const r = ride(straightPack(), [...forward, ...back(15)].map((d) => ({ d })), { headingNull: true });
+    expect(count(r.events)).toBe(1);
+  });
+
+  it("fires once per spell however long the rider goes on", () => {
+    const sp = straightPack();
+    const r = ride(sp, [...range(1000, 1200, 5), ...back(40, 1200)].map((d) => ({ d })));
+    expect(count(r.events)).toBe(1);
+  });
+
+  it("does not fire on a normal ride, a slow dawdle, or a short U-turn", () => {
+    const sp = straightPack();
+    expect(count(ride(sp, range(300, 1100, 5).map((d) => ({ d }))).events)).toBe(0);
+    expect(count(ride(sp, [...forward, ...back(15, 400, 1)].map((d) => ({ d }))).events)).toBe(0);
+    expect(count(ride(sp, [...forward, ...back(5), ...range(375, 500, 5)].map((d) => ({ d }))).events)).toBe(0);
+    const real = run(fixesAlong(line()));
+    expect(real.events.filter((e) => e.type === "wrong_way")).toHaveLength(0);
+    const noisy = run(fixesAlong(line(), { noise: 8, accuracy: 10, seed: 7 }));
+    expect(noisy.events.filter((e) => e.type === "wrong_way")).toHaveLength(0);
+  });
+
+  it("does not fire within 60 m of a stop, where people circle about", () => {
+    const sp = straightPack();
+    // stop c sits beside the middle of the line, so this reversal happens inside its 60 m zone
+    const nearStop = ride(sp, [...range(950, 1000, 5), ...back(8, 1000, 5)].map((d) => ({ d })));
+    expect(count(nearStop.events)).toBe(0);
+    // the same reversal further along the line does fire
+    const away = ride(sp, [...range(1450, 1500, 5), ...back(15, 1500, 5)].map((d) => ({ d })));
+    expect(count(away.events)).toBe(1);
+  });
+
+  it("does not fire while off route", () => {
+    const sp = straightPack();
+    const steps: Step[] = [...forward.map((d) => ({ d })), ...back(25).map((d) => ({ d, offset: 100 }))];
+    const r = ride(sp, steps);
+    expect(r.states.some((s) => s.offRoute)).toBe(true);
+    expect(count(r.events)).toBe(0);
+  });
+
+  it("is cleared by going off route and by a jump", () => {
+    const sp = straightPack();
+    const engine = createNavEngine(sp);
+    const steps: Step[] = [...forward, ...back(14)].map((d) => ({ d }));
+    for (const f of straightFixes(steps)) engine.update(f);
+    expect(engine.state.wrongWay).toBe(true);
+    engine.jumpToSegment(1);
+    expect(engine.state.wrongWay).toBe(false);
   });
 });

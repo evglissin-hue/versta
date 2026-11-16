@@ -23,6 +23,10 @@ export interface Bed {
   stop(fadeSeconds: number): void;
   /** Two strokes of a ship's bell. */
   chime(): void;
+  /** Two soft clicks on the nav bus. */
+  tick(): void;
+  /** Scale the soundscape and music. Remembered across beds and until the graph exists. */
+  setBedLevel(level: number): void;
   dispose(): void;
 }
 
@@ -35,6 +39,7 @@ export function createBed(): Bed {
   let amb: Session | null = null;
   let mus: Session | null = null;
   let startToken = 0;
+  let level = 1;
 
   const ensure = (): boolean => {
     if (!g && !failed) {
@@ -44,6 +49,7 @@ export function createBed(): Bed {
         const base = typeof import.meta.env?.BASE_URL === "string" ? import.meta.env.BASE_URL : "/";
         loops = createLoopLib(g.synth.ctx, base);
         const graph = g;
+        graph.setBedLevel(level);
         if (typeof window !== "undefined") window.__verstaAudio = { levels: () => graph.levels() };
       }
     }
@@ -96,6 +102,14 @@ export function createBed(): Bed {
       L.bell(x, s, 1, 660, 0.65, 0.5);
       // let both strokes ring out, then free the nodes
       setTimeout(() => { endSession(x, s, 0.4); }, 2500);
+    },
+    tick() {
+      if (!ensure() || !g) return;
+      g.tick();
+    },
+    setBedLevel(l) {
+      level = Math.max(0, l);
+      g?.setBedLevel(level);
     },
     dispose() {
       stop(0.1);
