@@ -34,8 +34,9 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # Installs the Android SDK pieces the Gradle build asks for, and caches Gradle.
-      - uses: android-actions/setup-android@v3
+      # The GitHub runner already has the Android SDK (ANDROID_HOME is set) with its licences accepted,
+      # and Gradle fetches any platform or build tools it is missing. No separate SDK setup step:
+      # android-actions/setup-android failed here asking for the long-gone "tools" package.
 
       - uses: gradle/actions/setup-gradle@v4
 
