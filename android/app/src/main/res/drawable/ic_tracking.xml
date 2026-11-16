@@ -1,0 +1,5 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <!-- A verst post: cap, shaft, base. Plain white on transparent, as notification icons must be. -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M9,3h6v2.5l1.5,2.5v11h2.5v2h-14v-2h2.5v-11l1.5,-2.5z" />
+</vector>
