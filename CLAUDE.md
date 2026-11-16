@@ -7,7 +7,7 @@ rider by GPS, speaks the turns, plays a stop's stories on arrival and drops in a
 ## Stack
 
 - Vite, TypeScript (strict), Preact with signals, MapLibre GL, vite-plugin-pwa. No backend.
-- Hosted on Cloudflare Pages from this repo: build `npm run build`, output `dist`.
+- Hosted on Cloudflare (Workers static assets, connected to this repo): build `npm run build`, deploy `npx wrangler deploy`, settings in `wrangler.jsonc`.
 - Map tiles: OpenFreeMap vector tiles (no key). Attribution to OpenStreetMap and OpenFreeMap must stay visible.
 - Phase 2 wraps the same build as an Android app with Capacitor for GPS with the screen off. Keep browser-only
   assumptions out of `src/nav` and `src/story` so that swap stays small.
