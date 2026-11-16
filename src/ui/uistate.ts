@@ -1,5 +1,6 @@
 import { signal } from "@preact/signals";
 import { geoDistance } from "../geo";
+import type { SavedRide } from "../ride";
 import type { LngLat, NavState, Pack } from "../types";
 
 /** Whether the full-screen story scene is showing. A story can keep playing with the scene hidden. */
@@ -91,3 +92,19 @@ export function joinChoice(n: NavState, p: Pack): JoinChoice | null {
 // Handle for the end-to-end tests: what the camera controls are doing.
 declare global { interface Window { __verstaUi?: { following: typeof following; wholeRoute: typeof wholeRoute; peek: typeof peek; followZoom: typeof followZoom } } }
 if (typeof window !== "undefined") window.__verstaUi = { following, wholeRoute, peek, followZoom };
+
+/** The one-time sheet before the first ride on this device. Holds the ride it will start. */
+export const firstRideSheet = signal<{ id: string; resume: SavedRide | null } | null>(null);
+/** A ride being started from Home: the route is loading, or the ride itself is starting. */
+export const startPhase = signal<{ id: string; phase: "loading" | "starting" } | null>(null);
+/** The last start that failed, with what it takes to try again. */
+export const startFailure = signal<{ id: string; kind: "load" | "start"; resume: SavedRide | null } | null>(null);
+/** The device has no network. */
+export const netDown = signal(typeof navigator !== "undefined" && navigator.onLine === false);
+
+/** Back 15 s is offered when a recorded story is playing (not read by tapping) and the director can rewind. The preview has no director. */
+export function canRewind(manual: boolean, director: { rewind?: unknown } | null): boolean {
+  if (manual) return false;
+  if (director) return typeof director.rewind === "function";
+  return new URLSearchParams(location.search).get("demo") === "ride";
+}

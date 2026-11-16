@@ -2,7 +2,7 @@ import { useState } from "preact/hooks";
 import { endRide, currentDirector } from "../ride";
 import { nav, nowPlaying, pack } from "../state";
 import { fmtDistTime, pad2 } from "./format";
-import { sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { canRewind, sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 export function Dock() {
   const [confirm, setConfirm] = useState(false);
@@ -24,6 +24,7 @@ export function Dock() {
       {np?.kind === "story" && !sceneOpen.value ? (
         <div class="mini" data-testid="mini-bar">
           <div class="mini-title"><span class="label">Story playing</span><strong>{np.story.title}</strong></div>
+          {canRewind(np.manual, currentDirector()) ? <button type="button" class="btn small ghost" data-testid="mini-back" onClick={() => currentDirector()?.rewind?.(15)}>Back 15 s</button> : null}
           <button type="button" class="btn small" onClick={() => (np.manual ? currentDirector()?.nextParagraph() : currentDirector()?.togglePause())}>
             {np.manual ? "Next" : np.paused ? "Resume" : "Pause"}
           </button>

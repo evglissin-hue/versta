@@ -2,15 +2,17 @@ import { useEffect } from "preact/hooks";
 import { geoDistance } from "../geo";
 import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packIndex, screen, settings, simulated } from "../state";
 import type { Detour, LngLat, NavState, Pack, PackIndexEntry } from "../types";
-import { demoRide, finishOpen, finishedAt, following, joinTarget, lastTouch, peek, ringDemo, sceneOpen, soundOpen, stopsOpen, wholeRoute } from "./uistate";
+import { demoRide, finishOpen, finishedAt, following, joinTarget, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
 
 /** Preview route /?demo=ride&step=N: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time"] as const;
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
 function shift(p: LngLat, dx: number, dy: number): LngLat {
   return [p[0] + dx / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + dy / 111320];
 }
+
+const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline"];
 
 function demoState(p: Pack, step: string): void {
   const seg = p.segments[2]!;
@@ -22,7 +24,8 @@ function demoState(p: Pack, step: string): void {
   wholeRoute.value = false; peek.value = null; ringDemo.value = null; lastTouch.value = 0;
   settings.value = { ...settings.value, courseUp: true };
   nowPlaying.value = null; simulated.value = new URLSearchParams(location.search).get("simtag") === "1";
-  screen.value = step === "continue" ? "home" : "ride";
+  firstRideSheet.value = null; startPhase.value = null; startFailure.value = null; netDown.value = false;
+  screen.value = HOME_STEPS.includes(step) ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
   const tagged = p.asides.find((a) => a.tags.length > 0) ?? p.asides[0]!;
   const off = shift(on, 0, 70);
@@ -52,14 +55,24 @@ function demoState(p: Pack, step: string): void {
       const all = p.stops.flatMap((s) => s.stories);
       const skipped = new Set(all.filter((x) => x.kind === "optional").slice(0, 3).map((x) => x.id));
       const end = Date.now();
-      demoRide.value = { startedAt: end - (2 * 60 + 14) * 60000, finishedAt: end, heard: all.filter((x) => !skipped.has(x.id)).map((x) => x.id) };
+      demoRide.value = { startedAt: end - (2 * 60 + 14) * 60000, finishedAt: end, heard: all.filter((x) => !skipped.has(x.id)).map((x) => x.id).concat(p.asides.slice(0, 14).map((a) => a.id)) };
       const last = p.stops.length - 1;
       nav.value = { ...base, status: "finished", seg: last, alongSeg: 0, toStop: 0, distanceDone: p.km * 1000, distanceLeft: 0, nextCue: null, toCue: null, arrived: p.stops.map((_, i) => i) };
       break;
     }
     case "aside": nav.value = { ...base, toCue: 14 }; nowPlaying.value = { kind: "aside", aside: tagged }; break;
     case "gps-denied": nav.value = { ...IDLE_NAV, status: "locating" }; gpsError.value = "denied"; break;
-    case "stops-list": nav.value = base; stopsOpen.value = true; break;
+    case "stops-list": {
+      const heardNow = p.stops.slice(0, 2).flatMap((x) => x.stories.map((y) => y.id)).concat(p.stops[2]!.stories.slice(0, 1).map((y) => y.id));
+      demoRide.value = { startedAt: Date.now() - 50 * 60000, finishedAt: Date.now(), heard: heardNow };
+      nav.value = base; stopsOpen.value = true;
+      break;
+    }
+    case "first-ride": nav.value = IDLE_NAV; firstRideSheet.value = { id: p.id, resume: null }; break;
+    case "loading": nav.value = IDLE_NAV; startPhase.value = { id: p.id, phase: "loading" }; break;
+    case "load-failed": nav.value = IDLE_NAV; startFailure.value = { id: p.id, kind: "load", resume: null }; break;
+    case "offline": nav.value = IDLE_NAV; netDown.value = true; break;
+    case "story-manual": nav.value = { ...base, status: "at_stop", toStop: 0, arrived: [0, 1, 2] }; nowPlaying.value = { kind: "story", stop: 2, story, para: 1, paused: false, manual: true }; break;
     case "sound": nav.value = base; soundOpen.value = true; break;
     case "recentre":
     case "follow-free": nav.value = base; following.value = false; ringDemo.value = 0.55; break;

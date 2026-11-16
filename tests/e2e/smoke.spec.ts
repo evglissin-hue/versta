@@ -35,7 +35,7 @@ test("demo ride shows the banner and dock", async ({ page }) => {
 
 test("demo ride: every button is at least 48px tall at 360px wide", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
-  for (const step of ["riding", "at-stop", "story", "aside", "stops-list", "sound", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time"]) {
+  for (const step of ["riding", "at-stop", "story", "aside", "stops-list", "sound", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "story-manual"]) {
     await page.goto(`/?demo=ride&step=${step}`);
     await expect(page.getByTestId("banner").or(page.getByTestId("finish"))).toBeVisible();
     // Stop markers shrink to 30px at low zoom on purpose (the map is still easing in on the rider when this runs), so they are left out then.
@@ -100,8 +100,10 @@ test("finish logbook shows the ride, the stories not heard and two ways out", as
   await expect(book).toContainText("Thames Loop");
   await expect(book).toContainText("2 h 14 min");
   await expect(book).toContainText("15/18");
+  await expect(page.getByTestId("avg-speed")).toHaveText("10.3");
+  await expect(page.getByTestId("asides-heard")).toHaveText("14/21");
   await expect(book.getByRole("button", { name: "Play" })).toHaveCount(3);
-  await book.getByRole("button", { name: "Back to the map" }).click();
+  await book.getByRole("button", { name: "Back to map" }).click();
   await expect(book).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Stops 13\/13/ })).toBeVisible();
 });
@@ -121,6 +123,89 @@ test("the Stops button counts the stops done, and the aside card shows its tags"
   await expect(page.getByRole("button", { name: "Stops 2/13" })).toBeVisible();
   await page.goto("/?demo=ride&step=aside");
   await expect(page.getByTestId("aside-card").locator(".tag").first()).toBeVisible();
+});
+
+/* ---------------------------------------------------------------- iteration 3: polish */
+
+test("home: what is inside the route, the Android line, no offline warning online", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("inside")).toHaveText("13 stops, 18 stories, 21 passing-by stories, about 30 min of listening");
+  await expect(page.getByTestId("android-link")).toHaveAttribute("href", "https://github.com/evglissin-hue/versta/releases/tag/android-latest");
+  await expect(page.getByTestId("offline-note")).toHaveCount(0);
+});
+
+test("home preview states: first ride sheet, loading, load failure, offline, all with big targets and no overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  for (const step of ["first-ride", "loading", "load-failed", "offline"]) {
+    await page.goto(`/?demo=ride&step=${step}`);
+    await expect(page.getByTestId("route-card")).toBeVisible();
+    if (step === "first-ride") {
+      const sheet = page.getByTestId("first-ride");
+      await expect(sheet).toContainText("Versta follows your ride by GPS and talks to you as you go.");
+      await expect(sheet.getByRole("button", { name: "Start the ride" })).toBeVisible();
+    }
+    if (step === "loading") await expect(page.getByTestId("route-card").getByRole("button", { name: "Loading the route" })).toBeDisabled();
+    if (step === "load-failed") {
+      await expect(page.getByTestId("load-failure")).toContainText("Could not load the route. Check your connection and try again.");
+      await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    }
+    if (step === "offline") await expect(page.getByTestId("offline-note")).toContainText("offline");
+    const small = await page.$$eval("button, a.linkbtn", (els) => els.filter((e) => e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().height < 47.5).map((e) => e.textContent));
+    expect(small, `small targets in ${step}`).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), `overflow in ${step}`).toBe(false);
+  }
+});
+
+test("the first-ride sheet shows once, before the browser asks for anything, and never again", async ({ page, context }) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 51.5, longitude: -0.1 });
+  await page.goto("/");
+  await page.getByTestId("route-card").getByRole("button", { name: "Ride", exact: true }).click();
+  const sheet = page.getByTestId("first-ride");
+  await expect(sheet).toBeVisible();
+  await expect(page.getByTestId("ride")).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Start the ride" }).click();
+  await expect(page.getByTestId("ride")).toBeVisible({ timeout: 20_000 });
+  expect(await page.evaluate(() => localStorage.getItem("versta:firstride"))).toBe("1");
+  await page.goto("/");
+  await page.getByTestId("route-card").getByRole("button", { name: /^Ride|Continue/ }).first().click();
+  await expect(page.getByTestId("ride")).toBeVisible({ timeout: 20_000 });
+});
+
+test("the sound sheet is grouped, and the soundscape level writes the setting", async ({ page }) => {
+  await page.goto("/?demo=ride&step=sound");
+  const sheet = page.getByTestId("sound-sheet");
+  for (const h of ["Voices", "Atmosphere", "Riding"]) await expect(sheet.getByText(h, { exact: true })).toBeVisible();
+  for (const l of ["Story voice", "Turn instructions", "Soundscape", "Music", "Start stories on arrival", "Keep the screen awake", "Course up", "Recentre by itself"]) await expect(sheet.getByText(l, { exact: true }).first()).toBeVisible();
+  await sheet.getByTestId("bed-level").getByRole("radio", { name: "Rich" }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("versta:settings") ?? "{}").bedLevel)).toBe("rich");
+  await sheet.getByTestId("bed-level").getByRole("radio", { name: "Soft" }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("versta:settings") ?? "{}").bedLevel)).toBe("soft");
+  await sheet.getByText("Recentre by itself", { exact: true }).click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("versta:settings") ?? "{}").autoRecentre)).toBe(false);
+});
+
+test("the scene shows Back 15 s and the time left for a recorded story, and neither Back 15 s nor a time when read by tapping", async ({ page }) => {
+  await page.goto("/?demo=ride&step=story");
+  const scene = page.getByTestId("scene");
+  await expect(scene.getByRole("button", { name: "Back 15 s" })).toBeVisible();
+  await expect(page.getByTestId("time-left")).toHaveText(/^(under a minute|\d+ min) left$/);
+  await page.goto("/?demo=ride&step=story-manual");
+  await expect(page.getByTestId("scene")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back 15 s" })).toHaveCount(0);
+  await expect(page.getByTestId("time-left")).toHaveCount(0);
+  await page.goto("/?demo=ride&step=scene-hidden");
+  await expect(page.getByTestId("mini-bar").getByRole("button", { name: "Back 15 s" })).toBeVisible();
+});
+
+test("the stops list shows distance from the start, time to stops ahead, pint stops and story dots", async ({ page }) => {
+  await page.goto("/?demo=ride&step=stops-list");
+  const list = page.getByTestId("stops-list");
+  await expect(list).toContainText("from start");
+  await expect(list.getByTestId("stop-eta").first()).toContainText(/about \d+ min|about \d+ h/);
+  await expect(list.locator(".chip.pint").first()).toBeVisible();
+  await expect(list.locator(".sdots i.on").first()).toBeVisible();
+  await expect(list.locator(".sdots i:not(.on)").first()).toBeVisible();
 });
 
 /* ---------------------------------------------------------------- iteration 3: the camera and the riding controls */
