@@ -1,6 +1,14 @@
-/** Web Audio helpers for the generated bed: the context, noise buffer, sessions and the timers that drive them. */
+/** Web Audio helpers for the generated bed: noise buffer, sessions and the timers that drive them. */
 
-export interface Synth { ctx: AudioContext; master: GainNode; noise: AudioBuffer }
+/** Everything the generated sounds connect to. The graph itself is built in graph.ts. */
+export interface Synth {
+  ctx: AudioContext;
+  /** Input of the bed bus: layers, loops and music connect here and are carved by the pocket. */
+  bed: GainNode;
+  /** Input of the master bus: sounds that bypass the pocket (the chime). */
+  master: GainNode;
+  noise: AudioBuffer;
+}
 
 type Timer = ReturnType<typeof setTimeout>;
 
@@ -9,23 +17,12 @@ export interface Session { bus: GainNode; srcs: AudioScheduledSourceNode[]; time
 
 export const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
 
-/** Create the audio context, or null where Web Audio does not exist (Node, old browsers). */
-export function createSynth(): Synth | null {
-  const g = globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
-  const C = g.AudioContext ?? g.webkitAudioContext;
-  if (!C) return null;
-  try {
-    const ctx = new C();
-    const master = ctx.createGain();
-    master.gain.value = 0.85;
-    master.connect(ctx.destination);
-    const noise = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
-    const d = noise.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    return { ctx, master, noise };
-  } catch {
-    return null;
-  }
+/** A three second buffer of white noise, shared by every noise source. */
+export function makeNoise(ctx: BaseAudioContext): AudioBuffer {
+  const noise = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+  const d = noise.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return noise;
 }
 
 export function gain(x: Synth, v: number): GainNode {
@@ -45,7 +42,7 @@ export function filter(x: Synth, type: BiquadFilterType, f: number, q?: number):
 /** `instant` skips the slow fade-in, for one-off sounds such as the chime. */
 export function session(x: Synth, level: number, instant = false): Session {
   const s: Session = { bus: gain(x, instant ? level : 0), srcs: [], timers: [], dead: false, level };
-  s.bus.connect(x.master);
+  s.bus.connect(instant ? x.master : x.bed);
   if (!instant) s.bus.gain.setTargetAtTime(level, x.ctx.currentTime, 0.6);
   return s;
 }

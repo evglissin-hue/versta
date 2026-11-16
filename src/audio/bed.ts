@@ -1,83 +1,109 @@
-/** The generated bed (ambience plus music) and the chime, on one lazily created AudioContext. */
-import { type Session, type Synth, createSynth, endSession, session } from "./synth";
-import { L, buildAmbience, buildMusic } from "./soundscapes";
+/** The bed (recorded and generated soundscape plus music) and the chime, on the graph's one AudioContext. */
+import { type Graph, type Levels, createGraph } from "./graph";
+import { type LoopLib, createLoopLib } from "./loops";
+import { L, allLoops, buildAmbience, buildMusic, loopsFor } from "./soundscapes";
+import { type Session, endSession, session } from "./synth";
 
 export type Mood = "minor" | "bright";
 
-const AMB_LEVEL = { open: 0.9, ducked: 0.5 };
-const MUS_LEVEL = { open: 0.8, ducked: 0.45 };
+/** Soundscape and music levels on the bed bus. The music sits under the soundscape. */
+const AMB_LEVEL = 0.9;
+const MUS_LEVEL = 0.55;
+/** How long a starting soundscape waits for its recordings before it starts without them. */
+const LOAD_WAIT_MS = 1500;
 
 export interface Bed {
   /** Create or resume the context. Returns false where Web Audio is not available. */
   ensure(): boolean;
+  /** The graph, once `ensure` has created it. */
+  readonly graph: Graph | null;
+  /** Fetch and decode every recorded loop in the background. */
+  preload(): void;
   start(ambience: string | null, mood: Mood | null): void;
   stop(fadeSeconds: number): void;
-  duck(on: boolean): void;
   /** Two strokes of a ship's bell. */
   chime(): void;
   dispose(): void;
 }
 
+declare global { interface Window { __verstaAudio?: { levels(): Levels } } }
+
 export function createBed(): Bed {
-  let x: Synth | null = null;
+  let g: Graph | null = null;
+  let loops: LoopLib | null = null;
   let failed = false;
   let amb: Session | null = null;
   let mus: Session | null = null;
-  let ducked = false;
+  let startToken = 0;
 
   const ensure = (): boolean => {
-    if (!x && !failed) {
-      x = createSynth();
-      if (!x) failed = true;
+    if (!g && !failed) {
+      g = createGraph();
+      if (!g) failed = true;
+      else {
+        const base = typeof import.meta.env?.BASE_URL === "string" ? import.meta.env.BASE_URL : "/";
+        loops = createLoopLib(g.synth.ctx, base);
+        const graph = g;
+        if (typeof window !== "undefined") window.__verstaAudio = { levels: () => graph.levels() };
+      }
     }
-    if (x && x.ctx.state === "suspended") { try { void x.ctx.resume().catch(() => {}); } catch {} }
-    return x !== null;
+    if (g && g.synth.ctx.state === "suspended") { try { void g.synth.ctx.resume().catch(() => {}); } catch {} }
+    return g !== null;
   };
 
   const stop = (fade: number): void => {
-    if (!x) return;
-    endSession(x, amb, fade);
-    endSession(x, mus, fade);
+    startToken++;
+    if (!g) return;
+    endSession(g.synth, amb, fade);
+    endSession(g.synth, mus, fade);
     amb = mus = null;
   };
 
   return {
     ensure,
+    get graph() { return g; },
+    preload() {
+      if (!ensure() || !loops) return;
+      void loops.load(allLoops());
+    },
     start(ambience, mood) {
-      if (!ensure() || !x) return;
+      if (!ensure() || !g || !loops) return;
+      const x = g.synth, lib = loops;
       stop(0.4);
-      if (ambience !== null) {
-        amb = session(x, ducked ? AMB_LEVEL.ducked : AMB_LEVEL.open);
-        buildAmbience(x, amb, ambience);
-      }
-      if (mood !== null) {
-        mus = session(x, ducked ? MUS_LEVEL.ducked : MUS_LEVEL.open);
-        buildMusic(x, mus, mood);
-      }
+      const token = startToken;
+      const go = (): void => {
+        if (token !== startToken) return;
+        if (ambience !== null) {
+          amb = session(x, AMB_LEVEL);
+          buildAmbience(x, amb, ambience, lib);
+        }
+        if (mood !== null) {
+          mus = session(x, MUS_LEVEL);
+          buildMusic(x, mus, mood);
+        }
+      };
+      if (ambience === null) { go(); return; }
+      let waited = false;
+      const timer = setTimeout(() => { waited = true; go(); }, LOAD_WAIT_MS);
+      void lib.load(loopsFor(ambience)).then(() => { if (!waited) { clearTimeout(timer); go(); } });
     },
     stop,
-    duck(on) {
-      ducked = on;
-      if (!x) return;
-      const t = x.ctx.currentTime;
-      if (amb && !amb.dead) amb.bus.gain.setTargetAtTime(on ? AMB_LEVEL.ducked : AMB_LEVEL.open, t, 0.5);
-      if (mus && !mus.dead) mus.bus.gain.setTargetAtTime(on ? MUS_LEVEL.ducked : MUS_LEVEL.open, t, 0.5);
-    },
     chime() {
-      if (!ensure() || !x) return;
+      if (!ensure() || !g) return;
+      const x = g.synth;
       const s = session(x, 1, true);
       L.bell(x, s, 1, 660, 0.05, 0.5);
       L.bell(x, s, 1, 660, 0.65, 0.5);
       // let both strokes ring out, then free the nodes
-      const owner = x;
-      setTimeout(() => { endSession(owner, s, 0.4); }, 2500);
+      setTimeout(() => { endSession(x, s, 0.4); }, 2500);
     },
     dispose() {
       stop(0.1);
-      const c = x;
-      x = null;
+      const c = g;
+      g = null;
       failed = true;
-      if (c) setTimeout(() => { void c.ctx.close().catch(() => {}); }, 1000);
+      if (typeof window !== "undefined") delete window.__verstaAudio;
+      c?.dispose();
     },
   };
 }

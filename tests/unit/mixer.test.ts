@@ -152,3 +152,30 @@ describe("mixer (virtual)", () => {
     await expect(m.unlock()).resolves.toBeUndefined();
   });
 });
+
+describe("recorded loops", () => {
+  it("crossfadeLoop shortens by the fade and joins the end into the start without a jump", async () => {
+    const { crossfadeLoop } = await import("../../src/audio/loops");
+    const sr = 1000, n = 10 * sr;
+    // a steady tone whose period does not divide the length: a plain loop would click
+    const tone = new Float32Array(n).map((_, i) => Math.sin((2 * Math.PI * 7.3 * i) / sr));
+    const [out] = crossfadeLoop([tone], sr, 1);
+    expect(out!.length).toBe(n - sr);
+    // the step from the last sample to the first is no bigger than the step between neighbours elsewhere
+    const jump = Math.abs(out![0]! - out![out!.length - 1]!);
+    const typical = Math.max(...Array.from({ length: 200 }, (_, i) => Math.abs(out![3000 + i + 1]! - out![3000 + i]!)));
+    expect(jump).toBeLessThan(typical * 2);
+    // outside the faded part it is the original
+    expect(out![5000]).toBe(tone[5000]);
+    // equal power: a constant signal stays constant across the fade
+    const [flat] = crossfadeLoop([new Float32Array(n).fill(0.5)], sr, 1);
+    expect(Math.max(...flat!.subarray(0, sr))).toBeLessThan(0.5 * Math.SQRT2 + 1e-6);
+  });
+
+  it("every soundscape recipe names loops that are in the loop list", async () => {
+    const { RECIPES, allLoops, loopsFor } = await import("../../src/audio/soundscapes");
+    const all = new Set(allLoops());
+    for (const name of Object.keys(RECIPES)) for (const l of loopsFor(name)) expect(all.has(l)).toBe(true);
+    expect(loopsFor("no-such-soundscape")).toEqual(loopsFor("river"));
+  });
+});
