@@ -1,0 +1,36 @@
+/* Map furniture. Colours come from src/styles/tokens.css. */
+.versta-map { position: relative; width: 100%; height: 100%; background: var(--land); overflow: hidden; touch-action: none; }
+.versta-map .maplibregl-canvas { outline: none; }
+
+/* Attribution stays visible, lifted above the dock. The shell can set --map-attrib-bottom to its dock height. */
+.versta-map .maplibregl-ctrl-bottom-left { bottom: var(--map-attrib-bottom, 96px); left: 0; }
+.versta-map .maplibregl-ctrl-attrib { background: color-mix(in srgb, var(--paper) 88%, transparent); color: var(--ink); font-family: var(--f-body); font-size: 12px; }
+.versta-map .maplibregl-ctrl-attrib a { color: var(--ink); }
+
+/* Stop markers: a 48px hit area around a 30px numbered disc. */
+.vm-stop { appearance: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; box-sizing: border-box; width: 48px; height: 48px; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.vm-stop-dot {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+  font: 600 15px/1 var(--f-display); letter-spacing: 0.02em;
+  background: var(--paper); color: var(--ink); border: 2px solid var(--ink);
+  box-shadow: 0 0 0 2px var(--land);
+}
+.vm-stop.is-next .vm-stop-dot { background: var(--mark); color: var(--on-mark); border-color: var(--mark); width: 34px; height: 34px; font-size: 17px; }
+.vm-stop.is-arrived .vm-stop-dot { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.vm-stop:focus-visible .vm-stop-dot { outline: 3px solid var(--mark); outline-offset: 3px; }
+
+/* Rider: accuracy circle, dot, heading wedge. Never takes touches. */
+.vm-rider { position: relative; width: 0; height: 0; pointer-events: none; }
+.vm-acc { position: absolute; left: 0; top: 0; border-radius: 50%; transform: translate(-50%, -50%); background: color-mix(in srgb, var(--mark) 16%, transparent); border: 1px solid color-mix(in srgb, var(--mark) 45%, transparent); }
+.vm-arrow { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; }
+.vm-arrow svg { width: 52px; height: 52px; display: block; overflow: visible; }
+.vm-arrow path { fill: var(--mark); stroke: var(--paper); stroke-width: 2.5; stroke-linejoin: round; }
+.vm-rider.is-off .vm-arrow path { fill: var(--warn); }
+.vm-rider.is-off .vm-pip { background: var(--warn); }
+.vm-pip { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--mark); border: 3px solid var(--paper); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+.vm-rider.is-off .vm-acc { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.vm-rider.no-heading .vm-arrow { display: none; }
+
+/* Stop discs sit above the rider so a stop's number stays readable when the rider is on it. */
+.maplibregl-marker:has(.vm-stop) { z-index: 2; }
+@media (prefers-color-scheme: dark) { .versta-map .maplibregl-ctrl-attrib-button { filter: invert(1); } }
