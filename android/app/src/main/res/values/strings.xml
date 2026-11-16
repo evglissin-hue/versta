@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Versta</string>
+    <string name="title_activity_main">Versta</string>
+    <string name="package_name">app.versta.ride</string>
+    <string name="custom_url_scheme">app.versta.ride</string>
+    <string name="capacitor_background_geolocation_notification_channel_name">Ride in progress</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_tracking</string>
+    <string name="capacitor_background_geolocation_notification_color">#0E2233</string>
+</resources>

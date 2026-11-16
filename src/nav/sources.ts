@@ -1,8 +1,20 @@
 import { cumulative, makeProjection, pointAlong, project, unproject, type XY } from "../geo";
+import { createNativeGpsSource } from "../native/gps";
+import { isNative } from "../native/platform";
 import type { Fix, FixSource, GpsError, Pack } from "../types";
 
-/** The device GPS through the browser Geolocation API. */
+/** Which device GPS the app uses: the background plugin inside the Android app, the browser API anywhere else. */
+export function gpsKind(): "native" | "browser" {
+  return isNative() ? "native" : "browser";
+}
+
+/** The device GPS: native background location in the Android app, the browser Geolocation API otherwise. */
 export function createGpsSource(): FixSource {
+  return gpsKind() === "native" ? createNativeGpsSource() : createBrowserGpsSource();
+}
+
+/** The device GPS through the browser Geolocation API. */
+export function createBrowserGpsSource(): FixSource {
   let watch: number | null = null;
   return {
     start(onFix, onError) {
