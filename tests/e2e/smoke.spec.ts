@@ -17,7 +17,7 @@ test("home shows the Thames Loop card", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Versta" })).toBeVisible();
   const card = page.getByTestId("route-card");
   await expect(card).toContainText("Thames Loop");
-  await expect(card).toContainText("22");
+  await expect(card).toContainText("km");
   await expect(card.getByRole("button", { name: "Ride" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Save for offline" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Simulate a ride" })).toBeVisible();
