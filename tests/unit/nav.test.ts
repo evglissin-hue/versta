@@ -91,7 +91,7 @@ function run(fixes: Fix[]): Run {
 const arrivals = (events: NavEvent[]): number[] => events.flatMap((e) => (e.type === "arrive" ? [e.stop] : []));
 const cueEvents = (events: NavEvent[]) => events.flatMap((e) => (e.type === "cue" ? [e] : []));
 
-/** Turns so close to a stop that they are announced as the rider sets off, with no earlier warning. */
+/** Turns so close to a stop that they are announced as the rider sets off, with no earlier warning. This ride never stands still at a stop, so the old rule applies. */
 const EXPECTED_NOW_ONLY = ["s03-003", "s09-002", "s11-003"];
 
 describe("navigation engine on the Thames Loop", () => {

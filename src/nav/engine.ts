@@ -19,6 +19,12 @@ const WINDOW_BEHIND = 30;
 const WINDOW_AHEAD = 400;
 const BACK_ON_ROUTE = 25;
 const DEPART_ALONG = 15;
+/** Setting off: a rider this far along the next stretch, this close to it, moving with it for this many fixes, has left the stop. */
+const SET_OFF_ALONG = 20;
+const SET_OFF_LINE = 15;
+const SET_OFF_HEADING = 60;
+const SET_OFF_FIXES = 2;
+const STANDING_SPEED = 1;
 const ASIDE_LATE = 60;
 const LATE_CUE = 30;
 const UNKNOWN_SPEED = 4;
@@ -116,6 +122,10 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   let wrongSince: number | null = null;
   let wrongFrom = 0;
   let rightSince: number | null = null;
+  /** Consecutive fixes at a stop that look like riding away along the next stretch. */
+  let settingOff = 0;
+  /** The stop the rider has come to rest at. Only a rider who stopped can set off; one rolling through leaves by the radius. */
+  let stoodAt = -1;
 
   function clearWrongWay(): void {
     s.wrongWay = false;
@@ -499,7 +509,16 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     const g = segAt(s.seg);
     const n = nearestOnPolyline(g.pts, p, g.cum, s.alongSeg - WINDOW_BEHIND, s.alongSeg + WINDOW_AHEAD);
     const radius = radiusOf(atStop);
-    if (dist(p, stopAt(atStop)) > radius + LEAVE_EXTRA || n.along > LEAVE_ALONG) {
+    // A first turn 60 m from a stop is passed before the leave radius is reached, so a rider who stopped and is now
+    // plainly riding away along the line has left already. The heading test keeps a rider standing where the line
+    // doubles back at the stop; having stood still keeps one who is still arriving where the line overshoots it.
+    if (curSpeed !== null && curSpeed < STANDING_SPEED) stoodAt = atStop;
+    const lineBearing = pointAlong(g.pts, Math.min(g.len, Math.max(0, n.along)), g.cum).bearing;
+    const goingWithIt = curHeading !== null && curSpeed !== null && curSpeed > WRONG_MIN_SPEED
+      && Math.abs(angleDiff(lineBearing, curHeading)) < SET_OFF_HEADING;
+    settingOff = stoodAt === atStop && goingWithIt && n.along > SET_OFF_ALONG && n.dist < SET_OFF_LINE ? settingOff + 1 : 0;
+    if (dist(p, stopAt(atStop)) > radius + LEAVE_EXTRA || n.along > LEAVE_ALONG || settingOff >= SET_OFF_FIXES) {
+      settingOff = 0;
       ev.push({ type: "leave", stop: atStop });
       s.status = "riding";
       atStop = -1;

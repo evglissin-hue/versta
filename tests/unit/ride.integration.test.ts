@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS, type DirectorLogEntry, type Fix, type NowPlaying, typ
 
 const pack = packJson as unknown as Pack;
 
-interface RideResult { log: DirectorLogEntry[]; arrived: number[]; status: string; overlaps: string[]; seconds: number }
+interface RideResult { log: DirectorLogEntry[]; arrived: number[]; status: string; overlaps: string[]; seconds: number; late: string[]; leads: number[] }
 
 /** Ride every segment at `speed` m/s. The rider stands still while a story plays at a stop, as a real one would. */
 async function ride(speed: number, patch: Partial<Settings> = {}, fromSeg = 1): Promise<RideResult> {
@@ -22,6 +22,10 @@ async function ride(speed: number, patch: Partial<Settings> = {}, fromSeg = 1): 
   const log: DirectorLogEntry[] = [];
   const overlaps: string[] = [];
   let now: NowPlaying = null;
+  /** Turns first heard at the turn itself, and for the others the metres of warning given. */
+  const late: string[] = [];
+  const leads: number[] = [];
+  const warned = new Set<string>();
   const mixer = createMixer({ baseUrl: "", virtual: true });
   const engine = createNavEngine(pack);
   const director = createDirector({
@@ -31,6 +35,11 @@ async function ride(speed: number, patch: Partial<Settings> = {}, fromSeg = 1): 
   const feed = async (lng: number, lat: number, heading: number | null, moving: boolean): Promise<void> => {
     const fix: Fix = { lng, lat, accuracy: 6, heading, speed: moving ? speed : 0, time: clock };
     const events = engine.update(fix);
+    for (const e of events) {
+      if (e.type !== "cue" || e.cue.turn === "depart" || e.cue.quiet) continue;
+      if (e.phase === "approach") { warned.add(e.cue.id); leads.push(engine.state.toCue ?? 0); }
+      else if (!warned.has(e.cue.id)) late.push(e.cue.id);
+    }
     director.handle(events, engine.state);
     clock += 1000;
     await vi.advanceTimersByTimeAsync(1000);
@@ -63,7 +72,7 @@ async function ride(speed: number, patch: Partial<Settings> = {}, fromSeg = 1): 
   }
   // let any last story finish
   for (let i = 0; i < 600 && now !== null; i++) await feed(pack.stops.at(-1)!.at[0], pack.stops.at(-1)!.at[1], null, false);
-  const result = { log, arrived: [...engine.state.arrived], status: engine.state.status, overlaps, seconds: (clock - 1_700_000_000_000) / 1000 };
+  const result = { log, arrived: [...engine.state.arrived], status: engine.state.status, overlaps, seconds: (clock - 1_700_000_000_000) / 1000, late, leads };
   director.dispose();
   return result;
 }
@@ -100,6 +109,11 @@ describe("whole rides, engine and director together", () => {
     expect(played.length).toBeGreaterThanOrEqual(6);
     for (let i = 1; i < played.length; i++) expect((played[i]!.at - played[i - 1]!.at) / 1000).toBeGreaterThanOrEqual(300);
     expect(r.log.some((e) => e.what === "off_route")).toBe(false);
+    // a rider on the line is never told they are riding against it, wherever the line doubles back
+    expect(r.log.some((e) => e.what === "wrong_way")).toBe(false);
+    // no turn is first heard at the turn itself, and every warning comes with room to act on it
+    expect(r.late).toEqual([]);
+    expect(Math.min(...r.leads)).toBeGreaterThanOrEqual(20);
     expect(r.overlaps).toEqual([]);
   }, 120_000);
 
@@ -109,6 +123,9 @@ describe("whole rides, engine and director together", () => {
     const spoken = ids(r.log, "cue_spoken");
     const mustSpeak = pack.cues.filter((c) => !c.quiet).map((c) => c.id);
     expect(mustSpeak.filter((id) => !spoken.includes(id))).toEqual([]);
+    expect(r.log.some((e) => e.what === "wrong_way")).toBe(false);
+    expect(r.late).toEqual([]);
+    expect(Math.min(...r.leads)).toBeGreaterThanOrEqual(20);
   }, 120_000);
 
   it("rich mode plays more passing-by stories than sparse, and off plays none", async () => {
