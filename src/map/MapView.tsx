@@ -4,10 +4,10 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
 import { nav, openStop, settings } from "../state";
-import { finishOpen, joinChoice, joinTarget } from "../ui/uistate";
+import { finishOpen, followZoom, joinChoice, joinTarget, lastTouch, leaveFollow, peek, wholeRoute } from "../ui/uistate";
 import { tileTemplate } from "../offline";
 import type { LngLat, NavState, Pack } from "../types";
-import { lineLength, metresPerPixel, splitAt } from "./geometry";
+import { angleDiff, cameraZoom, clampFollowZoom, lineLength, lookAheadPadding, metresPerPixel, splitAt } from "./geometry";
 import { DARK, EMPTY, LIGHT, ROUTE_SOURCES, TILEJSON_URL, buildStyle, type Palette, type RouteData } from "./style";
 
 export interface MapViewProps {
@@ -22,12 +22,18 @@ export interface MapViewProps {
 
 declare global { interface Window { __verstaMap?: maplibregl.Map } }
 
-const FOLLOW_ZOOM = 16.2;
 const PAD_TOP = 150;
 const PAD_BOTTOM = 230;
+/** Below this zoom the stop markers shrink so the ones along the river do not pile up. */
+const LOW_ZOOM = 13;
+/** Bearing changes smaller than this are ignored so the map does not twitch. */
+const BEARING_DEADBAND = 8;
+/** In course up the rider sits this far down the visible map (0.5 is the middle). */
+const LOOK_AHEAD = 2 / 3;
 /** Share of the height a bottom sheet may cover (see .sheet.bottom in app.css). */
 const SHEET_SHARE = 0.62;
 const GLIDE_MS = 900;
+const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 const darkQuery = (): MediaQueryList => window.matchMedia("(prefers-color-scheme: dark)");
 
 const pad2 = (i: number): string => String(i + 1).padStart(2, "0");
@@ -142,10 +148,12 @@ export function MapView(props: MapViewProps) {
       const riderMarker = new maplibregl.Marker({ element: rider.outer, anchor: "center" });
       let riderOn = false;
       let shown: LngLat | null = null;
-      let glide: { from: LngLat; to: LngLat; t0: number } | null = null;
+      let glide: { from: LngLat; to: LngLat; t0: number; ms: number } | null = null;
       let raf = 0;
       let accuracy = 0;
       let heading: number | null = null;
+      /** How long the rider marker and the camera take to cover the gap between two fixes. */
+      let glideMs = GLIDE_MS;
 
       const paintAccuracy = (): void => {
         if (!shown) return;
@@ -161,14 +169,14 @@ export function MapView(props: MapViewProps) {
       const step = (now: number): void => {
         raf = 0;
         if (!glide) return;
-        const t = Math.min(1, (now - glide.t0) / GLIDE_MS);
+        const t = Math.min(1, (now - glide.t0) / glide.ms);
         shown = [glide.from[0] + (glide.to[0] - glide.from[0]) * t, glide.from[1] + (glide.to[1] - glide.from[1]) * t];
         riderMarker.setLngLat(shown);
         if (t < 1) raf = requestAnimationFrame(step); else glide = null;
       };
       const moveRider = (to: LngLat): void => {
         if (!riderOn) { riderOn = true; shown = to; riderMarker.setLngLat(to).addTo(m); return; }
-        glide = { from: shown ?? to, to, t0: performance.now() };
+        glide = { from: shown ?? to, to, t0: performance.now(), ms: glideMs };
         if (!raf) raf = requestAnimationFrame(step);
       };
       const hideRider = (): void => {
@@ -176,13 +184,51 @@ export function MapView(props: MapViewProps) {
       };
       m.on("rotate", paintHeading);
       m.on("zoom", paintAccuracy);
+      const paintLowZoom = (): void => { container.classList.toggle("is-low", m.getZoom() < LOW_ZOOM); };
+      m.on("zoom", paintLowZoom);
+      paintLowZoom();
       cleanups.push(() => { if (raf) cancelAnimationFrame(raf); });
 
       /* ---- camera ---- */
-      let mode: "overview" | "follow" | null = null;
+      let mode: "overview" | "follow" | "whole" | "peek" | null = null;
       let overviewHadRider = false;
+      /** The bearing the follow camera holds; it only moves when the route turns by more than the dead band. */
+      let camBearing: number | null = null;
+      /** What the camera added to the rider's own zoom at the last frame (turn close, fast). */
+      let zoomAdj = 0;
+      /** Fingers (or the mouse) on the map right now, and when the last wheel turn or touch move was. A camera move in the middle of a gesture cancels it. */
+      const down = new Map<number, number>();
+      let lastGesture = -1e9;
+      let lastWheel = -1e9;
+      const gestureBusy = (): boolean => {
+        const t = performance.now();
+        for (const [id, at] of down) if (t - at > 10000) down.delete(id);
+        return down.size > 0 || t - lastWheel < 400;
+      };
       /** A bottom sheet covers the lower part of the map: the stop sheet, or the finish logbook. */
       const sheetUp = (n: NavState): boolean => openStop.value !== null || (n.status === "finished" && finishOpen.value);
+      /** The part of the map the rider can see: below the banner, above the dock or sheet. */
+      const insets = (lowered: boolean): { top: number; bottom: number } => {
+        const h = container.clientHeight || 800;
+        const box = container.getBoundingClientRect();
+        const banner = document.querySelector(".banner");
+        const dock = document.querySelector(".ride-bottom");
+        const top = banner ? Math.round(banner.getBoundingClientRect().bottom - box.top) + 8 : 16;
+        const bottom = lowered ? Math.round(h * SHEET_SHARE) : dock ? Math.round(box.bottom - dock.getBoundingClientRect().top) + 8 : PAD_BOTTOM;
+        return { top: clamp(top, 0, h * 0.4), bottom: clamp(bottom, 0, h * 0.7) };
+      };
+      /**
+       * Fit bounds inside the padding. The follow camera leaves its own padding on the map, and MapLibre adds that to the padding
+       * asked for, so the fit is worked out with the map's padding cleared and the move ends with it cleared.
+       */
+      const fit = (b: maplibregl.LngLatBounds, padding: { top: number; bottom: number; left: number; right: number }): void => {
+        const none = { top: 0, bottom: 0, left: 0, right: 0 };
+        const saved = m.getPadding();
+        m.setPadding(none);
+        const cam = m.cameraForBounds(b, { padding, maxZoom: 16, bearing: 0 });
+        m.setPadding(saved);
+        if (cam) m.easeTo({ center: cam.center, zoom: cam.zoom, bearing: 0, padding: none, duration: 700, essential: true });
+      };
       const frame = (force: boolean): void => {
         const n = nav.value;
         const p = live.current;
@@ -191,13 +237,40 @@ export function MapView(props: MapViewProps) {
         const lowered = sheetUp(n);
         const padBottom = lowered ? Math.round(h * SHEET_SHARE) : PAD_BOTTOM;
         if ((n.status === "riding" || n.status === "at_stop") && target) {
+          const inset = insets(lowered);
+          const pk = peek.peek();
+          if (pk) {
+            if (mode !== "peek" || force) {
+              mode = "peek";
+              m.easeTo({ center: pk.at, zoom: 17, padding: { top: inset.top, bottom: inset.bottom, left: 0, right: 0 }, duration: 800, essential: true });
+            }
+            return;
+          }
+          if (wholeRoute.peek()) {
+            if (mode === "whole" && !force) return;
+            mode = "whole";
+            const b = new maplibregl.LngLatBounds();
+            for (const seg of pack.segments) for (const c of seg) b.extend(c);
+            for (const s of pack.stops) b.extend(s.at);
+            b.extend(target);
+            fit(b, { top: inset.top + 16, bottom: inset.bottom + 16, left: 40, right: 72 });
+            return;
+          }
           if (!p.follow) { mode = null; return; }
-          const bearing = settings.value.courseUp ? (n.routeBearing ?? m.getBearing()) : 0;
+          if (!force && gestureBusy()) return;
           const first = mode !== "follow" || force;
           mode = "follow";
+          const courseUp = settings.value.courseUp;
+          const want = courseUp ? (n.routeBearing ?? camBearing ?? m.getBearing()) : 0;
+          if (first || camBearing === null || !courseUp || Math.abs(angleDiff(want, camBearing)) >= BEARING_DEADBAND) camBearing = want;
+          const speed = n.speedAvg ?? n.fix?.speed ?? null;
+          const turnAhead = !!n.nextCue && n.nextCue.turn !== "straight" && n.nextCue.turn !== "depart";
+          const zoom = cameraZoom(clampFollowZoom(followZoom.peek()), { toCue: n.toCue, turnAhead, speed });
+          zoomAdj = zoom - clampFollowZoom(followZoom.peek());
+          const pad = courseUp ? lookAheadPadding(h, inset.top, inset.bottom, LOOK_AHEAD) : inset;
           m.easeTo({
-            center: target, zoom: FOLLOW_ZOOM, bearing, padding: { top: PAD_TOP, bottom: padBottom, left: 0, right: 0 },
-            duration: first ? 700 : GLIDE_MS, easing: first ? (t: number) => t * (2 - t) : (t: number) => t, essential: true,
+            center: target, zoom, bearing: camBearing, padding: { top: pad.top, bottom: pad.bottom, left: 0, right: 0 },
+            duration: first ? 800 : glideMs, easing: first ? (t: number) => t * (2 - t) : (t: number) => t, essential: true,
           });
         } else if (n.status === "idle" || n.status === "locating" || n.status === "to_start" || n.status === "finished") {
           const hasRider = !!target && n.status !== "finished";
@@ -210,8 +283,8 @@ export function MapView(props: MapViewProps) {
           for (const s of pack.stops) b.extend(s.at);
           if (hasRider && target) b.extend(target);
           const top = n.status === "finished" && lowered ? 48 : Math.min(PAD_TOP, h * 0.25);
-          const bottom = lowered ? Math.round(h * SHEET_SHARE) : Math.min(PAD_BOTTOM, h * 0.3);
-          m.fitBounds(b, { padding: { top, bottom, left: 40, right: 40 }, maxZoom: 16, duration: 700, bearing: 0, essential: true });
+          const bottom = lowered ? Math.round(h * SHEET_SHARE) : Math.min(padBottom, h * 0.3);
+          fit(b, { top, bottom, left: 40, right: 40 });
         }
       };
       camera.current = frame;
@@ -278,22 +351,64 @@ export function MapView(props: MapViewProps) {
       };
       m.on("load", () => { seedLines(); pushNav(nav.peek()); frame(true); });
 
+      let lastNav: NavState | null = null;
+      let lastRunAt = 0;
+      let lastView = "";
       cleanups.push(effect(() => {
         const n = nav.value;
-        void settings.value;
+        const courseUp = settings.value.courseUp;
         void joinTarget.value;
+        const view = `${wholeRoute.value}|${peek.value?.until ?? 0}|${courseUp}`;
         const lowered = sheetUp(n);
         if (!m.loaded() && !m.getSource(ROUTE_SOURCES.lines)) return;
+        // the camera and the rider marker take about as long as the gap between fixes, so the map glides
+        if (n !== lastNav) {
+          const t = performance.now();
+          if (lastRunAt) glideMs = clamp(t - lastRunAt, 300, 2000);
+          lastRunAt = t;
+          lastNav = n;
+        }
         pushNav(n);
-        frame(lowered !== wasLowered);
+        frame(lowered !== wasLowered || view !== lastView);
         wasLowered = lowered;
+        lastView = view;
       }));
 
       /* ---- a tap on the bare map ---- */
       m.on("click", () => live.current.onMapTap?.());
 
       /* ---- the rider taking the camera ---- */
-      m.on("movestart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent && live.current.follow) live.current.onFollowChange(false); });
+      // Only a drag or a rotate takes the camera. A pinch or a double tap changes the follow zoom and keeps following.
+      const takeCamera = (e: { originalEvent?: unknown }): void => {
+        const oe = e.originalEvent as { touches?: ArrayLike<unknown> } | undefined;
+        if (!oe || (oe.touches && oe.touches.length > 1)) return;
+        if (live.current.follow || peek.peek()) { live.current.onFollowChange(false); leaveFollow(); }
+      };
+      m.on("dragstart", takeCamera);
+      m.on("rotatestart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent && (live.current.follow || peek.peek())) { live.current.onFollowChange(false); leaveFollow(); } });
+      m.on("zoom", (e) => {
+        const byRider = !!(e as { originalEvent?: unknown }).originalEvent || performance.now() - lastGesture < 1000;
+        if (!byRider || !live.current.follow || mode !== "follow") return;
+        followZoom.value = clampFollowZoom(m.getZoom() - zoomAdj);
+      });
+      // Any touch on the map restarts the wait before following comes back by itself.
+      const touched = (): void => { lastTouch.value = Date.now(); };
+      for (const ev of ["pointerdown", "pointerup", "pointercancel", "wheel"]) container.addEventListener(ev, touched, { passive: true });
+      cleanups.push(() => { for (const ev of ["pointerdown", "pointerup", "pointercancel", "wheel"]) container.removeEventListener(ev, touched); });
+      // MapLibre does not tag wheel zooms with the event that caused them, so a zoom close behind a touch or a wheel counts as the rider's.
+      const gesture = (e: Event): void => {
+        const now = performance.now();
+        if (e.type === "pointerdown") down.set((e as PointerEvent).pointerId, now);
+        if (e.type === "wheel") lastWheel = now;
+        if (e.type !== "pointermove" || (e as PointerEvent).buttons > 0) lastGesture = now;
+      };
+      const released = (e: Event): void => { down.delete((e as PointerEvent).pointerId); };
+      for (const ev of ["pointerdown", "pointermove", "wheel"]) container.addEventListener(ev, gesture, { passive: true });
+      for (const ev of ["pointerup", "pointercancel"]) window.addEventListener(ev, released, { passive: true });
+      cleanups.push(() => {
+        for (const ev of ["pointerdown", "pointermove", "wheel"]) container.removeEventListener(ev, gesture);
+        for (const ev of ["pointerup", "pointercancel"]) window.removeEventListener(ev, released);
+      });
 
       /* ---- light and dark, live ---- */
       const q = darkQuery();

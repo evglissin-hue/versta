@@ -8,6 +8,51 @@ export const stopsOpen = signal(false);
 export const soundOpen = signal(false);
 /** Map camera follows the rider. */
 export const following = signal(true);
+/** The map shows the whole route with the rider. Following is off while it does. */
+export const wholeRoute = signal(false);
+/** A peek at the next turn: the camera is on that manoeuvre until `until`, then following resumes. */
+export const peek = signal<{ at: LngLat; until: number } | null>(null);
+/** When the rider last touched the map, in milliseconds. Restarts the wait before following comes back. */
+export const lastTouch = signal(0);
+/** The zoom the follow camera uses, in map zoom levels. Remembered for the session. */
+export const followZoom = signal(16.2);
+/** Preview only: freezes the auto-recentre ring at this share (0 to 1) and stops the timer. */
+export const ringDemo = signal<number | null>(null);
+
+export const PEEK_MS = 4000;
+export const RECENTRE_MS = 8000;
+export const RECENTRE_WHOLE_MS = 12000;
+let peekTimer = 0;
+
+/** Back to following, eased: clears the whole route view and any peek. */
+export function resumeFollow(): void {
+  clearTimeout(peekTimer);
+  peek.value = null;
+  wholeRoute.value = false;
+  following.value = true;
+}
+/** The rider took the camera (a drag or a rotate): stop following and start the wait to come back. */
+export function leaveFollow(): void {
+  clearTimeout(peekTimer);
+  peek.value = null;
+  following.value = false;
+  lastTouch.value = Date.now();
+}
+/** Show the whole route with the rider. */
+export function showWholeRoute(): void {
+  clearTimeout(peekTimer);
+  peek.value = null;
+  wholeRoute.value = true;
+  following.value = false;
+  lastTouch.value = Date.now();
+}
+/** Fly to a manoeuvre for a few seconds, then follow again. */
+export function peekAt(at: LngLat): void {
+  clearTimeout(peekTimer);
+  wholeRoute.value = false;
+  peek.value = { at, until: Date.now() + PEEK_MS };
+  peekTimer = window.setTimeout(resumeFollow, PEEK_MS);
+}
 /** Whether the finish logbook is showing. "Back to the map" hides it until the next finish. */
 export const finishOpen = signal(true);
 /** When the ride finished, in milliseconds. */
@@ -42,3 +87,7 @@ export function joinChoice(n: NavState, p: Pack): JoinChoice | null {
   const chosen = picked === "route" && routeDist === null ? "start" : picked ?? nearer;
   return { startDist: n.toStop, routeDist, at: { start, route: offered && near ? near.at : null }, chosen };
 }
+
+// Handle for the end-to-end tests: what the camera controls are doing.
+declare global { interface Window { __verstaUi?: { following: typeof following; wholeRoute: typeof wholeRoute; peek: typeof peek; followZoom: typeof followZoom } } }
+if (typeof window !== "undefined") window.__verstaUi = { following, wholeRoute, peek, followZoom };

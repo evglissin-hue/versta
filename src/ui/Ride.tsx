@@ -6,11 +6,12 @@ import { AsideCard } from "./AsideCard";
 import { Banner } from "./Banner";
 import { Dock } from "./Dock";
 import { Finish } from "./Finish";
+import { MapControls } from "./MapControls";
 import { Scene } from "./Scene";
 import { SoundSheet } from "./SoundSheet";
 import { StopSheet } from "./StopSheet";
 import { StopsList } from "./StopsList";
-import { finishOpen, finishedAt, following, joinTarget, sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { finishOpen, finishedAt, following, joinTarget, resumeFollow, sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 let lastStory = "";
 let lastStatus = "";
@@ -34,6 +35,8 @@ export function Ride() {
     if (status !== "to_start") joinTarget.value = null;
     lastStatus = status;
   });
+  // A new ride starts by following the rider, whatever the last one ended on.
+  useEffect(() => resumeFollow, []);
   // Keep the map credit clear of whatever sits at the bottom: a bottom sheet when one is open, else the dock (and the passing-by card when it shows).
   const root = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -59,6 +62,7 @@ export function Ride() {
         <MapView pack={p} follow={following.value} onFollowChange={(f) => { following.value = f; }} onStopTap={(i) => { openStop.value = i; }} onMapTap={() => { openStop.value = null; }} />
       </div>
       {logbook ? null : <Banner />}
+      {logbook ? null : <MapControls />}
       <div class="ride-bottom" ref={bottom}>
         {np?.kind === "aside" ? <AsideCard aside={np.aside} /> : null}
         <Dock />

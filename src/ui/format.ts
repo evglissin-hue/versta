@@ -64,3 +64,32 @@ export function turnLabel(t: TurnKind, dist: number | null): string {
   if (t === "straight") return turnWord(t);
   return dist !== null && dist < 20 ? turnWord(t) : `${turnWord(t)} in`;
 }
+
+/** Speed assumed for the time estimate when the rider is not moving or the speed is not known yet, metres per second. */
+export const DEFAULT_SPEED = 4;
+
+/** "about 5 min" or "about 1 h 10 min": the time to cover `m` metres at the smoothed speed, or 4 m/s when that is absent or under 1 m/s. */
+export function fmtEta(m: number, speed: number | null | undefined): string {
+  const v = speed != null && speed >= 1 ? speed : DEFAULT_SPEED;
+  const mins = Math.max(1, Math.round(m / v / 60));
+  if (mins < 60) return `about ${mins} min`;
+  const h = Math.floor(mins / 60);
+  const r = mins % 60;
+  return r === 0 ? `about ${h} h` : `about ${h} h ${r} min`;
+}
+
+/** "1.2 km, about 5 min": the line under the next stop's name. */
+export function fmtDistTime(m: number, speed: number | null | undefined): string {
+  return `${fmtDist(m)}, ${fmtEta(m, speed)}`;
+}
+
+const THEN_WORD: Record<TurnKind, string> = {
+  depart: "set off", straight: "continue", left: "left", right: "right",
+  slight_left: "bear left", slight_right: "bear right", sharp_left: "sharp left", sharp_right: "sharp right",
+};
+/** The small second line of the turn banner: "then right onto Cable Street". */
+export function thenText(turn: TurnKind, name: string): string {
+  const word = THEN_WORD[turn];
+  if (!name) return `then ${word}`;
+  return `then ${word} onto ${name}`;
+}

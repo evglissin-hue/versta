@@ -20,7 +20,7 @@ describe("format", () => {
   });
 });
 
-import { fmtDuration, turnLabel } from "./format";
+import { fmtDistTime, fmtDuration, fmtEta, thenText, turnLabel } from "./format";
 
 describe("format, round two", () => {
   it("reads durations", () => {
@@ -32,5 +32,30 @@ describe("format, round two", () => {
     expect(turnLabel("left", 120)).toBe("Turn left in");
     expect(turnLabel("left", 12)).toBe("Turn left");
     expect(turnLabel("straight", 120)).toBe("Continue onto");
+  });
+});
+
+describe("format, iteration 3", () => {
+  it("gives the time to a stop from the smoothed speed", () => {
+    expect(fmtEta(1240, 4.1)).toBe("about 5 min");
+    expect(fmtEta(300, 5)).toBe("about 1 min");
+    expect(fmtEta(18000, 5)).toBe("about 1 h");
+    expect(fmtEta(21000, 5)).toBe("about 1 h 10 min");
+  });
+  it("falls back to 4 m/s when the speed is absent or under 1 m/s", () => {
+    expect(fmtEta(1200, null)).toBe("about 5 min");
+    expect(fmtEta(1200, undefined)).toBe("about 5 min");
+    expect(fmtEta(1200, 0.4)).toBe("about 5 min");
+    expect(fmtEta(1200, 1)).toBe("about 20 min");
+  });
+  it("puts distance and time on one line", () => {
+    expect(fmtDistTime(1240, 4.1)).toBe("1.2 km, about 5 min");
+    expect(fmtDistTime(840, null)).toBe("840 m, about 4 min");
+  });
+  it("words the manoeuvre after next", () => {
+    expect(thenText("right", "Cable Street")).toBe("then right onto Cable Street");
+    expect(thenText("slight_left", "The Highway")).toBe("then bear left onto The Highway");
+    expect(thenText("sharp_right", "")).toBe("then sharp right");
+    expect(thenText("straight", "Wapping Wall")).toBe("then continue onto Wapping Wall");
   });
 });

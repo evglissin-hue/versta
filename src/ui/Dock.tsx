@@ -1,8 +1,8 @@
 import { useState } from "preact/hooks";
 import { endRide, currentDirector } from "../ride";
 import { nav, nowPlaying, pack } from "../state";
-import { fmtDist, pad2 } from "./format";
-import { following, sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { fmtDistTime, pad2 } from "./format";
+import { sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 export function Dock() {
   const [confirm, setConfirm] = useState(false);
@@ -34,8 +34,8 @@ export function Dock() {
         <div class="dock-name">
           <span class="label">{n.status === "finished" ? "Last stop" : waiting ? "Next stop" : "Heading for"}</span>
           <strong>{n.status === "finished" ? "Done" : `${pad2(target + 1)} ${stop?.name ?? ""}`}</strong>
+          {showTo ? <span class="dock-dist" data-testid="dock-dist">{fmtDistTime(n.toStop, n.speedAvg)}</span> : null}
         </div>
-        {showTo ? <span class="dock-dist">{fmtDist(n.toStop)}</span> : null}
       </div>
       <div class="progress" role="progressbar" aria-label="Route progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
         <i style={{ width: `${pct}%` }} />
@@ -49,7 +49,6 @@ export function Dock() {
       ) : (
         <div class="dock-btns">
           <button type="button" class="btn ghost" onClick={() => { stopsOpen.value = true; }}>Stops {new Set(n.arrived).size}/{p.stops.length}</button>
-          {!following.value ? <button type="button" class="btn play" onClick={() => { following.value = true; }}>Recentre</button> : null}
           <button type="button" class="btn ghost" onClick={() => { soundOpen.value = true; }}>Sound</button>
           <button type="button" class="btn ghost" onClick={() => setConfirm(true)}>End ride</button>
         </div>
