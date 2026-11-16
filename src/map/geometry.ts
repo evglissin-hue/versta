@@ -41,3 +41,30 @@ export function splitAt(line: LngLat[], dist: number): [LngLat[], LngLat[]] {
 export function metresPerPixel(lat: number, zoom: number): number {
   return (78271.517 * Math.cos(rad(lat))) / 2 ** zoom;
 }
+
+/** Signed shortest turn from bearing `b` to bearing `a`, in degrees, from -180 to 180. */
+export function angleDiff(a: number, b: number): number {
+  return ((((a - b) % 360) + 540) % 360) - 180;
+}
+
+export const FOLLOW_ZOOM_MIN = 14.5;
+export const FOLLOW_ZOOM_MAX = 18;
+export const clampFollowZoom = (z: number): number => Math.min(FOLLOW_ZOOM_MAX, Math.max(FOLLOW_ZOOM_MIN, z));
+
+/** The zoom the follow camera uses: the rider's own zoom, in a little for a turn close ahead, out a little when fast. */
+export function cameraZoom(base: number, o: { toCue: number | null; turnAhead: boolean; speed: number | null }): number {
+  let z = base;
+  if (o.turnAhead && o.toCue !== null && o.toCue < 120) z += 0.4;
+  if (o.speed !== null && o.speed > 7) z -= 0.4;
+  return z;
+}
+
+/**
+ * Where the rider sits in the visible band between `top` and `bottom` insets of a map `height` tall:
+ * returns the padding that puts the map centre there. `share` is how far down the band (0.5 is the middle).
+ */
+export function lookAheadPadding(height: number, top: number, bottom: number, share: number): { top: number; bottom: number } {
+  const visible = height - top - bottom;
+  if (visible < 120) return { top, bottom };
+  return { top: Math.round(top + visible * (2 * share - 1)), bottom };
+}

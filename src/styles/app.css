@@ -71,7 +71,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .dock-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .dock-name { display: flex; flex-direction: column; min-width: 0; }
 .dock-name strong { font-family: var(--f-display); font-weight: 700; font-size: 24px; line-height: 1.05; text-transform: uppercase; overflow-wrap: anywhere; }
-.dock-dist { font-family: var(--f-display); font-weight: 700; font-size: 28px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dock-dist { font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1.15; letter-spacing: .03em; font-variant-numeric: tabular-nums; color: var(--muted); margin-top: 2px; }
 .dock-btns { display: flex; gap: 6px; }
 .dock-btns .btn { flex: 1 1 0; min-width: 0; padding: 10px 4px; font-size: 16px; min-height: 52px; }
 .confirm { display: flex; gap: 8px; align-items: center; }
@@ -189,3 +189,26 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .missed-words { display: flex; flex-direction: column; min-width: 0; }
 .missed-title { font-family: var(--f-body); font-style: italic; font-size: 20px; line-height: 1.15; }
 .banner.warn .arrow { color: var(--paper); }
+
+/* the next manoeuvre after this one, and the wrong way warning */
+.banner.peekable { cursor: pointer; }
+.b-then { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1.1; letter-spacing: .03em; text-transform: uppercase; color: var(--ink); }
+.banner .b-then .arrow { width: 22px; height: 22px; flex: none; color: var(--mark); }
+.b-warn { font-family: var(--f-display); font-weight: 700; font-size: 28px; line-height: 1.05; text-transform: uppercase; overflow-wrap: anywhere; }
+
+/* map controls: follow and whole route, floating above the dock */
+.map-controls { position: absolute; right: 14px; bottom: calc(var(--map-attrib-bottom, 96px) + 44px); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none; }
+.map-controls > *, .mc-row > .mc-btn { pointer-events: auto; }
+.mc-row { display: flex; align-items: center; gap: 8px; }
+.mc-btn { position: relative; width: 56px; height: 56px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--paper); color: var(--ink); border: 2px solid var(--ink); box-shadow: 0 2px 8px rgba(0, 0, 0, .35); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mc-btn.small { width: 48px; height: 48px; margin-right: 4px; }
+.mc-btn.small.on { background: var(--ink); color: var(--paper); }
+.mc-btn.small.on .mc-icon circle:last-child { fill: var(--ink); }
+.mc-btn.follow.course { color: var(--mark); border-color: var(--mark); }
+.mc-btn.follow.free { color: var(--mark); border-color: var(--mark); }
+.mc-icon { display: block; overflow: visible; }
+.mc-n { font-family: var(--f-display); font-weight: 700; font-size: 11px; fill: var(--ink); }
+.mc-label { pointer-events: none; background: var(--paper); color: var(--mark); border: 2px solid var(--mark); padding: 6px 10px; font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 2px 8px rgba(0, 0, 0, .35); animation: fadein .25s; }
+.mc-ring { position: absolute; inset: -6px; width: 66px; height: 66px; transform: rotate(-90deg); pointer-events: none; overflow: visible; }
+.mc-ring circle { fill: none; stroke: var(--mark); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; animation-name: ringfill; animation-timing-function: linear; animation-fill-mode: forwards; }
+@keyframes ringfill { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }

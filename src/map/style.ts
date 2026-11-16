@@ -3,7 +3,8 @@ import type { ExpressionSpecification, StyleSpecification } from "maplibre-gl";
 /**
  * The map style: an Admiralty chart. Land buff, shoal blue water, quiet green parks, plain road lines.
  * MapLibre cannot read CSS variables, so the two palettes repeat the values of src/styles/tokens.css
- * (land, shoal, ink, muted, line, mark, warn). Park and road tints are chart-only and live here.
+ * (land, ink, muted, line, mark, warn). Water in the dark palette is darker than the shoal token so the sea reads below the land.
+ * Park and road tints are chart-only and live here.
  */
 export interface Palette {
   land: string; water: string; park: string; ink: string; muted: string; line: string; mark: string; warn: string;
@@ -16,9 +17,9 @@ export const LIGHT: Palette = {
   building: "#DCCB96", roadMinor: "#9C8F66", roadMajor: "#5E5336", roadCasing: "#F6EDCB", rail: "#7A8A93",
 };
 export const DARK: Palette = {
-  land: "#3A3418", water: "#12283A", park: "#2D3A1E", ink: "#DDE7EA", muted: "#8FA3AF", line: "#274052",
+  land: "#1D2D3C", water: "#0A1824", park: "#2A4535", ink: "#DDE7EA", muted: "#8FA3AF", line: "#274052",
   mark: "#F07CC0", warn: "#F0A050",
-  building: "#463F1F", roadMinor: "#8A8260", roadMajor: "#C2B88C", roadCasing: "#2A2611", rail: "#6B7F8B",
+  building: "#2A3C4E", roadMinor: "#6E8496", roadMajor: "#B4C3CE", roadCasing: "#121E2A", rail: "#60778A",
 };
 
 export const GLYPHS = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";

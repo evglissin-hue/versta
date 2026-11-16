@@ -1,11 +1,11 @@
 import { useEffect } from "preact/hooks";
 import { geoDistance } from "../geo";
-import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packIndex, screen, simulated } from "../state";
+import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packIndex, screen, settings, simulated } from "../state";
 import type { Detour, LngLat, NavState, Pack, PackIndexEntry } from "../types";
-import { demoRide, finishOpen, finishedAt, following, joinTarget, sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { demoRide, finishOpen, finishedAt, following, joinTarget, lastTouch, peek, ringDemo, sceneOpen, soundOpen, stopsOpen, wholeRoute } from "./uistate";
 
 /** Preview route /?demo=ride&step=N: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain"] as const;
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
 function shift(p: LngLat, dx: number, dy: number): LngLat {
@@ -16,9 +16,11 @@ function demoState(p: Pack, step: string): void {
   const seg = p.segments[2]!;
   const on = seg[Math.floor(seg.length * 0.4)]!;
   const fix = { lng: on[0], lat: on[1], accuracy: 8, heading: 90, speed: 4, time: 0 };
-  const base: NavState = { ...IDLE_NAV, status: "riding", fix, snapped: on, seg: 2, alongSeg: 400, toStop: 840, distanceDone: 3100, distanceLeft: 18900, nextCue: p.cues.find((c) => c.turn === "left") ?? null, toCue: 120, currentCue: p.cues[1] ?? null, arrived: [0, 1] };
+  const base: NavState = { ...IDLE_NAV, status: "riding", fix, snapped: on, seg: 2, alongSeg: 400, toStop: 840, speedAvg: 4.5, distanceDone: 3100, distanceLeft: 18900, nextCue: p.cues.find((c) => c.turn === "left") ?? null, toCue: 120, currentCue: p.cues[1] ?? null, arrived: [0, 1] };
   gpsError.value = null; openStop.value = null; stopsOpen.value = false; soundOpen.value = false; sceneOpen.value = true; following.value = true;
   finishOpen.value = true; finishedAt.value = null; joinTarget.value = null; demoRide.value = null;
+  wholeRoute.value = false; peek.value = null; ringDemo.value = null; lastTouch.value = 0;
+  settings.value = { ...settings.value, courseUp: true };
   nowPlaying.value = null; simulated.value = new URLSearchParams(location.search).get("simtag") === "1";
   screen.value = step === "continue" ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
@@ -59,7 +61,18 @@ function demoState(p: Pack, step: string): void {
     case "gps-denied": nav.value = { ...IDLE_NAV, status: "locating" }; gpsError.value = "denied"; break;
     case "stops-list": nav.value = base; stopsOpen.value = true; break;
     case "sound": nav.value = base; soundOpen.value = true; break;
-    case "recentre": nav.value = { ...base, nextCue: null, toCue: null }; following.value = false; break;
+    case "recentre":
+    case "follow-free": nav.value = base; following.value = false; ringDemo.value = 0.55; break;
+    case "follow-course": nav.value = base; break;
+    case "follow-north": nav.value = base; settings.value = { ...settings.value, courseUp: false }; break;
+    case "whole-route": nav.value = base; wholeRoute.value = true; following.value = false; ringDemo.value = 0.3; break;
+    case "then": {
+      const c = p.cues.filter((x) => x.turn === "right" || x.turn === "left");
+      nav.value = { ...base, nextCue: c[0] ?? base.nextCue, toCue: 80, thenCue: p.cues.find((x) => x.name.length > 0 && x !== c[0] && x.turn === "right") ?? c[1] ?? null, toThen: 60 };
+      break;
+    }
+    case "wrong-way": nav.value = { ...base, nextCue: null, toCue: null, wrongWay: true }; break;
+    case "dock-time": nav.value = { ...base, nextCue: null, toCue: null, toStop: 1240, speedAvg: 4.1 }; break;
     case "continue": {
       const saved = { packId: p.id, seg: 5, arrived: [0, 1, 2, 3, 4], heard: [], startedAt: Date.now() - 3600000, savedAt: Date.now() };
       try { localStorage.setItem("versta:ride", JSON.stringify(saved)); } catch {}

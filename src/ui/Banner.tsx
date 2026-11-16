@@ -1,7 +1,7 @@
 import { gpsError, nav, pack, simulated } from "../state";
 import type { GpsError } from "../types";
-import { fmtDist, pad2, turnAngle, turnLabel } from "./format";
-import { joinChoice, joinTarget } from "./uistate";
+import { fmtDist, pad2, thenText, turnAngle, turnLabel } from "./format";
+import { joinChoice, joinTarget, peekAt } from "./uistate";
 
 const GPS_TEXT: Record<GpsError, { title: string; fix: string }> = {
   denied: { title: "Location is blocked", fix: "Allow location for this site in your browser settings, then end the ride and start again." },
@@ -28,6 +28,7 @@ export function Banner() {
   let tone = "";
   let cls = "";
   let body;
+  let peekable = false;
   if (err && (n.status === "locating" || !n.fix)) {
     const t = GPS_TEXT[err];
     tone = "warn";
@@ -87,8 +88,18 @@ export function Banner() {
         ) : null}
       </div>
     );
+  } else if (n.wrongWay && n.status === "riding") {
+    tone = "warn";
+    body = (
+      <div class="b-text">
+        <div class="b-warn">You are riding against the route</div>
+        <div class="b-sub">Turn around when you can</div>
+      </div>
+    );
   } else if (n.nextCue) {
     const c = n.nextCue;
+    peekable = n.status === "riding";
+    const then = n.thenCue ?? null;
     const dist = n.toCue === null ? "" : fmtDist(n.toCue, 20);
     const label = <div class="b-label">{turnLabel(c.turn, n.toCue)}</div>;
     body = (
@@ -97,6 +108,7 @@ export function Banner() {
         <div class="b-text">
           {c.turn === "straight" ? <><div class="b-dist">{dist}</div>{label}</> : <>{label}<div class="b-dist">{dist}</div></>}
           <div class="b-street">{c.name}</div>
+          {then ? <div class="b-then" data-testid="banner-then"><Arrow angle={turnAngle(then.turn)} /><span>{thenText(then.turn, then.name)}</span></div> : null}
           {n.currentCue ? <div class="b-sub">Now on {n.currentCue.name}</div> : null}
         </div>
       </>
@@ -112,7 +124,12 @@ export function Banner() {
   }
 
   return (
-    <div class={`banner ${tone} ${cls}`} role="status" aria-live="polite" data-testid="banner">
+    <div
+      class={`banner ${tone} ${cls} ${peekable ? "peekable" : ""}`} role="status" aria-live="polite" data-testid="banner"
+      tabIndex={peekable ? 0 : undefined}
+      onClick={peekable && n.nextCue ? () => peekAt(n.nextCue!.at) : undefined}
+      onKeyDown={peekable && n.nextCue ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); peekAt(n.nextCue!.at); } } : undefined}
+    >
       {body}
       {tag}
     </div>

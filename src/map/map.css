@@ -17,6 +17,11 @@
 }
 .vm-stop.is-next .vm-stop-dot { background: var(--mark); color: var(--on-mark); border-color: var(--mark); width: 34px; height: 34px; font-size: 17px; }
 .vm-stop.is-arrived .vm-stop-dot { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+/* Low zoom: the stops along the river pile up, so the markers shrink to 30px and the next stop stays on top. */
+.versta-map.is-low .vm-stop { width: 30px; height: 30px; }
+.versta-map.is-low .vm-stop-dot { width: 24px; height: 24px; font-size: 13px; border-width: 2px; }
+.versta-map.is-low .vm-stop.is-next .vm-stop-dot { width: 30px; height: 30px; font-size: 15px; }
+.maplibregl-marker:has(.vm-stop.is-next) { z-index: 3; }
 .vm-stop:focus-visible .vm-stop-dot { outline: 3px solid var(--mark); outline-offset: 3px; }
 
 /* Rider: accuracy circle, dot, heading wedge. Never takes touches. */

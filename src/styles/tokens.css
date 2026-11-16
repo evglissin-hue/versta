@@ -11,7 +11,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0B1620; --shoal: #12283A; --land: #3A3418; --ink: #DDE7EA; --muted: #8FA3AF; --line: #274052;
+    --paper: #0B1620; --shoal: #12283A; --land: #1D2D3C; --ink: #DDE7EA; --muted: #8FA3AF; --line: #274052;
     --mark: #F07CC0; --on-mark: #1A0612; --ok: #5FC08F; --warn: #F0A050;
     color-scheme: dark;
   }
