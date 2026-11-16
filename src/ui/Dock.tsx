@@ -48,7 +48,7 @@ export function Dock() {
         </div>
       ) : (
         <div class="dock-btns">
-          <button type="button" class="btn ghost" onClick={() => { stopsOpen.value = true; }}>Stops</button>
+          <button type="button" class="btn ghost" onClick={() => { stopsOpen.value = true; }}>Stops {new Set(n.arrived).size}/{p.stops.length}</button>
           {!following.value ? <button type="button" class="btn play" onClick={() => { following.value = true; }}>Recentre</button> : null}
           <button type="button" class="btn ghost" onClick={() => { soundOpen.value = true; }}>Sound</button>
           <button type="button" class="btn ghost" onClick={() => setConfirm(true)}>End ride</button>

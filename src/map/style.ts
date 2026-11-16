@@ -42,9 +42,15 @@ export interface RouteData {
   lines: GeoJSON.FeatureCollection;
   asides: GeoJSON.FeatureCollection;
   cue: GeoJSON.FeatureCollection;
+  /** Dashed guide from the rider to where they are heading before the route is under them. */
+  guide: GeoJSON.FeatureCollection;
+  /** The way back to the route while off it. */
+  detour: GeoJSON.FeatureCollection;
+  /** Ring where the detour rejoins the route. */
+  rejoin: GeoJSON.FeatureCollection;
 }
 
-export const ROUTE_SOURCES = { lines: "route-lines", asides: "route-asides", cue: "route-cue" } as const;
+export const ROUTE_SOURCES = { lines: "route-lines", asides: "route-asides", cue: "route-cue", guide: "route-guide", detour: "route-detour", rejoin: "route-rejoin" } as const;
 
 type Layer = StyleSpecification["layers"][number];
 
@@ -98,6 +104,9 @@ export function buildStyle(p: Palette, tiles: { url?: string; tiles?: string[] }
       [ROUTE_SOURCES.lines]: { type: "geojson", data: data.lines },
       [ROUTE_SOURCES.asides]: { type: "geojson", data: data.asides },
       [ROUTE_SOURCES.cue]: { type: "geojson", data: data.cue },
+      [ROUTE_SOURCES.guide]: { type: "geojson", data: data.guide },
+      [ROUTE_SOURCES.detour]: { type: "geojson", data: data.detour },
+      [ROUTE_SOURCES.rejoin]: { type: "geojson", data: data.rejoin },
     },
     layers,
   };
@@ -131,6 +140,11 @@ function routeLayers(p: Palette): Layer[] {
     casing("route-now-casing", "now", w([10, 5.6], [16, 11.5])),
     line("route-now", "now", p.mark, now, 1),
     dash("route-now-dash", "now", p.mark, now, 1),
+    { id: "guide-casing", type: "line", source: ROUTE_SOURCES.guide, layout: round, paint: { "line-color": p.land, "line-width": w([10, 4], [16, 8]) } },
+    { id: "guide", type: "line", source: ROUTE_SOURCES.guide, layout: { "line-join": "round" }, paint: { "line-color": p.ink, "line-width": w([10, 2.4], [16, 4.5]), "line-dasharray": [1.4, 1.4] } },
+    { id: "detour-casing", type: "line", source: ROUTE_SOURCES.detour, layout: round, paint: { "line-color": p.land, "line-width": w([10, 5.6], [16, 11.5]) } },
+    { id: "detour", type: "line", source: ROUTE_SOURCES.detour, layout: { "line-join": "round" }, paint: { "line-color": p.warn, "line-width": w([10, 3.6], [16, 7]), "line-dasharray": [1.4, 1.2] } },
+    { id: "detour-rejoin", type: "circle", source: ROUTE_SOURCES.rejoin, paint: { "circle-radius": w([10, 8], [16, 15]), "circle-color": p.land, "circle-opacity": 0.5, "circle-stroke-color": p.warn, "circle-stroke-width": 3.4 } },
     {
       id: "route-asides", type: "circle", source: ROUTE_SOURCES.asides,
       paint: { "circle-radius": w([10, 2], [16, 4.2]), "circle-color": p.land, "circle-stroke-color": p.ink, "circle-stroke-width": 1.4, "circle-opacity": 0.95, "circle-stroke-opacity": 0.7 },

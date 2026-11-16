@@ -1,28 +1,71 @@
 import { useEffect } from "preact/hooks";
+import { geoDistance } from "../geo";
 import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packIndex, screen, simulated } from "../state";
-import type { NavState, Pack } from "../types";
-import { following, sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import type { Detour, LngLat, NavState, Pack, PackIndexEntry } from "../types";
+import { demoRide, finishOpen, finishedAt, following, joinTarget, sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 /** Preview route /?demo=ride&step=N: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre"] as const;
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain"] as const;
+
+/** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
+function shift(p: LngLat, dx: number, dy: number): LngLat {
+  return [p[0] + dx / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + dy / 111320];
+}
 
 function demoState(p: Pack, step: string): void {
-  const fix = { lng: -0.0536, lat: 51.5018, accuracy: 8, heading: 90, speed: 4, time: 0 };
-  const base: NavState = { ...IDLE_NAV, status: "riding", fix, snapped: fix ? [fix.lng, fix.lat] : null, seg: 2, alongSeg: 400, toStop: 840, distanceDone: 3100, distanceLeft: 18900, nextCue: p.cues.find((c) => c.turn === "left") ?? null, toCue: 120, currentCue: p.cues[1] ?? null, arrived: [0, 1] };
+  const seg = p.segments[2]!;
+  const on = seg[Math.floor(seg.length * 0.4)]!;
+  const fix = { lng: on[0], lat: on[1], accuracy: 8, heading: 90, speed: 4, time: 0 };
+  const base: NavState = { ...IDLE_NAV, status: "riding", fix, snapped: on, seg: 2, alongSeg: 400, toStop: 840, distanceDone: 3100, distanceLeft: 18900, nextCue: p.cues.find((c) => c.turn === "left") ?? null, toCue: 120, currentCue: p.cues[1] ?? null, arrived: [0, 1] };
   gpsError.value = null; openStop.value = null; stopsOpen.value = false; soundOpen.value = false; sceneOpen.value = true; following.value = true;
+  finishOpen.value = true; finishedAt.value = null; joinTarget.value = null; demoRide.value = null;
   nowPlaying.value = null; simulated.value = new URLSearchParams(location.search).get("simtag") === "1";
+  screen.value = step === "continue" ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
+  const tagged = p.asides.find((a) => a.tags.length > 0) ?? p.asides[0]!;
+  const off = shift(on, 0, 70);
+  const offFix = { ...fix, lng: off[0], lat: off[1] };
+  const k = Math.floor(seg.length * 0.4);
+  const rejoin = seg[Math.min(seg.length - 1, k + 2)]!;
+  const lost: NavState = { ...base, fix: offFix, snapped: null, offRoute: true, offBy: 70 };
+  const way = (next: Detour["next"]): Detour => ({ line: [off, shift(off, 20, 0), rejoin], toRejoin: 240, next });
   switch (step) {
     case "locating": nav.value = { ...IDLE_NAV, status: "locating" }; break;
-    case "to-start": nav.value = { ...base, status: "to_start", seg: 0, toStop: 640, nextCue: null, toCue: null, currentCue: null, arrived: [] }; break;
-    case "off-route": nav.value = { ...base, offRoute: true, offBy: 63 }; break;
+    case "to-start": nav.value = { ...base, status: "to_start", seg: 0, distanceDone: 0, distanceLeft: p.km * 1000, toStop: 640, nextCue: null, toCue: null, currentCue: null, arrived: [] }; break;
+    case "join": {
+      const near = p.segments[4]![Math.floor(p.segments[4]!.length / 2)]!;
+      const rider = shift(near, -180, -240);
+      const here = { ...fix, lng: rider[0], lat: rider[1] };
+      nav.value = { ...base, fix: here, snapped: null, status: "to_start", seg: 0, distanceDone: 0, distanceLeft: p.km * 1000, toStop: geoDistance(rider, p.stops[0]!.at), nextCue: null, toCue: null, currentCue: null, arrived: [], nearest: { at: near, seg: 4, dist: geoDistance(rider, near) } };
+      break;
+    }
+    case "off-route": nav.value = lost; break;
+    case "detour-turn": nav.value = { ...lost, detour: way({ turn: "left", name: p.cues[3]?.name ?? "Bermondsey Wall East", at: seg[Math.min(seg.length - 1, k + 2)]!, dist: 120 }) }; break;
+    case "detour-plain": nav.value = { ...lost, detour: way(null) }; break;
     case "at-stop": nav.value = { ...base, status: "at_stop", toStop: 0, nextCue: null, toCue: null, arrived: [0, 1, 2] }; openStop.value = 2; break;
+    case "stop-sheet": nav.value = base; openStop.value = 5; break;
     case "story": nav.value = { ...base, status: "at_stop", toStop: 0, arrived: [0, 1, 2] }; nowPlaying.value = { kind: "story", stop: 2, story, para: 1, paused: false, manual: false }; break;
-    case "aside": nav.value = { ...base, toCue: 14 }; nowPlaying.value = { kind: "aside", aside: p.asides[1] ?? p.asides[0]! }; break;
+    case "scene-hidden": nav.value = base; nowPlaying.value = { kind: "story", stop: 2, story, para: 1, paused: false, manual: false }; setTimeout(() => { sceneOpen.value = false; }, 600); break;
+    case "finish": {
+      const all = p.stops.flatMap((s) => s.stories);
+      const skipped = new Set(all.filter((x) => x.kind === "optional").slice(0, 3).map((x) => x.id));
+      const end = Date.now();
+      demoRide.value = { startedAt: end - (2 * 60 + 14) * 60000, finishedAt: end, heard: all.filter((x) => !skipped.has(x.id)).map((x) => x.id) };
+      const last = p.stops.length - 1;
+      nav.value = { ...base, status: "finished", seg: last, alongSeg: 0, toStop: 0, distanceDone: p.km * 1000, distanceLeft: 0, nextCue: null, toCue: null, arrived: p.stops.map((_, i) => i) };
+      break;
+    }
+    case "aside": nav.value = { ...base, toCue: 14 }; nowPlaying.value = { kind: "aside", aside: tagged }; break;
     case "gps-denied": nav.value = { ...IDLE_NAV, status: "locating" }; gpsError.value = "denied"; break;
     case "stops-list": nav.value = base; stopsOpen.value = true; break;
     case "sound": nav.value = base; soundOpen.value = true; break;
     case "recentre": nav.value = { ...base, nextCue: null, toCue: null }; following.value = false; break;
+    case "continue": {
+      const saved = { packId: p.id, seg: 5, arrived: [0, 1, 2, 3, 4], heard: [], startedAt: Date.now() - 3600000, savedAt: Date.now() };
+      try { localStorage.setItem("versta:ride", JSON.stringify(saved)); } catch {}
+      nav.value = IDLE_NAV;
+      break;
+    }
     default: nav.value = base;
   }
 }
@@ -31,8 +74,7 @@ export async function enterDemo(step: string): Promise<void> {
   const res = await fetch(`${import.meta.env.BASE_URL}packs/thames-loop/pack.json`);
   const p = (await res.json()) as Pack;
   pack.value = p;
-  packIndex.value = [];
-  screen.value = "ride";
+  try { packIndex.value = ((await (await fetch(`${import.meta.env.BASE_URL}packs/index.json`)).json()) as { packs: PackIndexEntry[] }).packs; } catch { packIndex.value = []; }
   demoState(p, step);
 }
 

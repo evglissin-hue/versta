@@ -16,7 +16,7 @@ const TURN_ANGLE: Record<TurnKind, number> = {
 export const turnAngle = (t: TurnKind): number => TURN_ANGLE[t];
 
 const TURN_WORD: Record<TurnKind, string> = {
-  depart: "Set off", straight: "Go straight", slight_left: "Bear left", slight_right: "Bear right",
+  depart: "Set off", straight: "Continue onto", slight_left: "Bear left", slight_right: "Bear right",
   left: "Turn left", right: "Turn right", sharp_left: "Sharp left", sharp_right: "Sharp right",
 };
 export const turnWord = (t: TurnKind): string => TURN_WORD[t];
@@ -48,4 +48,19 @@ export function fmtDate(ms: number): string {
 }
 export function fmtMB(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1048576))} MB`;
+}
+
+/** Time taken, as a rider says it: "48 min" or "2 h 14 min". */
+export function fmtDuration(ms: number): string {
+  const mins = Math.max(1, Math.round(ms / 60000));
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/** The label above a distance: "Turn left in", or just "Turn left" once the turn is here. "Continue onto" has no distance after it. */
+export function turnLabel(t: TurnKind, dist: number | null): string {
+  if (t === "straight") return turnWord(t);
+  return dist !== null && dist < 20 ? turnWord(t) : `${turnWord(t)} in`;
 }

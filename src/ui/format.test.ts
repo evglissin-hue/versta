@@ -19,3 +19,18 @@ describe("format", () => {
     expect(minutesOf({ paras: ["word ".repeat(280)] })).toBe(2);
   });
 });
+
+import { fmtDuration, turnLabel } from "./format";
+
+describe("format, round two", () => {
+  it("reads durations", () => {
+    expect(fmtDuration(48 * 60000)).toBe("48 min");
+    expect(fmtDuration((2 * 60 + 14) * 60000)).toBe("2 h 14 min");
+    expect(fmtDuration(3 * 3600000)).toBe("3 h");
+  });
+  it("labels turns", () => {
+    expect(turnLabel("left", 120)).toBe("Turn left in");
+    expect(turnLabel("left", 12)).toBe("Turn left");
+    expect(turnLabel("straight", 120)).toBe("Continue onto");
+  });
+});
