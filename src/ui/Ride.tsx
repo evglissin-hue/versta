@@ -1,17 +1,19 @@
 import { useSignalEffect } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { MapView } from "../map/MapView";
-import { nowPlaying, openStop, pack } from "../state";
+import { nav, nowPlaying, openStop, pack } from "../state";
 import { AsideCard } from "./AsideCard";
 import { Banner } from "./Banner";
 import { Dock } from "./Dock";
+import { Finish } from "./Finish";
 import { Scene } from "./Scene";
 import { SoundSheet } from "./SoundSheet";
 import { StopSheet } from "./StopSheet";
 import { StopsList } from "./StopsList";
-import { following, sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { finishOpen, finishedAt, following, joinTarget, sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 let lastStory = "";
+let lastStatus = "";
 
 export function Ride() {
   const p = pack.value;
@@ -23,11 +25,22 @@ export function Ride() {
     if (id && id !== lastStory) sceneOpen.value = true;
     lastStory = id;
   });
-  // Keep the map credit clear of whatever sits at the bottom (the dock, and the passing-by card when it shows).
+  // Riding away from a stop with a story still playing puts the map and the turn banner back; the mini bar keeps the story one tap away.
+  // The finish logbook comes back at each finish, and the join choice starts afresh whenever the rider is on the route.
+  useSignalEffect(() => {
+    const status = nav.value.status;
+    if (lastStatus === "at_stop" && status === "riding" && nowPlaying.peek()?.kind === "story") sceneOpen.value = false;
+    if (status === "finished" && lastStatus !== "finished") { finishOpen.value = true; finishedAt.value = Date.now(); }
+    if (status !== "to_start") joinTarget.value = null;
+    lastStatus = status;
+  });
+  // Keep the map credit clear of whatever sits at the bottom: a bottom sheet when one is open, else the dock (and the passing-by card when it shows).
   const root = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const sheetUp = openStop.value !== null || (nav.value.status === "finished" && np === null && finishOpen.value && !stopsOpen.value && !soundOpen.value);
   useEffect(() => {
-    const r = root.current, b = bottom.current;
+    const r = root.current;
+    const b = r?.querySelector<HTMLElement>(".sheet.bottom") ?? bottom.current;
     if (!r || !b) return;
     const apply = (): void => { r.style.setProperty("--map-attrib-bottom", `${b.offsetHeight + 8}px`); };
     apply();
@@ -35,22 +48,25 @@ export function Ride() {
     const ro = new ResizeObserver(apply);
     ro.observe(b);
     return () => ro.disconnect();
-  }, [p?.id]);
+  }, [p?.id, sheetUp]);
   if (!p) return null;
   const stop = openStop.value;
+  // The logbook takes the place of the last stop's sheet, which the arrival opened.
+  const logbook = nav.value.status === "finished" && np === null && finishOpen.value && !stopsOpen.value && !soundOpen.value;
   return (
     <div class="ride" data-testid="ride" ref={root}>
       <div class="map-layer">
-        <MapView pack={p} follow={following.value} onFollowChange={(f) => { following.value = f; }} onStopTap={(i) => { openStop.value = i; }} />
+        <MapView pack={p} follow={following.value} onFollowChange={(f) => { following.value = f; }} onStopTap={(i) => { openStop.value = i; }} onMapTap={() => { openStop.value = null; }} />
       </div>
-      <Banner />
+      {logbook ? null : <Banner />}
       <div class="ride-bottom" ref={bottom}>
         {np?.kind === "aside" ? <AsideCard aside={np.aside} /> : null}
         <Dock />
       </div>
       {stopsOpen.value ? <StopsList /> : null}
-      {stop !== null ? <StopSheet index={stop} /> : null}
+      {stop !== null && !logbook ? <StopSheet index={stop} /> : null}
       {soundOpen.value ? <SoundSheet /> : null}
+      {logbook ? <Finish /> : null}
       {np?.kind === "story" && sceneOpen.value ? <Scene np={np} /> : null}
     </div>
   );

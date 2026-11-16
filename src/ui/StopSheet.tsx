@@ -11,10 +11,13 @@ export function StopSheet({ index }: { index: number }) {
   const d = currentDirector();
   const n = nav.value;
   const close = () => { openStop.value = null; };
-  const canRide = !(n.seg === index && n.status === "riding");
+  // The stop the rider is at, and the one they are heading for, get a status in place of "Ride to this stop".
+  const here = (n.status === "at_stop" || n.status === "finished") && n.seg === index;
+  const heading = ((n.status === "riding" || n.status === "to_start") && n.seg === index) || (n.status === "at_stop" && n.seg + 1 === index);
+  const canRide = !here && !heading;
 
   return (
-    <Sheet kicker={`Stop ${pad2(index + 1)} of ${pad2(p.stops.length)}`} title={stop.name} onClose={close} testid="stop-sheet">
+    <Sheet bottom kicker={`Stop ${pad2(index + 1)} of ${pad2(p.stops.length)}`} title={stop.name} onClose={close} testid="stop-sheet">
       <p class="note">{stop.note}</p>
       {stop.pint ? <div><span class="chip pint">Pint stop</span></div> : null}
       <div class="stories">
@@ -38,6 +41,8 @@ export function StopSheet({ index }: { index: number }) {
       </div>
       <div class="acts">
         {stop.stories.length > 1 ? <button type="button" class="btn" onClick={() => { sceneOpen.value = true; d?.playStop(index); }}>Play all</button> : null}
+        {here ? <span class="here">You are here</span> : null}
+        {heading ? <span class="here">Next stop</span> : null}
         {canRide ? <button type="button" class="btn" onClick={() => { jumpToStop(index); close(); }}>Ride to this stop</button> : null}
         <button type="button" class="btn ghost" onClick={close}>Close</button>
       </div>

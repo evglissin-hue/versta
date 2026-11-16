@@ -1,6 +1,7 @@
 import { gpsError, nav, pack, simulated } from "../state";
 import type { GpsError } from "../types";
-import { fmtDist, pad2, turnAngle, turnWord } from "./format";
+import { fmtDist, pad2, turnAngle, turnLabel } from "./format";
+import { joinChoice, joinTarget } from "./uistate";
 
 const GPS_TEXT: Record<GpsError, { title: string; fix: string }> = {
   denied: { title: "Location is blocked", fix: "Allow location for this site in your browser settings, then end the ride and start again." },
@@ -25,6 +26,7 @@ export function Banner() {
   const tag = simulated.value ? <span class="sim-tag">Simulated</span> : null;
 
   let tone = "";
+  let cls = "";
   let body;
   if (err && (n.status === "locating" || !n.fix)) {
     const t = GPS_TEXT[err];
@@ -36,6 +38,25 @@ export function Banner() {
     body = <div class="b-text"><div class="b-big">Route complete</div><div class="b-sub">{p ? `You have reached ${p.stops[p.stops.length - 1]?.name}.` : ""}</div></div>;
   } else if (n.status === "at_stop") {
     body = <div class="b-text"><div class="b-label">You have arrived</div><div class="b-big">At {pad2(n.seg + 1)} {stop?.name}</div></div>;
+  } else if (n.offRoute && n.detour) {
+    const d = n.detour;
+    tone = "warn";
+    body = d.next ? (
+      <>
+        <Arrow angle={turnAngle(d.next.turn)} />
+        <div class="b-text">
+          <div class="b-label">Way back, {turnLabel(d.next.turn, d.next.dist).toLowerCase()}</div>
+          <div class="b-dist">{fmtDist(d.next.dist, 20)}</div>
+          {d.next.name ? <div class="b-street">{d.next.name}</div> : null}
+          <div class="b-sub">Back on the route in {fmtDist(d.toRejoin, 20)}</div>
+        </div>
+      </>
+    ) : (
+      <div class="b-text">
+        <div class="b-label">Way back</div>
+        <div class="b-big">Follow the dashed line, {fmtDist(d.toRejoin, 20)}</div>
+      </div>
+    );
   } else if (n.offRoute) {
     tone = "warn";
     body = (
@@ -45,21 +66,36 @@ export function Banner() {
       </div>
     );
   } else if (n.status === "to_start") {
+    const j = p ? joinChoice(n, p) : null;
+    const toRoute = j?.chosen === "route" && j.routeDist !== null;
+    const dist = toRoute && j?.routeDist != null ? j.routeDist : n.toStop;
+    cls = "join";
     body = (
       <div class="b-text">
-        <div class="b-label">Head to the start</div>
-        <div class="b-big">{stop?.name}</div>
-        <div class="b-sub">{fmtDist(n.toStop)} away</div>
+        <div class="b-label">{toRoute ? "Joining part way" : "From the beginning"}</div>
+        <div class="b-big">{toRoute ? "Head for the route" : "Head for the start"}, {fmtDist(dist, 20)}</div>
+        <div class="b-sub">{toRoute ? "The ride picks up where you meet the line." : stop?.name ?? ""}</div>
+        {j && j.routeDist !== null ? (
+          <div class="b-choices" role="group" aria-label="Where to join">
+            <button type="button" class="choice" aria-pressed={!toRoute} onClick={() => { joinTarget.value = "start"; }}>
+              <b>To the start</b><span>{fmtDist(j.startDist, 20)}</span>
+            </button>
+            <button type="button" class="choice" aria-pressed={toRoute} onClick={() => { joinTarget.value = "route"; }}>
+              <b>Join nearby</b><span>{fmtDist(j.routeDist, 20)}</span>
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   } else if (n.nextCue) {
     const c = n.nextCue;
+    const dist = n.toCue === null ? "" : fmtDist(n.toCue, 20);
+    const label = <div class="b-label">{turnLabel(c.turn, n.toCue)}</div>;
     body = (
       <>
         <Arrow angle={turnAngle(c.turn)} />
         <div class="b-text">
-          <div class="b-label">{turnWord(c.turn)} in</div>
-          <div class="b-dist">{n.toCue === null ? "" : fmtDist(n.toCue, 20)}</div>
+          {c.turn === "straight" ? <><div class="b-dist">{dist}</div>{label}</> : <>{label}<div class="b-dist">{dist}</div></>}
           <div class="b-street">{c.name}</div>
           {n.currentCue ? <div class="b-sub">Now on {n.currentCue.name}</div> : null}
         </div>
@@ -76,7 +112,7 @@ export function Banner() {
   }
 
   return (
-    <div class={`banner ${tone}`} role="status" aria-live="polite" data-testid="banner">
+    <div class={`banner ${tone} ${cls}`} role="status" aria-live="polite" data-testid="banner">
       {body}
       {tag}
     </div>

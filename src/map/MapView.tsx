@@ -3,7 +3,8 @@ import { effect } from "@preact/signals";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
-import { nav, settings } from "../state";
+import { nav, openStop, settings } from "../state";
+import { finishOpen, joinChoice, joinTarget } from "../ui/uistate";
 import { tileTemplate } from "../offline";
 import type { LngLat, NavState, Pack } from "../types";
 import { lineLength, metresPerPixel, splitAt } from "./geometry";
@@ -15,6 +16,8 @@ export interface MapViewProps {
   follow: boolean;
   onFollowChange(follow: boolean): void;
   onStopTap(stop: number): void;
+  /** A tap on the map itself, not on a stop. */
+  onMapTap?(): void;
 }
 
 declare global { interface Window { __verstaMap?: maplibregl.Map } }
@@ -22,6 +25,8 @@ declare global { interface Window { __verstaMap?: maplibregl.Map } }
 const FOLLOW_ZOOM = 16.2;
 const PAD_TOP = 150;
 const PAD_BOTTOM = 230;
+/** Share of the height a bottom sheet may cover (see .sheet.bottom in app.css). */
+const SHEET_SHARE = 0.62;
 const GLIDE_MS = 900;
 const darkQuery = (): MediaQueryList => window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -100,7 +105,7 @@ export function MapView(props: MapViewProps) {
     let map: maplibregl.Map | null = null;
     const cleanups: (() => void)[] = [];
 
-    const data: RouteData = { lines: EMPTY, asides: EMPTY, cue: EMPTY };
+    const data: RouteData = { lines: EMPTY, asides: EMPTY, cue: EMPTY, guide: EMPTY, detour: EMPTY, rejoin: EMPTY };
     data.asides = { type: "FeatureCollection", features: pack.asides.map((a) => point(a.at, { id: a.id })) };
 
     const paletteNow = (): Palette => (darkQuery().matches ? DARK : LIGHT);
@@ -176,17 +181,22 @@ export function MapView(props: MapViewProps) {
       /* ---- camera ---- */
       let mode: "overview" | "follow" | null = null;
       let overviewHadRider = false;
+      /** A bottom sheet covers the lower part of the map: the stop sheet, or the finish logbook. */
+      const sheetUp = (n: NavState): boolean => openStop.value !== null || (n.status === "finished" && finishOpen.value);
       const frame = (force: boolean): void => {
         const n = nav.value;
         const p = live.current;
         const target = riderTarget(n);
+        const h = container.clientHeight || 800;
+        const lowered = sheetUp(n);
+        const padBottom = lowered ? Math.round(h * SHEET_SHARE) : PAD_BOTTOM;
         if ((n.status === "riding" || n.status === "at_stop") && target) {
           if (!p.follow) { mode = null; return; }
           const bearing = settings.value.courseUp ? (n.routeBearing ?? m.getBearing()) : 0;
           const first = mode !== "follow" || force;
           mode = "follow";
           m.easeTo({
-            center: target, zoom: FOLLOW_ZOOM, bearing, padding: { top: PAD_TOP, bottom: PAD_BOTTOM, left: 0, right: 0 },
+            center: target, zoom: FOLLOW_ZOOM, bearing, padding: { top: PAD_TOP, bottom: padBottom, left: 0, right: 0 },
             duration: first ? 700 : GLIDE_MS, easing: first ? (t: number) => t * (2 - t) : (t: number) => t, essential: true,
           });
         } else if (n.status === "idle" || n.status === "locating" || n.status === "to_start" || n.status === "finished") {
@@ -199,9 +209,8 @@ export function MapView(props: MapViewProps) {
           for (const seg of pack.segments) for (const c of seg) b.extend(c);
           for (const s of pack.stops) b.extend(s.at);
           if (hasRider && target) b.extend(target);
-          const h = container.clientHeight || 800;
-          const top = Math.min(PAD_TOP, h * 0.25);
-          const bottom = Math.min(PAD_BOTTOM, h * 0.3);
+          const top = n.status === "finished" && lowered ? 48 : Math.min(PAD_TOP, h * 0.25);
+          const bottom = lowered ? Math.round(h * SHEET_SHARE) : Math.min(PAD_BOTTOM, h * 0.3);
           m.fitBounds(b, { padding: { top, bottom, left: 40, right: 40 }, maxZoom: 16, duration: 700, bearing: 0, essential: true });
         }
       };
@@ -219,6 +228,9 @@ export function MapView(props: MapViewProps) {
       };
       let lastKey = "";
       let lastCue = "";
+      let lastGuide = "";
+      let wasLowered = false;
+      let lastDetour = "";
       const pushNav = (n: NavState): void => {
         const key = `${n.status}|${n.seg}|${Math.round(n.alongSeg / 4)}`;
         if (key !== lastKey) {
@@ -230,6 +242,20 @@ export function MapView(props: MapViewProps) {
           ? { type: "FeatureCollection", features: [point(n.nextCue.at)] } : EMPTY;
         const cueKey = JSON.stringify(cueFc);
         if (cueKey !== lastCue) { lastCue = cueKey; data.cue = cueFc; setData(ROUTE_SOURCES.cue, cueFc); }
+        const rider0 = n.fix ? ([n.fix.lng, n.fix.lat] as LngLat) : null;
+        const join = joinChoice(n, pack);
+        const goal = join ? (join.chosen === "route" && join.at.route ? join.at.route : join.at.start) : null;
+        const guideFc: GeoJSON.FeatureCollection = rider0 && goal
+          ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [rider0, goal] } }] } : EMPTY;
+        const guideKey = JSON.stringify(guideFc);
+        if (guideKey !== lastGuide) { lastGuide = guideKey; data.guide = guideFc; setData(ROUTE_SOURCES.guide, guideFc); }
+        const d = n.offRoute ? n.detour ?? null : null;
+        const line = d && d.line.length > 1 ? d.line : null;
+        const detourFc: GeoJSON.FeatureCollection = line
+          ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line } }] } : EMPTY;
+        const rejoinFc: GeoJSON.FeatureCollection = line ? { type: "FeatureCollection", features: [point(line[line.length - 1]!)] } : EMPTY;
+        const detourKey = JSON.stringify(detourFc);
+        if (detourKey !== lastDetour) { lastDetour = detourKey; data.detour = detourFc; data.rejoin = rejoinFc; setData(ROUTE_SOURCES.detour, detourFc); setData(ROUTE_SOURCES.rejoin, rejoinFc); }
         stopEls.forEach((el, i) => {
           const next = (n.status === "riding" || n.status === "to_start" || n.status === "locating") && i === n.seg;
           el.classList.toggle("is-next", next);
@@ -255,10 +281,16 @@ export function MapView(props: MapViewProps) {
       cleanups.push(effect(() => {
         const n = nav.value;
         void settings.value;
+        void joinTarget.value;
+        const lowered = sheetUp(n);
         if (!m.loaded() && !m.getSource(ROUTE_SOURCES.lines)) return;
         pushNav(n);
-        frame(false);
+        frame(lowered !== wasLowered);
+        wasLowered = lowered;
       }));
+
+      /* ---- a tap on the bare map ---- */
+      m.on("click", () => live.current.onMapTap?.());
 
       /* ---- the rider taking the camera ---- */
       m.on("movestart", (e) => { if ((e as { originalEvent?: unknown }).originalEvent && live.current.follow) live.current.onFollowChange(false); });
