@@ -44,7 +44,6 @@ export function StopSheet({ index }: { index: number }) {
         {here ? <span class="here">You are here</span> : null}
         {heading ? <span class="here">Next stop</span> : null}
         {canRide ? <button type="button" class="btn" onClick={() => { jumpToStop(index); close(); }}>Ride to this stop</button> : null}
-        <button type="button" class="btn ghost" onClick={close}>Close</button>
       </div>
     </Sheet>
   );

@@ -1,8 +1,9 @@
 /** What the Android back button closes, top-most first. Returns true when something was closed. */
 import { nowPlaying, openStop } from "../state";
-import { sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { firstRideSheet, sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 export function closeTopOverlay(): boolean {
+  if (firstRideSheet.value) { firstRideSheet.value = null; return true; }
   if (nowPlaying.value?.kind === "story" && sceneOpen.value) { sceneOpen.value = false; return true; }
   if (soundOpen.value) { soundOpen.value = false; return true; }
   if (stopsOpen.value) { stopsOpen.value = false; return true; }

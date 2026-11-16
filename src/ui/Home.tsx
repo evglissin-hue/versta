@@ -57,7 +57,9 @@ function FirstRide() {
       <ul class="tips">
         <li>Allow location when your phone asks.</li>
         <li>Turn the volume up. Earphones are best.</li>
-        <li>Keep the screen on, or use the Android app for the pocket.</li>
+        {isNative()
+          ? <li>Allow location all the time, so the ride carries on in your pocket.</li>
+          : <li>Keep the screen on, or use the Android app for the pocket.</li>}
       </ul>
       <div class="acts"><button type="button" class="btn play" onClick={go}>Start the ride</button></div>
     </Sheet>
