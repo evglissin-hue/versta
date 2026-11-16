@@ -113,3 +113,8 @@ export function pointAlong(pts: XY[], d: number, cum: number[] = cumulative(pts)
   const t = len > 0 ? (at - cum[leg]!) / len : 0;
   return { point: [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])], bearing: bearing(a, b), leg };
 }
+
+/** Signed difference between two bearings, -180 to 180. Positive means a turn to the right (clockwise). */
+export function angleDiff(from: number, to: number): number {
+  return ((((to - from) % 360) + 540) % 360) - 180;
+}

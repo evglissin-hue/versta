@@ -1,5 +1,6 @@
 import { cumulative, dist, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../geo";
-import type { Aside, Cue, Fix, NavEngine, NavEvent, NavOptions, NavState, Pack } from "../types";
+import type { Aside, Cue, Fix, NavEngine, NavEvent, NavOptions, NavState, Pack, RouteGraph } from "../types";
+import { buildIndex, findWayBack, type GraphIndex, type WayTarget, type WayTurn } from "./reroute";
 
 export const DEFAULT_NAV_OPTIONS: NavOptions = {
   maxAccuracy: 80, offRouteDistance: 45, offRouteDelay: 8, cueNowDistance: 15, cueApproachSeconds: 12, cueApproachMin: 60, asideLead: 40,
@@ -21,9 +22,22 @@ const DEPART_ALONG = 15;
 const ASIDE_LATE = 60;
 const LATE_CUE = 30;
 const UNKNOWN_SPEED = 4;
+/** Way back: how far behind the last known position targets are sampled, their spacing, and the penalty factor for behind. */
+const TARGET_BEHIND = 50;
+const TARGET_STEP = 50;
+const BEHIND_PENALTY = 1.5;
+/** Metres before a detour turn at which it is announced. */
+const DETOUR_TURN_LEAD = 40;
+/** Metres from the detour line beyond which the rider has strayed from it, for how many seconds, and the pause between searches. */
+const STRAY_DISTANCE = 40;
+const STRAY_SECONDS = 6;
+const RECOMPUTE_SECONDS = 10;
+const NEAREST_SECONDS = 5;
+const TURN_PASSED = 3;
 
 interface CueInfo { cue: Cue; along: number; depart: boolean; approached: boolean; done: boolean }
 interface AsideInfo { aside: Aside; along: number; done: boolean }
+interface ActiveDetour { pts: XY[]; cum: number[]; turns: (WayTurn & { said: boolean })[] }
 interface SegInfo { pts: XY[]; cum: number[]; len: number; cues: CueInfo[]; asides: AsideInfo[] }
 
 function initialState(): NavState {
@@ -66,6 +80,22 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   let needFull = false;
   /** Index of the stop the rider is waiting at while status is at_stop. */
   let atStop = -1;
+  /** The corridor graph, once given. Null means no way back is looked for. */
+  let index: GraphIndex | null = null;
+  let active: ActiveDetour | null = null;
+  /** When the way back was last computed (fix time), null before the first search of an off-route spell. */
+  let lastCompute: number | null = null;
+  let strayingSince: number | null = null;
+  let notFoundSaid = false;
+  let nearestAt: number | null = null;
+
+  function clearDetour(): void {
+    active = null;
+    s.detour = null;
+    lastCompute = null;
+    strayingSince = null;
+    notFoundSaid = false;
+  }
 
   function resetFlags(): void {
     for (const g of segs) {
@@ -170,6 +200,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     arriveAt(stop, ev);
     offSince = null;
     s.offRoute = false;
+    clearDetour();
     s.offBy = 0;
     if (stop === lastStop) {
       s.status = "finished";
@@ -184,6 +215,66 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.alongSeg = 0;
     derive();
     s.snapped = unproject(proj, stopAt(stop));
+  }
+
+  /** Look for a way back from `p` to the current segment, ahead of the rider by preference. */
+  function computeDetour(fix: Fix, p: XY, ev: NavEvent[]): void {
+    lastCompute = fix.time;
+    strayingSince = null;
+    const g = segAt(s.seg);
+    const targets: WayTarget[] = [];
+    const from = Math.max(0, s.alongSeg - TARGET_BEHIND);
+    for (let d = from; d < g.len + TARGET_STEP; d += TARGET_STEP) {
+      const at = Math.min(d, g.len);
+      targets.push({ at: pointAlong(g.pts, at, g.cum).point, penalty: at < s.alongSeg ? BEHIND_PENALTY * (s.alongSeg - at) : 0 });
+      if (at >= g.len) break;
+    }
+    targets.push({ at: stopAt(s.seg), penalty: 0 });
+    const way = index ? findWayBack(index, p, targets) : null;
+    if (!way) {
+      active = null;
+      s.detour = null;
+      if (!notFoundSaid) { notFoundSaid = true; ev.push({ type: "detour", found: false }); }
+      return;
+    }
+    notFoundSaid = false;
+    const cum = cumulative(way.line);
+    active = { pts: way.line, cum, turns: way.turns.map((t) => ({ ...t, said: false })) };
+    ev.push({ type: "detour", found: true });
+    trackDetour(p, ev);
+  }
+
+  /** Trim the detour behind the rider, update its distances and announce the turns that are close. */
+  function trackDetour(p: XY, ev: NavEvent[]): void {
+    const a = active;
+    if (!a) return;
+    const n = nearestOnPolyline(a.pts, p, a.cum, 0, a.cum.length ? a.cum[a.cum.length - 1]! : 0);
+    const total = a.cum[a.cum.length - 1] ?? 0;
+    const rest = a.pts.slice(n.leg + 1);
+    const line = [p, ...rest];
+    let next: NonNullable<NavState["detour"]>["next"] = null;
+    for (const t of a.turns) {
+      const ahead = t.along - n.along;
+      if (ahead < TURN_PASSED) { t.said = true; continue; }
+      if (!t.said && ahead <= DETOUR_TURN_LEAD) { t.said = true; ev.push({ type: "detour_turn", turn: t.turn, name: t.name }); }
+      if (!next) next = { turn: t.turn, name: t.name, at: unproject(proj, t.at), dist: ahead };
+    }
+    s.detour = { line: line.map((q) => unproject(proj, q)), toRejoin: Math.max(0, total - n.along), next };
+    // Strayed from the way back: look again, but not too often.
+    if (n.dist > STRAY_DISTANCE) strayingSince ??= s.fix?.time ?? 0;
+    else strayingSince = null;
+  }
+
+  /** Off route: find, follow and renew the way back. Does nothing without a graph. */
+  function detourStep(fix: Fix, p: XY, ev: NavEvent[]): void {
+    if (!index) return;
+    const due = lastCompute === null || fix.time - lastCompute >= RECOMPUTE_SECONDS * 1000;
+    if (!active) {
+      if (due) computeDetour(fix, p, ev);
+      return;
+    }
+    trackDetour(p, ev);
+    if (strayingSince !== null && fix.time - strayingSince >= STRAY_SECONDS * 1000 && due) computeDetour(fix, p, ev);
   }
 
   function riding(fix: Fix, p: XY, ev: NavEvent[], departNow: boolean): void {
@@ -217,6 +308,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
         s.seg += 1;
         s.alongSeg = nx.along;
         s.offRoute = false;
+        clearDetour();
         offSince = null;
         needFull = false;
         markBehind(s.seg, nx.along);
@@ -246,9 +338,11 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
       s.offRoute = false;
       offSince = null;
       markBehind(s.seg, n.along);
+      clearDetour();
       ev.push({ type: "back_on_route" });
     }
 
+    if (s.offRoute) detourStep(fix, p, ev);
     if (!s.offRoute) {
       processCues(fix, ev, departNow);
       processAsides(ev);
@@ -284,6 +378,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
         }
       }
       if (best) {
+        s.nearest = null;
         s.status = "riding";
         s.seg = best.seg;
         s.alongSeg = best.along;
@@ -298,6 +393,15 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.toStop = d0;
     s.offBy = 0;
     s.offRoute = false;
+    if (nearestAt === null || fix.time - nearestAt >= NEAREST_SECONDS * 1000 || !s.nearest) {
+      nearestAt = fix.time;
+      let near: NavState["nearest"] = null;
+      for (let k = 1; k < segs.length; k++) {
+        const n = nearestOnPolyline(segAt(k).pts, p, segAt(k).cum);
+        if (!near || n.dist < near.dist) near = { at: unproject(proj, n.point), seg: k, dist: n.dist };
+      }
+      s.nearest = near;
+    }
     derive();
   }
 
@@ -324,7 +428,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     const p = project(proj, [fix.lng, fix.lat]);
     if (s.status === "locating" || s.status === "idle") s.status = "to_start";
     if (s.status === "to_start" && s.seg === 0) toStart(fix, p, ev);
-    else if (s.status === "to_start") { s.status = "riding"; riding(fix, p, ev, false); }
+    else if (s.status === "to_start") { s.nearest = null; s.status = "riding"; riding(fix, p, ev, false); }
     else if (s.status === "at_stop") atStopStep(fix, p, ev);
     else riding(fix, p, ev, false);
     return ev;
@@ -338,6 +442,9 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.alongSeg = 0;
     s.arrived = Array.from({ length: target }, (_, i) => i);
     s.offRoute = false;
+    clearDetour();
+    s.nearest = null;
+    nearestAt = null;
     s.offBy = 0;
     offSince = null;
     atStop = -1;
@@ -346,8 +453,18 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     derive();
   }
 
+  function setGraph(graph: RouteGraph | null): void {
+    index = graph && graph.nodes.length > 0 ? buildIndex(graph, (q) => project(proj, q)) : null;
+    clearDetour();
+  }
+
   function reset(): void {
     s = initialState();
+    active = null;
+    lastCompute = null;
+    strayingSince = null;
+    notFoundSaid = false;
+    nearestAt = null;
     resetFlags();
     offSince = null;
     needFull = false;
@@ -358,6 +475,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     update,
     get state() { return s; },
     jumpToSegment,
+    setGraph,
     reset,
   };
 }

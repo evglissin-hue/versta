@@ -42,6 +42,8 @@ export function createDirector(deps: DirectorDeps): Director {
   let lastAsideEnd: number | null = null;
   let ridingSince: number | null = null;
   let bedKey: string | null = null;
+  /** The soft bed under the aside now playing, when the aside started it. */
+  let asideBed = false;
   let disposed = false;
 
   const log = (what: DirectorLogEntry["what"], id?: string, reason?: string): void => {
@@ -94,7 +96,19 @@ export function createDirector(deps: DirectorDeps): Director {
   }
   function fadeBed(): void {
     bedKey = null;
+    asideBed = false;
     mixer.stopBed(BED_FADE_SECONDS);
+  }
+  /** A soft bed under a passing-by story, from the stop the rider last left. A bed already running is left alone. */
+  function startAsideBed(nav: NavState): void {
+    if (!deps.settings().ambience || bedKey !== null) return;
+    const ambience = pack.stops[Math.max(0, nav.seg - 1)]?.ambience ?? "river";
+    bedKey = `${ambience}|`;
+    asideBed = true;
+    mixer.startBed(ambience, null);
+  }
+  function endAsideBed(): void {
+    if (asideBed) fadeBed();
   }
 
   /* ---------------------------------------------------------------- stories */
@@ -110,6 +124,7 @@ export function createDirector(deps: DirectorDeps): Director {
     asidePending = false;
     asideHandle = null;
     mixer.stopVoice();
+    endAsideBed();
   }
 
   function startStory(stop: number, story: Story): void {
@@ -210,7 +225,7 @@ export function createDirector(deps: DirectorDeps): Director {
     return null;
   }
 
-  function playAside(aside: Aside): void {
+  function playAside(aside: Aside, nav: NavState): void {
     asidePending = true;
     const my = ++token;
     void mixer.chime().then(() => {
@@ -219,6 +234,7 @@ export function createDirector(deps: DirectorDeps): Director {
       heard.add(aside.id);
       asideNow = aside;
       log("aside_played", aside.id);
+      startAsideBed(nav);
       emit();
       const h = mixer.playVoice(aside.audio, { estimatedSeconds: words(aside.text) / WORDS_PER_SECOND });
       asideHandle = h;
@@ -227,6 +243,7 @@ export function createDirector(deps: DirectorDeps): Director {
         asideHandle = null;
         asideNow = null;
         lastAsideEnd = deps.clock();
+        endAsideBed();
         emit();
       };
       h.done.then(finish, (reason: unknown) => { if (reason !== "stopped") finish(); });
@@ -252,11 +269,23 @@ export function createDirector(deps: DirectorDeps): Director {
             log("back_on_route");
             if (deps.settings().navVoice) speakNav(pack.system.backOnRoute, "Back on the route.");
             break;
+          case "detour":
+            if (!e.found) break;
+            log("detour");
+            if (deps.settings().navVoice && pack.system.rerouting) speakNav(pack.system.rerouting, "Rerouting.");
+            break;
+          case "detour_turn": {
+            log("detour_turn", e.turn, e.name);
+            const clip = pack.system.turns?.[e.turn];
+            if (clip && deps.settings().navVoice) speakNav(clip, e.turn.replace("_", " "));
+            break;
+          }
           case "arrive": {
             if (asideNow || asidePending) {
               token++;
               asideNow = null; asideHandle = null; asidePending = false;
               mixer.stopVoice();
+              endAsideBed();
               lastAsideEnd = deps.clock();
               emit();
             }
@@ -272,7 +301,7 @@ export function createDirector(deps: DirectorDeps): Director {
           case "aside": {
             const reason = asideSkipReason(e.aside, nav);
             if (reason) log("aside_skipped", e.aside.id, reason);
-            else playAside(e.aside);
+            else playAside(e.aside, nav);
             break;
           }
           case "finished":
@@ -329,6 +358,10 @@ export function createDirector(deps: DirectorDeps): Director {
       mixer.stopBed();
       bedKey = null;
       deps.onNowPlaying(null);
+    },
+
+    markHeard(ids: string[]): void {
+      for (const id of ids) heard.add(id);
     },
 
     get heard(): ReadonlySet<string> { return heard; },

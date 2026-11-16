@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import packJson from "../../public/packs/thames-loop/pack.json";
-import { cumulative, makeProjection, pointAlong, project, unproject, type XY } from "../../src/geo";
+import { cumulative, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../../src/geo";
 import { createNavEngine } from "../../src/nav/engine";
 import { createSimSource } from "../../src/nav/sources";
-import type { Fix, NavEvent, NavState, Pack } from "../../src/types";
+import type { Fix, LngLat, NavEvent, NavState, Pack, RouteGraph } from "../../src/types";
 
 const pack = packJson as unknown as Pack;
 const proj = makeProjection(pack.stops[0]!.at);
@@ -294,5 +294,241 @@ describe("simulator", () => {
     expect(Math.hypot(at(a, 0) - at(b, 0), at(a, 1) - at(b, 1))).toBeLessThan(7);
     expect(held.every((f) => f.accuracy === 6 && f.speed === 5)).toBe(true);
     source.stop();
+  });
+});
+
+/** A 60 m street grid over the bounding box of one segment, padded by `pad` metres, shaped like RouteGraph. */
+function gridOver(seg: number, pad = 500, step = 60): RouteGraph {
+  const pts = at(pack.segments, seg).map((q) => project(proj, q));
+  const xs = pts.map((p) => at(p, 0));
+  const ys = pts.map((p) => at(p, 1));
+  const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+  const nx = Math.floor((x1 - x0) / step) + 1, ny = Math.floor((y1 - y0) / step) + 1;
+  const nodes: LngLat[] = [];
+  const edges: RouteGraph["edges"] = [];
+  const names: string[] = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) nodes.push(unproject(proj, [x0 + i * step, y0 + j * step]));
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = j * nx + i;
+    if (i + 1 < nx) { names.push(`Row ${j}`); edges.push([a, a + 1, step, step, names.length - 1, 0, 0]); }
+    if (j + 1 < ny) { names.push(`Col ${i}`); edges.push([a, a + nx, step, step, names.length - 1, 0, 0]); }
+  }
+  return { nodes, edges, names, kinds: ["road"] };
+}
+
+describe("finding a way back", () => {
+  const SEG = 4;
+  const graph = gridOver(SEG);
+  const ALONG = 1950;
+  const onRoute = line(SEG, ALONG);
+
+  /** Fixes riding the route up to `ALONG` + 40 m, 4 m/s, one a second. */
+  function ridden(): Fix[] { return fixesAlong(onRoute).slice(0, 50); }
+
+  /** Where the rider is, 150 m to the right of the route, `lateral` metres out. */
+  function offPoint(lateral: number): XY {
+    const f = at(ridden(), 49);
+    const p = project(proj, [f.lng, f.lat]);
+    const pa = pointAlong(onRoute, 4 * 49);
+    const rad = (pa.bearing + 90) * (Math.PI / 180);
+    return [at(p, 0) + Math.sin(rad) * lateral, at(p, 1) + Math.cos(rad) * lateral];
+  }
+  const fixAt = (p: XY, time: number): Fix => {
+    const ll = unproject(proj, p);
+    return { lng: ll[0], lat: ll[1], accuracy: 5, heading: null, speed: 4, time };
+  };
+
+  interface Drive { engine: ReturnType<typeof createNavEngine>; time: number; events: { at: number; e: NavEvent }[] }
+  function start(withGraph: boolean): Drive {
+    const engine = createNavEngine(pack);
+    if (withGraph) engine.setGraph?.(graph);
+    const d: Drive = { engine, time: T0, events: [] };
+    for (const f of ridden()) { for (const e of engine.update(f)) d.events.push({ at: f.time, e }); d.time = f.time; }
+    return d;
+  }
+  function feed(d: Drive, p: XY): NavEvent[] {
+    d.time += 1000;
+    const ev = d.engine.update(fixAt(p, d.time));
+    for (const e of ev) d.events.push({ at: d.time, e });
+    return ev;
+  }
+  const ofType = (d: Drive, type: NavEvent["type"]) => d.events.filter((x) => x.e.type === type);
+  /** Stand 150 m off the route until off_route fires and the engine has had its chance to answer. */
+  function strayOut(d: Drive, lateral = 150): XY {
+    const p = offPoint(lateral);
+    for (let k = 0; k < 12; k++) feed(d, p);
+    return p;
+  }
+  /** Walk `path` at 4 m/s from where the rider is, one fix a second, until it ends. */
+  function walk(d: Drive, path: XY[]): void {
+    const cum = cumulative(path);
+    const total = at(cum, cum.length - 1);
+    for (let m = 4; m < total + 4; m += 4) feed(d, pointAlong(path, Math.min(m, total), cum).point);
+  }
+
+  it("a detour 150 m off the line gives off_route, then a detour with a line that ends on the route", () => {
+    const d = start(true);
+    expect(d.engine.state.status).toBe("riding");
+    strayOut(d);
+    const order = d.events.map((x) => x.e.type).filter((x) => x === "off_route" || x === "detour");
+    expect(order).toEqual(["off_route", "detour"]);
+    expect(at(ofType(d, "detour"), 0).e).toEqual({ type: "detour", found: true });
+    const det = d.engine.state.detour!;
+    expect(det.line.length).toBeGreaterThan(2);
+    const end = project(proj, at(det.line, det.line.length - 1));
+    const g = at(pack.segments, SEG).map((q) => project(proj, q));
+    expect(nearestOnPolyline(g, end).dist).toBeLessThan(1);
+    expect(det.toRejoin).toBeGreaterThan(100);
+    expect(det.toRejoin).toBeLessThan(500);
+    // ahead of where the rider was, not behind
+    expect(nearestOnPolyline(g, end).along).toBeGreaterThan(d.engine.state.alongSeg - 60);
+  });
+
+  it("with the rider following the detour: turns in order, then back_on_route with the detour cleared", () => {
+    const d = start(true);
+    const p = strayOut(d);
+    const first = d.engine.state.detour!;
+    const path = [p, ...first.line.slice(1).map((q) => project(proj, q))];
+    walk(d, path);
+    for (let k = 0; k < 4; k++) feed(d, path[path.length - 1]!);
+    const turns = d.events.flatMap((x) => (x.e.type === "detour_turn" ? [x.e] : []));
+    expect(turns.length).toBeGreaterThan(0);
+    // The first announcement is the turn the detour said was next, and none is repeated back to back.
+    expect({ turn: at(turns, 0).turn, name: at(turns, 0).name }).toEqual({ turn: first.next!.turn, name: first.next!.name });
+    expect(first.next!.turn).not.toBe("straight");
+    expect(turns.length).toBeLessThanOrEqual(3);
+    const types = d.events.map((x) => x.e.type);
+    expect(types.filter((x) => x === "back_on_route")).toHaveLength(1);
+    expect(types.indexOf("detour")).toBeLessThan(types.indexOf("detour_turn"));
+    expect(types.indexOf("detour_turn")).toBeLessThan(types.indexOf("back_on_route"));
+    expect(d.engine.state.offRoute).toBe(false);
+    expect(d.engine.state.detour ?? null).toBeNull();
+  });
+
+  it("announces a turn 40 m before it, and next shrinks as the rider walks", () => {
+    const d = start(true);
+    const p = strayOut(d);
+    const first = d.engine.state.detour!;
+    expect(first.next).not.toBeNull();
+    const path = [p, ...first.line.slice(1).map((q) => project(proj, q))];
+    const cum = cumulative(path);
+    const nextAt = project(proj, first.next!.at);
+    const turnAlong = nearestOnPolyline(path, nextAt, cum).along;
+    let said: number | null = null;
+    let lastDist = Infinity;
+    for (let m = 4; m < turnAlong + 20; m += 4) {
+      const ev = feed(d, pointAlong(path, m, cum).point);
+      if (said === null && ev.some((e) => e.type === "detour_turn")) said = turnAlong - m;
+      const nx = d.engine.state.detour?.next;
+      if (nx && nx.name === first.next!.name && m < turnAlong - 8) { expect(nx.dist).toBeLessThanOrEqual(lastDist + 1); lastDist = nx.dist; }
+    }
+    expect(said).not.toBeNull();
+    expect(said!).toBeLessThanOrEqual(40);
+    expect(said!).toBeGreaterThan(30);
+  });
+
+  it("without a graph the same ride gives no detour events", () => {
+    const d = start(false);
+    const p = strayOut(d);
+    walk(d, [p, ...ridden().slice(48, 49).map((f) => project(proj, [f.lng, f.lat]))]);
+    expect(ofType(d, "off_route")).toHaveLength(1);
+    expect(d.events.some((x) => x.e.type === "detour" || x.e.type === "detour_turn")).toBe(false);
+    expect(d.engine.state.detour ?? null).toBeNull();
+  });
+
+  it("setGraph(null) turns the feature off again", () => {
+    const d = start(true);
+    d.engine.setGraph?.(null);
+    strayOut(d);
+    expect(d.events.some((x) => x.e.type === "detour")).toBe(false);
+  });
+
+  it("reports detour found false when the rider is far from any street, once", () => {
+    const d = start(true);
+    strayOut(d, 3000);
+    for (let k = 0; k < 30; k++) feed(d, offPoint(3000));
+    const found = ofType(d, "detour").map((x) => (x.e as { found: boolean }).found);
+    expect(found).toEqual([false]);
+    expect(d.engine.state.detour ?? null).toBeNull();
+  });
+
+  it("straying from the detour triggers one recompute, not a storm", () => {
+    const d = start(true);
+    strayOut(d, 150);
+    expect(ofType(d, "detour")).toHaveLength(1);
+    const first = d.time;
+    // A different place 90 m further out, held for 25 s.
+    const far = offPoint(240);
+    for (let k = 0; k < 25; k++) feed(d, far);
+    const found = ofType(d, "detour");
+    expect(found).toHaveLength(2);
+    expect(at(found, 1).at - at(found, 0).at).toBeGreaterThanOrEqual(10_000);
+    expect(at(found, 1).at).toBeGreaterThan(first);
+    // Drifting away at walking pace for a minute never searches more often than every 10 s.
+    const before = ofType(d, "detour").length;
+    for (let k = 0; k < 60; k++) feed(d, offPoint(240 + k * 3));
+    const times = ofType(d, "detour").slice(before - 1).map((x) => x.at);
+    for (let i = 1; i < times.length; i++) expect(at(times, i) - at(times, i - 1)).toBeGreaterThanOrEqual(10_000);
+    expect(times.length).toBeLessThanOrEqual(7);
+  });
+
+  it("keeps the detour while off route and clears it on arrival at the stop or a jump", () => {
+    const d = start(true);
+    strayOut(d);
+    expect(d.engine.state.detour).toBeTruthy();
+    d.engine.jumpToSegment(SEG + 1);
+    expect(d.engine.state.detour ?? null).toBeNull();
+  });
+});
+
+describe("the nearest point of the route while guiding to the start", () => {
+  it("points at the right segment for a rider near Greenwich", () => {
+    // 100 m to the side of the line, 400 m along segment 5 (Deptford to Cutty Sark and Greenwich).
+    const seg = 5;
+    const pts = at(pack.segments, seg).map((q) => project(proj, q));
+    const cum = cumulative(pts);
+    const pa = pointAlong(pts, Math.min(400, at(cum, cum.length - 1) / 2), cum);
+    const rad = (pa.bearing + 90) * (Math.PI / 180);
+    const rider: XY = [at(pa.point, 0) + Math.sin(rad) * 100, at(pa.point, 1) + Math.cos(rad) * 100];
+    const ll = unproject(proj, rider);
+    const engine = createNavEngine(pack);
+    const fix: Fix = { lng: ll[0], lat: ll[1], accuracy: 5, heading: null, speed: null, time: T0 };
+    engine.update(fix);
+    expect(engine.state.status).toBe("to_start");
+    // brute force over every segment
+    let best = { seg: 0, dist: Infinity };
+    for (let k = 1; k < pack.segments.length; k++) {
+      const n = nearestOnPolyline(at(pack.segments, k).map((q) => project(proj, q)), rider);
+      if (n.dist < best.dist) best = { seg: k, dist: n.dist };
+    }
+    const near = engine.state.nearest!;
+    expect(near).toBeTruthy();
+    expect(near.seg).toBe(best.seg);
+    expect(near.seg).toBe(seg);
+    expect(near.dist).toBeCloseTo(best.dist, 3);
+    expect(near.dist).toBeGreaterThan(90);
+    expect(near.dist).toBeLessThan(105);
+    // the point lies on the line
+    expect(nearestOnPolyline(pts, project(proj, near.at)).dist).toBeLessThan(0.5);
+  });
+
+  it("is recomputed at most once every 5 s and cleared once the ride starts", () => {
+    const engine = createNavEngine(pack);
+    const start = at(fixesAlong(line()), 0);
+    const [sx, sy] = project(proj, [start.lng, start.lat]);
+    const place = (dx: number, k: number): Fix => {
+      const ll = unproject(proj, [sx - 400 + dx, sy - 400]);
+      return { ...start, lng: ll[0], lat: ll[1], time: T0 + k * 1000 };
+    };
+    engine.update(place(0, 0));
+    const first = engine.state.nearest!;
+    expect(first).toBeTruthy();
+    engine.update(place(-300, 2));
+    expect(engine.state.nearest).toBe(first);
+    engine.update(place(-300, 6));
+    expect(engine.state.nearest).not.toBe(first);
+    engine.update(at(fixesAlong(line(4, 300)), 0));
+    expect(engine.state.status).toBe("riding");
+    expect(engine.state.nearest ?? null).toBeNull();
   });
 });
