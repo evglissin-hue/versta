@@ -269,6 +269,8 @@ export interface DirectorDeps {
   mixer: Mixer;
   settings: () => Settings;
   clock: Clock;
+  /** How many times faster than real time the ride runs (1 on a real ride). Divide real-timer waits by it. */
+  timeScale: number;
   /** Called whenever what is playing changes, so the UI can follow. */
   onNowPlaying: (now: NowPlaying) => void;
   /** Called for every decision worth recording: played, skipped and why. Feeds the debug log and the tests. */

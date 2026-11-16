@@ -44,7 +44,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl()):
   await mixer.unlock();
   const engine = createNavEngine(p);
   const director = createDirector({
-    pack: p, mixer, settings: () => settings.value, clock: () => (source.now ? source.now() : Date.now()),
+    pack: p, mixer, settings: () => settings.value, clock: () => (source.now ? source.now() : Date.now()), timeScale: sim?.scale ?? 1,
     onNowPlaying: (now) => {
       nowPlaying.value = now;
       // the simulated rider stands still while a story plays at a stop, as a real one would
