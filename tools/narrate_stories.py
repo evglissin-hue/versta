@@ -1,7 +1,9 @@
 """Record the main story narration with paragraph marks (Kokoro text-to-speech).
 Writes public/packs/<id>/audio/<stop>-<n>.mp3 and tools/content/<id>.audio.json (src, marks, dur).
 Usage: KOKORO_DIR=/path/to/models python3 tools/narrate_stories.py"""
-import json, re, os, subprocess, sys, time, numpy as np, soundfile as sf
+import json, re, os, sys, time, numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import voice
 from kokoro_onnx import Kokoro
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KD = os.environ.get("KOKORO_DIR", "/home/claude/tts")
@@ -41,14 +43,13 @@ for r in routes:
             key = f"{r['id']}/{s['id']}-{ki}"
             fn = os.path.join(OUT, f"{s['id']}-{ki}.mp3")
             if key in man and os.path.exists(fn): continue
-            sr = 24000; parts = [np.zeros(int(sr*1.6), dtype=np.float32)]; marks = []; pos = 1.6
+            sr = 24000; parts = [np.zeros(int(sr*voice.LEAD_STORY), dtype=np.float32)]; marks = []; pos = voice.LEAD_STORY
             for p in st["paras"]:
-                a, sr2 = k.create(norm(p), voice="bm_george", speed=0.92, lang="en-gb"); assert sr2 == sr
+                a, sr2 = k.create(norm(p), voice=voice.VOICE, speed=voice.SPEED_STORY, lang=voice.LANG); assert sr2 == sr
                 a = a.astype(np.float32); marks.append(round(pos, 2)); parts.append(a); pos += len(a)/sr
                 gap = 0.7; parts.append(np.zeros(int(sr*gap), dtype=np.float32)); pos += gap
             audio = np.concatenate(parts)
-            sf.write("/tmp/x.wav", audio, sr)
-            subprocess.run(["ffmpeg","-y","-loglevel","error","-i","/tmp/x.wav","-af","loudnorm=I=-16:TP=-1.5:LRA=11","-ar","24000","-ac","1","-b:a","48k",fn], check=True)
+            voice.encode(audio, sr, fn)
             man[key] = {"src": f"audio/{key}.mp3", "marks": marks, "dur": round(len(audio)/sr, 1)}
             json.dump(man, open(mpath, "w"))
             print(key, man[key]["dur"], "elapsed %.0fs" % (time.time()-t0), flush=True)

@@ -1,5 +1,5 @@
-"""Build a route pack (public/packs/<id>/pack.json) from: the route content JSON, the planned GPX
-tracks, cached OpenStreetMap extracts (see fetch_osm.py) and the asides JSON.
+"""Build a route pack (public/packs/<id>/pack.json) and its corridor graph (graph.json) from: the route content JSON, the planned line
+(<id>.track.json, written by plan_line.py), cached OpenStreetMap extracts (see fetch_osm.py) and the asides JSON.
 Usage: python3 tools/build_pack.py   (paths are set in the CONFIG block below)"""
 import glob, json, math, re, subprocess, sys, time, os
 import xml.etree.ElementTree as ET
@@ -16,26 +16,8 @@ routes = json.load(open(os.path.join(CONTENT, PACK_ID + ".route.json")))
 stops = routes[0]["stops"]
 SP = [P(s["lat"], s["lng"]) for s in stops]
 
-def gpx(f):
-    return [P(float(a), float(b)) for a, b in re.findall(r'<trkpt lat="([-\d.]+)" lon="([-\d.]+)"', open(f).read())]
-OUT, BACK = gpx(os.path.join(CONTENT, PACK_ID + ".out.gpx")), gpx(os.path.join(CONTENT, PACK_ID + ".back.gpx"))
-
-def densify(pts, step=12):
-    out = [pts[0]]
-    for a, b in zip(pts, pts[1:]):
-        d = math.dist(a, b); n = max(1, int(d // step))
-        for i in range(1, n + 1): out.append((a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n))
-    return out
-def split(track, sps):
-    """Cut a track into pieces between consecutive stops (nearest track index, monotonic)."""
-    idx, last = [], 0
-    for sp in sps:
-        best = min(range(last, len(track)), key=lambda i: math.dist(track[i], sp))
-        idx.append(best); last = best
-    idx[0] = 0; idx[-1] = len(track) - 1
-    return [track[a:b + 1] for a, b in zip(idx, idx[1:])]
-OUTD, BACKD = densify(OUT), densify(BACK)
-segs = [[]] + split(OUTD, SP[0:6]) + [[SP[5], SP[6]]] + split(BACKD, SP[6:13])   # segs[i] leads to stop i
+TRACK = json.load(open(os.path.join(CONTENT, PACK_ID + ".track.json")))
+segs = [[]] + [[P(ll[1], ll[0]) for ll in TRACK["segments"][str(i)]] for i in range(1, 13)]   # segs[i] leads to stop i
 assert len(segs) == 13
 ALL = [p for s in segs for p in s]
 
@@ -275,20 +257,39 @@ for si in range(1, 13):
         if turn == "straight" and ln < 120: c["quiet"] = True
         cues.append(c)
 
-# asides: anchored to a named stretch of a segment so they always sit on the real line
-asides = []
-for a in json.load(open(os.path.join(CONTENT, PACK_ID + ".asides.json"))):
-    cs = [c for c in cues if c["seg"] == a["seg"] and c["name"] == a["street"]]
-    if not cs: print("ASIDE NOT ANCHORED", a["id"], a["street"]); continue
-    c = max(cs, key=lambda c: c["len"]); t = seg_tracks[a["seg"]]
-    # walk along the track from the cue start for frac * len metres
-    def M(ll): return P(ll[1], ll[0])
-    want = a["frac"] * c["len"]; i = c["i"]; acc = 0; at = t[i]
+# asides: anchored to a named stretch of a segment, else to a near point, so they always sit on the real line
+def M(ll): return P(ll[1], ll[0])
+def along(si, c, frac):
+    """Point frac * c.len metres along the track from the cue's start."""
+    t = seg_tracks[si]; want = frac * c["len"]; i = c["i"]; acc = 0; at = t[i]
     while i < len(t) - 1 and acc < want:
         step = math.dist(M(t[i]), M(t[i + 1]))
         if acc + step >= want:
             f = (want - acc) / (step or 1); at = [round(t[i][0] + (t[i + 1][0] - t[i][0]) * f, 6), round(t[i][1] + (t[i + 1][1] - t[i][1]) * f, 6)]; break
         acc += step; i += 1; at = t[i]
+    return at
+def nearest_on(si, ll):
+    """(point, metres) nearest point of segment si's line to ll, by projection onto its pieces."""
+    t = seg_tracks[si]; p = M(ll); best = (1e9, t[0])
+    for a, b in zip(t, t[1:]):
+        pa, pb = M(a), M(b); dx, dy = pb[0] - pa[0], pb[1] - pa[1]; L2 = dx * dx + dy * dy or 1e-9
+        u = max(0, min(1, ((p[0] - pa[0]) * dx + (p[1] - pa[1]) * dy) / L2)); q = (pa[0] + dx * u, pa[1] + dy * u)
+        d = math.dist(p, q)
+        if d < best[0]: best = (d, [round(LON0 + q[0] / KX, 6), round(LAT0 - q[1] / KY, 6)])
+    return best[1], best[0]
+asides = []; aside_report = []
+for a in json.load(open(os.path.join(CONTENT, PACK_ID + ".asides.json"))):
+    cs = [c for c in cues if c["seg"] == a["seg"] and c["name"] == a["street"]]
+    at = how = None
+    if cs:
+        c = max(cs, key=lambda c: c["len"]); at = along(a["seg"], c, a["frac"]); how = "street"
+        # a street that happens to be on the line but is nowhere near the thing the story is about does not count
+        if a.get("near") and math.dist(M(at), M(a["near"])) > 250: at = None
+    if at is None and a.get("near"):
+        at, d = nearest_on(a["seg"], a["near"]); how = "near %dm" % round(d)
+        if d > 250: print("WARNING aside", a["id"], "is", round(d), "m from its near point")
+    if at is None: print("ASIDE NOT ANCHORED", a["id"], a["street"]); continue
+    aside_report.append((a["id"], a["seg"], how))
     asides.append({"id": a["id"], "seg": a["seg"], "at": at, "title": a["title"], "tags": a["tags"], "text": a["text"], "audio": f"asides/{a['id']}.mp3"})
 
 route = routes[0]; aud = json.load(open(os.path.join(CONTENT, PACK_ID + ".audio.json")))
@@ -308,12 +309,29 @@ for si, st in enumerate(stops):
 stops_out[-1]["name"] = "Wenlock Basin"; stops_out[-1]["id"] = "wenlock-basin"
 for o in stops_out[-1]["stories"]: o["id"] = o["id"].replace("home-", "wenlock-basin-")
 for c in cues: c["id"] = f"s{c['seg']:02d}-{c['i']:03d}"; c["audio"] = f"cues/{c['id']}.mp3"
-pack = {"format": 1, "id": PACK_ID, "name": route["name"], "mode": route["mode"], "km": route["km"], "blurb": route["blurb"],
+def seg_len(t): return sum(math.dist(M(a), M(b)) for a, b in zip(t, t[1:]))
+KM = round(sum(seg_len(t) for t in seg_tracks[1:]) / 1000)
+pack = {"format": 1, "id": PACK_ID, "name": route["name"], "mode": route["mode"], "km": KM, "blurb": route["blurb"],
         "hero": {"src": "img/" + pics[PACK_ID][0], "caption": pics[PACK_ID][1]},
         "legs": route["legs"], "stops": stops_out, "segments": seg_tracks, "cues": cues, "asides": asides,
-        "system": {"arrive": [f"system/arrive-{s['id']}.mp3" for s in stops_out], "offRoute": "system/off-route.mp3", "backOnRoute": "system/back-on-route.mp3"},
+        "system": {"arrive": [f"system/arrive-{s['id']}.mp3" for s in stops_out], "offRoute": "system/off-route.mp3", "backOnRoute": "system/back-on-route.mp3",
+                   "rerouting": "system/rerouting.mp3", "turns": {t: f"system/turn-{t.replace('_', '-')}.mp3" for t in ("left", "right", "slight_left", "slight_right", "sharp_left", "sharp_right", "straight")}},
+        "graph": "graph.json",
         "credits": ["Pictures are public domain works from Wikimedia Commons.", "Map data © OpenStreetMap contributors."]}
 out = os.path.join(ROOT, "public", "packs", PACK_ID, "pack.json")
 json.dump(pack, open(out, "w"), separators=(",", ":"), ensure_ascii=False)
 print("pack bytes", os.path.getsize(out), "| cues", len(cues), "spoken", sum(1 for c in cues if not c.get("quiet")), "| asides", len(asides), "| track pts", sum(len(t) for t in seg_tracks))
 for c in cues: print(c["id"], c["say"], c["len"], "(quiet)" if c.get("quiet") else "")
+
+for aid, sg, how in aside_report: print("aside", aid, "seg", sg, how)
+print("km", KM, "| per segment m:", [round(seg_len(t)) for t in seg_tracks[1:]])
+# index.json
+ip = os.path.join(ROOT, "public", "packs", "index.json"); idx = json.load(open(ip))
+for e in idx["packs"]:
+    if e["id"] == PACK_ID: e["km"] = KM
+json.dump(idx, open(ip, "w"), separators=(",", ":"), ensure_ascii=False)
+# corridor graph
+import router
+net = router.load()
+gr = router.write_graph(net, [t for t in TRACK["segments"].values()], [[st["lng"], st["lat"]] for st in stops], os.path.join(ROOT, "public", "packs", PACK_ID, "graph.json"))
+print("graph", gr)
