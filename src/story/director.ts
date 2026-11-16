@@ -8,6 +8,11 @@ const MIN_RIDING_SECONDS = 60;
 const ASIDE_GAP_SECONDS = { sparse: 300, rich: 90 };
 const NEAR_STOP_METRES = 150;
 const NEAR_TURN_METRES = 80;
+/** Below this many metres to the turn only the cue is spoken, without a distance. */
+const MIN_DISTANCE_CALL = 40;
+/** A distance clip is chosen for the turn distance plus this much, since it is spoken a moment before the cue. */
+const DISTANCE_SLACK = 15;
+const REROUTING_GAP_MS = 60_000;
 
 type StoryNow = Extract<NonNullable<NowPlaying>, { kind: "story" }>;
 interface Queued { stop: number; story: Story }
@@ -29,6 +34,11 @@ export function createDirector(deps: DirectorDeps): Director {
   const heard = new Set<string>();
   const spokenCues = new Set<string>();
   const shownCues = new Set<string>();
+  /** Cues whose approach was spoken: their "now" is a tick, not words. */
+  const approached = new Set<string>();
+  let lastRerouting: number | null = null;
+  /** Where the story on screen has got to, seconds, as last reported. */
+  let playhead = 0;
 
   let queue: Queued[] = [];
   /** The story on screen. `ended` means it has finished and is waiting out the pause before the next. */
@@ -134,6 +144,7 @@ export function createDirector(deps: DirectorDeps): Director {
     log("story_start", story.id);
     const settings = deps.settings();
     const manual = !settings.storyVoice || !story.audio;
+    playhead = 0;
     const now: NonNullable<typeof current> = { kind: "story", stop, story, para: 0, paused: false, manual, ended: false, handle: null };
     current = now;
     startBed(stop, story);
@@ -145,6 +156,7 @@ export function createDirector(deps: DirectorDeps): Director {
       estimatedSeconds: audio.dur,
       onTime: (t) => {
         if (my !== token || current !== now) return;
+        playhead = t;
         const p = paraAt(audio.marks, t);
         if (p !== now.para) { now.para = p; emit(); }
       },
@@ -196,8 +208,11 @@ export function createDirector(deps: DirectorDeps): Director {
   };
 
   /** Never speak a cue twice. A "now" after a spoken approach is therefore silent; a depart cue has no approach, so it speaks. */
-  function handleCue(cue: Cue): void {
-    if (spokenCues.has(cue.id)) return;
+  function handleCue(cue: Cue, phase: "approach" | "now", nav: NavState): void {
+    if (spokenCues.has(cue.id)) {
+      if (phase === "now" && approached.has(cue.id) && deps.settings().navVoice && !cue.quiet) mixer.tick?.();
+      return;
+    }
     const silent = cue.quiet === true || !deps.settings().navVoice;
     if (silent) {
       if (!shownCues.has(cue.id)) { shownCues.add(cue.id); log("cue_shown", cue.id); }
@@ -205,7 +220,25 @@ export function createDirector(deps: DirectorDeps): Director {
     }
     spokenCues.add(cue.id);
     log("cue_spoken", cue.id);
+    if (phase === "approach") {
+      approached.add(cue.id);
+      const call = distanceCall(nav.toCue);
+      if (call) speakNav(call.src, `In ${call.metres} metres,`);
+    }
     speakNav(cue.audio, cue.say);
+  }
+
+  /** The clip for "in a hundred metres" nearest below the distance to the turn, or null when none fits or the turn is close. */
+  function distanceCall(toCue: number | null): { src: string; metres: number } | null {
+    const table = pack.system.distances;
+    if (!table || toCue === null || toCue < MIN_DISTANCE_CALL) return null;
+    let best: { src: string; metres: number } | null = null;
+    for (const [key, src] of Object.entries(table)) {
+      const metres = Number(key);
+      if (!Number.isFinite(metres) || !src || metres > toCue + DISTANCE_SLACK) continue;
+      if (!best || metres > best.metres) best = { src, metres };
+    }
+    return best;
   }
 
   /* ---------------------------------------------------------------- asides */
@@ -259,7 +292,11 @@ export function createDirector(deps: DirectorDeps): Director {
       for (const e of events) {
         switch (e.type) {
           case "cue":
-            handleCue(e.cue);
+            handleCue(e.cue, e.phase, nav);
+            break;
+          case "wrong_way":
+            log("wrong_way");
+            if (deps.settings().navVoice && pack.system.wrongWay) speakNav(pack.system.wrongWay, "You are going the wrong way.");
             break;
           case "off_route":
             log("off_route");
@@ -272,7 +309,13 @@ export function createDirector(deps: DirectorDeps): Director {
           case "detour":
             if (!e.found) break;
             log("detour");
-            if (deps.settings().navVoice && pack.system.rerouting) speakNav(pack.system.rerouting, "Rerouting.");
+            if (deps.settings().navVoice && pack.system.rerouting) {
+              const at = deps.clock();
+              if (lastRerouting === null || at - lastRerouting >= REROUTING_GAP_MS) {
+                lastRerouting = at;
+                speakNav(pack.system.rerouting, "Rerouting.");
+              }
+            }
             break;
           case "detour_turn": {
             log("detour_turn", e.turn, e.name);
@@ -331,6 +374,17 @@ export function createDirector(deps: DirectorDeps): Director {
       current.paused = !current.paused;
       if (current.paused) mixer.pauseVoice(); else mixer.resumeVoice();
       emit();
+    },
+
+    rewind(seconds: number): void {
+      if (!Number.isFinite(seconds) || seconds <= 0) return;
+      if (asideNow) { mixer.seekVoice?.(-seconds); return; }
+      if (!current || current.manual || current.ended || !current.story.audio) return;
+      const to = Math.max(0, playhead - seconds);
+      mixer.seekVoice?.(-seconds); // may report the new playhead straight away
+      playhead = to;
+      const p = paraAt(current.story.audio.marks, to);
+      if (p !== current.para) { current.para = p; emit(); }
     },
 
     nextParagraph(): void {

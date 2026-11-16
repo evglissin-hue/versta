@@ -179,3 +179,81 @@ describe("recorded loops", () => {
     expect(loopsFor("no-such-soundscape")).toEqual(loopsFor("river"));
   });
 });
+
+describe("mixer guidance additions (virtual)", () => {
+  it("seekVoice moves the playhead and clamps at both ends", async () => {
+    const m = createMixer({ baseUrl: "", virtual: true });
+    const times: number[] = [];
+    const h = m.playVoice("a.mp3", { estimatedSeconds: 10, onTime: (t) => times.push(t) });
+    const r = track(h);
+    await ms(3000);
+    expect(times.at(-1)!).toBeGreaterThan(2.5);
+    expect(times.at(-1)!).toBeLessThan(3.5);
+    m.seekVoice!(-2);
+    expect(times.at(-1)!).toBeGreaterThan(0.5);
+    expect(times.at(-1)!).toBeLessThan(1.5);
+    m.seekVoice!(-15);
+    expect(times.at(-1)).toBe(0);
+    await ms(1000);
+    expect(times.at(-1)!).toBeGreaterThan(0.5);
+    expect(times.at(-1)!).toBeLessThan(1.5);
+    // the clip still takes its full length from the new playhead
+    await ms(8000);
+    expect(r.state).toBe("pending");
+    await ms(1500);
+    expect(r.state).toBe("done");
+    // forward past the end finishes the clip
+    const h2 = m.playVoice("b.mp3", { estimatedSeconds: 10, onTime: (t) => times.push(t) });
+    const r2 = track(h2);
+    await ms(1000);
+    m.seekVoice!(500);
+    expect(times.at(-1)).toBe(10);
+    await ms(10);
+    expect(r2.state).toBe("done");
+  });
+
+  it("seekVoice works on a paused clip and does nothing with no voice", async () => {
+    const m = createMixer({ baseUrl: "", virtual: true });
+    m.seekVoice!(-5);
+    const times: number[] = [];
+    m.playVoice("a.mp3", { estimatedSeconds: 10, onTime: (t) => times.push(t) });
+    await ms(4000);
+    m.pauseVoice();
+    m.seekVoice!(-2);
+    const at = times.at(-1)!;
+    expect(at).toBeGreaterThan(1.5);
+    expect(at).toBeLessThan(2.5);
+    await ms(3000);
+    expect(times.at(-1)).toBe(at); // still paused
+    m.resumeVoice();
+    await ms(1000);
+    expect(times.at(-1)!).toBeGreaterThan(at + 0.5);
+  });
+
+  it("tick counts calls and does not pause or disturb the voice channel", async () => {
+    const m = createMixer({ baseUrl: "", virtual: true });
+    const r = track(m.playVoice("a.mp3", { estimatedSeconds: 5 }));
+    await ms(1000);
+    m.tick!();
+    m.tick!();
+    expect(m.ticks).toBe(2);
+    expect(m.navBusy).toBe(false);
+    expect(m.voiceBusy).toBe(true);
+    await ms(3900);
+    expect(r.state).toBe("pending");
+    await ms(300);
+    expect(r.state).toBe("done");
+  });
+
+  it("setBedLevel is remembered and survives new beds", () => {
+    const m = createMixer({ baseUrl: "", virtual: true });
+    expect(m.bedLevel).toBe(1);
+    m.setBedLevel!(0.5);
+    m.startBed("river", "bright");
+    m.stopBed();
+    m.startBed("yard", null);
+    expect(m.bedLevel).toBe(0.5);
+    m.setBedLevel!(-3);
+    expect(m.bedLevel).toBe(0);
+  });
+});

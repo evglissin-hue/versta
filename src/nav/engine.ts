@@ -1,9 +1,9 @@
-import { cumulative, dist, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../geo";
+import { angleDiff, bearing, cumulative, dist, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../geo";
 import type { Aside, Cue, Fix, NavEngine, NavEvent, NavOptions, NavState, Pack, RouteGraph } from "../types";
 import { buildIndex, findWayBack, type GraphIndex, type WayTarget, type WayTurn } from "./reroute";
 
 export const DEFAULT_NAV_OPTIONS: NavOptions = {
-  maxAccuracy: 80, offRouteDistance: 45, offRouteDelay: 8, cueNowDistance: 15, cueApproachSeconds: 12, cueApproachMin: 60, asideLead: 40,
+  maxAccuracy: 80, offRouteDistance: 45, offRouteDelay: 8, cueNowDistance: 15, cueApproachSeconds: 15, cueApproachMin: 70, asideLead: 40,
 };
 
 /** Metres from stop 0 beyond which a rider on the line is taken to have joined part way. */
@@ -22,6 +22,23 @@ const DEPART_ALONG = 15;
 const ASIDE_LATE = 60;
 const LATE_CUE = 30;
 const UNKNOWN_SPEED = 4;
+/** Speed average: time constant and the data needed before it is reported. */
+const SPEED_TAU = 20;
+const SPEED_MIN_SECONDS = 5;
+/** Approach announcements: never further than this, and never closer than this to the cue in front. */
+const APPROACH_MAX = 320;
+const APPROACH_PREV_GAP = 15;
+/** A cue follows another closely enough to be mentioned with it. */
+const THEN_WITHIN = 120;
+/** Wrong way: seconds of fixes, minimum speed, heading error, metres gone back, seconds to clear, heading error to clear, and the stop radius it is ignored in. */
+const WRONG_SECONDS = 10;
+const WRONG_MIN_SPEED = 1.5;
+const WRONG_HEADING = 135;
+const WRONG_BACK = 40;
+const WRONG_CLEAR_SECONDS = 5;
+const WRONG_CLEAR_HEADING = 60;
+const WRONG_STOP_RADIUS = 60;
+const MOVED_MIN = 2;
 /** Way back: how far behind the last known position targets are sampled, their spacing, and the penalty factor for behind. */
 const TARGET_BEHIND = 50;
 const TARGET_STEP = 50;
@@ -44,6 +61,7 @@ function initialState(): NavState {
   return {
     status: "locating", fix: null, snapped: null, seg: 0, alongSeg: 0, toStop: 0, distanceDone: 0, distanceLeft: 0,
     routeBearing: null, offRoute: false, offBy: 0, nextCue: null, toCue: null, currentCue: null, arrived: [],
+    thenCue: null, toThen: null, speedAvg: null, wrongWay: false,
   };
 }
 
@@ -88,6 +106,61 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   let strayingSince: number | null = null;
   let notFoundSaid = false;
   let nearestAt: number | null = null;
+  /** Motion between usable fixes: the previous one, the first one, and what this one says about speed and heading. */
+  let prevFix: { p: XY; time: number } | null = null;
+  let firstTime: number | null = null;
+  let avg: number | null = null;
+  let curSpeed: number | null = null;
+  let curHeading: number | null = null;
+  /** Wrong way: when the current spell of heading against the line began, and where along the segment. */
+  let wrongSince: number | null = null;
+  let wrongFrom = 0;
+  let rightSince: number | null = null;
+
+  function clearWrongWay(): void {
+    s.wrongWay = false;
+    wrongSince = null;
+    rightSince = null;
+  }
+
+  /** Update the speed average and this fix's speed and heading. Called once per usable fix. */
+  function trackMotion(fix: Fix, p: XY): void {
+    const prev = prevFix;
+    const dt = prev ? (fix.time - prev.time) / 1000 : 0;
+    const moved = prev ? dist(prev.p, p) : 0;
+    curSpeed = fix.speed ?? (dt > 0 ? moved / dt : null);
+    curHeading = fix.heading ?? (prev && moved >= MOVED_MIN ? bearing(prev.p, p) : null);
+    if (firstTime === null) firstTime = fix.time;
+    if (curSpeed !== null) {
+      if (avg === null || dt <= 0) avg = avg ?? curSpeed;
+      else avg += (curSpeed - avg) * (1 - Math.exp(-dt / SPEED_TAU));
+    }
+    s.speedAvg = avg !== null && fix.time - firstTime >= SPEED_MIN_SECONDS * 1000 ? avg : null;
+    prevFix = { p, time: fix.time };
+  }
+
+  /** Notice a rider following the line backwards. Only called while riding on the line. */
+  function wrongWayStep(fix: Fix, p: XY, ev: NavEvent[]): void {
+    const bear = s.routeBearing;
+    const diff = curHeading !== null && bear !== null ? Math.abs(angleDiff(bear, curHeading)) : null;
+    if (s.wrongWay) {
+      if (diff !== null && diff < WRONG_CLEAR_HEADING) {
+        rightSince ??= fix.time;
+        if (fix.time - rightSince >= WRONG_CLEAR_SECONDS * 1000) clearWrongWay();
+      } else rightSince = null;
+      return;
+    }
+    const nearStop = pack.stops.some((_, i) => dist(p, stopAt(i)) <= WRONG_STOP_RADIUS);
+    const bad = !nearStop && diff !== null && diff > WRONG_HEADING && curSpeed !== null && curSpeed > WRONG_MIN_SPEED;
+    if (!bad) { wrongSince = null; return; }
+    if (wrongSince === null) { wrongSince = fix.time; wrongFrom = s.alongSeg; }
+    if (fix.time - wrongSince >= WRONG_SECONDS * 1000 && wrongFrom - s.alongSeg >= WRONG_BACK) {
+      s.wrongWay = true;
+      wrongSince = null;
+      rightSince = null;
+      ev.push({ type: "wrong_way" });
+    }
+  }
 
   function clearDetour(): void {
     active = null;
@@ -124,12 +197,12 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function derive(): void {
     if (s.status === "finished") {
-      s.toStop = 0; s.distanceDone = total; s.distanceLeft = 0; s.nextCue = null; s.toCue = null;
+      s.toStop = 0; s.distanceDone = total; s.distanceLeft = 0; s.nextCue = null; s.toCue = null; s.thenCue = null; s.toThen = null;
       return;
     }
     if (s.status === "locating" || s.status === "idle") return;
     if (s.status === "to_start") {
-      s.distanceDone = 0; s.distanceLeft = total; s.nextCue = null; s.toCue = null; s.currentCue = null; s.routeBearing = null;
+      s.distanceDone = 0; s.distanceLeft = total; s.nextCue = null; s.toCue = null; s.currentCue = null; s.routeBearing = null; s.thenCue = null; s.toThen = null;
       return;
     }
     const g = segAt(s.seg);
@@ -148,14 +221,19 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     }
     s.nextCue = next ? next.cue : null;
     s.toCue = next ? next.along - along : null;
+    const after = next ? g.cues[g.cues.indexOf(next) + 1] : undefined;
+    const gap = next && after ? after.along - next.along : Infinity;
+    s.thenCue = after && !after.depart && gap <= THEN_WITHIN ? after.cue : null;
+    s.toThen = s.thenCue ? gap : null;
     s.currentCue = current ? current.cue : null;
   }
 
-  function processCues(fix: Fix, ev: NavEvent[], departNow: boolean): void {
+  function processCues(ev: NavEvent[], departNow: boolean): void {
     const g = segAt(s.seg);
     const along = s.alongSeg;
-    const approachDist = Math.max(o.cueApproachMin, (fix.speed ?? UNKNOWN_SPEED) * o.cueApproachSeconds);
-    for (const c of g.cues) {
+    const base = Math.min(APPROACH_MAX, Math.max(o.cueApproachMin, (s.speedAvg ?? UNKNOWN_SPEED) * o.cueApproachSeconds));
+    for (let k = 0; k < g.cues.length; k++) {
+      const c = g.cues[k]!;
       if (c.done) {
         // A cue already spoken but not yet passed holds back the ones after it.
         if (c.along > along) break;
@@ -168,6 +246,9 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
         continue;
       }
       const d = c.along - along;
+      // Never announce a turn before the one in front of it has been reached; never later than the "now" distance.
+      const prev = g.cues[k - 1];
+      const approachDist = Math.max(o.cueNowDistance, prev ? Math.min(base, c.along - prev.along - APPROACH_PREV_GAP) : base);
       if (d > approachDist) break;
       if (d <= o.cueNowDistance) {
         c.done = true; c.approached = true;
@@ -176,6 +257,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
       }
       if (!c.approached) {
         c.approached = true;
+        derive(); // the director reads the distance to the cue from the state
         ev.push({ type: "cue", cue: c.cue, phase: "approach" });
       }
       break;
@@ -200,6 +282,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     arriveAt(stop, ev);
     offSince = null;
     s.offRoute = false;
+    clearWrongWay();
     clearDetour();
     s.offBy = 0;
     if (stop === lastStop) {
@@ -292,7 +375,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     if (nearStop || atEnd) {
       s.alongSeg = n.along;
       // Anything the rider is still due to hear on the last stretch goes out before the arrival.
-      processCues(fix, ev, departNow);
+      processCues(ev, departNow);
       processAsides(ev);
       s.alongSeg = g.len;
       finishArrival(ev);
@@ -305,6 +388,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
       const nx = nearestOnPolyline(next.pts, p, next.cum);
       if (nx.dist <= MISSED_ARRIVAL_LINE) {
         arriveAt(s.seg, ev);
+        clearWrongWay();
         s.seg += 1;
         s.alongSeg = nx.along;
         s.offRoute = false;
@@ -329,6 +413,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
         if (offSince === null) offSince = fix.time;
         if (fix.time - offSince >= o.offRouteDelay * 1000) {
           s.offRoute = true;
+          clearWrongWay();
           ev.push({ type: "off_route" });
         }
       } else {
@@ -344,7 +429,12 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
     if (s.offRoute) detourStep(fix, p, ev);
     if (!s.offRoute) {
-      processCues(fix, ev, departNow);
+      if (n.dist > threshold) wrongSince = null;
+      else {
+        derive();
+        wrongWayStep(fix, p, ev);
+      }
+      processCues(ev, departNow);
       processAsides(ev);
     }
     derive();
@@ -426,6 +516,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.fix = fix;
     if (s.status === "finished" || fix.accuracy > o.maxAccuracy) return ev;
     const p = project(proj, [fix.lng, fix.lat]);
+    trackMotion(fix, p);
     if (s.status === "locating" || s.status === "idle") s.status = "to_start";
     if (s.status === "to_start" && s.seg === 0) toStart(fix, p, ev);
     else if (s.status === "to_start") { s.nearest = null; s.status = "riding"; riding(fix, p, ev, false); }
@@ -450,6 +541,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     atStop = -1;
     needFull = target > 0;
     s.status = target === 0 ? "to_start" : "riding";
+    clearWrongWay();
     derive();
   }
 
@@ -460,6 +552,8 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function reset(): void {
     s = initialState();
+    prevFix = null; firstTime = null; avg = null; curSpeed = null; curHeading = null;
+    wrongSince = null; rightSince = null;
     active = null;
     lastCompute = null;
     strayingSince = null;

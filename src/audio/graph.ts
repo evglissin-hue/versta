@@ -28,6 +28,12 @@ const RELEASE_TAU = 0.22;
 const SPEECH_DB = -50;
 const SPEECH_HOLD_MS = 220;
 const DRIVE_MS = 30;
+/** The turn tick: two clicks this far apart, at this pitch and level. */
+const TICK_GAP = 0.12;
+const TICK_HZ = 1500;
+const TICK_GAIN = 0.2;
+/** Time constant of a bed level change: about 300 ms to settle. */
+const BED_LEVEL_TAU = 0.1;
 
 export interface Levels {
   /** RMS in dBFS of the voice bus (voice and nav together). */
@@ -44,6 +50,10 @@ export interface Graph {
   route(el: HTMLMediaElement, bus: "voice" | "nav"): boolean;
   /** Fallback for elements that could not be routed: tell the pocket speech is present. */
   hint(speaking: boolean): void;
+  /** Two short soft clicks on the nav bus: "the turn is here". */
+  tick(): void;
+  /** Scale the bed bus around its designed level (1), smoothed over about 300 ms. */
+  setBedLevel(level: number): void;
   levels(): Levels;
   dispose(): void;
 }
@@ -154,13 +164,15 @@ export function createGraph(): Graph | null {
     let lastSpeech = -Infinity;
     let hinted = false;
     let routed = 0;
+    let userLevel = 1;
+    const bedBase = (): number => BED_LEVEL * userLevel;
     const setPocket = (shut: boolean): void => {
       if (shut === closed) return;
       closed = shut;
       const t = ctx.currentTime, tau = shut ? ATTACK_TAU : RELEASE_TAU;
       pocket.gain.setTargetAtTime(shut ? POCKET_DB : 0, t, tau);
       body.gain.setTargetAtTime(shut ? BODY_DB : 0, t, tau);
-      bedLevel.gain.setTargetAtTime(shut ? BED_LEVEL * 10 ** (BED_DROP_DB / 20) : BED_LEVEL, t, tau);
+      bedLevel.gain.setTargetAtTime(shut ? bedBase() * 10 ** (BED_DROP_DB / 20) : bedBase(), t, tau);
     };
     const drive = setInterval(() => {
       const now = Date.now();
@@ -181,6 +193,29 @@ export function createGraph(): Graph | null {
         }
       },
       hint(speaking) { hinted = speaking; },
+      tick() {
+        const t0 = ctx.currentTime + 0.01;
+        for (const at of [t0, t0 + TICK_GAP]) {
+          const osc = ctx.createOscillator();
+          const env = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.value = TICK_HZ;
+          env.gain.setValueAtTime(0, at);
+          env.gain.linearRampToValueAtTime(TICK_GAIN, at + 0.004);
+          env.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+          osc.connect(env);
+          env.connect(navBus);
+          osc.start(at);
+          osc.stop(at + 0.06);
+          osc.onended = () => { try { env.disconnect(); } catch {} };
+        }
+      },
+      setBedLevel(level) {
+        userLevel = Math.max(0, level);
+        const t = ctx.currentTime;
+        bedLevel.gain.cancelScheduledValues(t);
+        bedLevel.gain.setTargetAtTime(closed ? bedBase() * 10 ** (BED_DROP_DB / 20) : bedBase(), t, BED_LEVEL_TAU);
+      },
       levels() {
         const mid = rms(bMid);
         return { voice: db(10 ** (rms(vA) / 10) + 10 ** (rms(nA) / 10)), bed: { all: rms(bAll), low: rms(bLow), mid, high: rms(bHigh) }, pocketClosed: closed };
