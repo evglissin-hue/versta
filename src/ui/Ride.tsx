@@ -1,4 +1,5 @@
 import { useSignalEffect } from "@preact/signals";
+import { useEffect, useRef } from "preact/hooks";
 import { MapView } from "../map/MapView";
 import { nowPlaying, openStop, pack } from "../state";
 import { AsideCard } from "./AsideCard";
@@ -22,15 +23,28 @@ export function Ride() {
     if (id && id !== lastStory) sceneOpen.value = true;
     lastStory = id;
   });
+  // Keep the map credit clear of whatever sits at the bottom (the dock, and the passing-by card when it shows).
+  const root = useRef<HTMLDivElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const r = root.current, b = bottom.current;
+    if (!r || !b) return;
+    const apply = (): void => { r.style.setProperty("--map-attrib-bottom", `${b.offsetHeight + 8}px`); };
+    apply();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(apply);
+    ro.observe(b);
+    return () => ro.disconnect();
+  }, [p?.id]);
   if (!p) return null;
   const stop = openStop.value;
   return (
-    <div class="ride" data-testid="ride">
+    <div class="ride" data-testid="ride" ref={root}>
       <div class="map-layer">
         <MapView pack={p} follow={following.value} onFollowChange={(f) => { following.value = f; }} onStopTap={(i) => { openStop.value = i; }} />
       </div>
       <Banner />
-      <div class="ride-bottom">
+      <div class="ride-bottom" ref={bottom}>
         {np?.kind === "aside" ? <AsideCard aside={np.aside} /> : null}
         <Dock />
       </div>

@@ -67,7 +67,11 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl()):
       const events = engine.update(fix);
       nav.value = { ...engine.state };
       director.handle(events, engine.state);
-      for (const e of events) if (e.type === "arrive") openStop.value = e.stop;
+      for (const e of events) {
+        if (e.type === "arrive") openStop.value = e.stop;
+        // riding away puts the map and the turn banner back in view without a tap
+        else if (e.type === "leave" && openStop.value === e.stop) openStop.value = null;
+      }
     },
     (error) => { gpsError.value = error; },
   );
