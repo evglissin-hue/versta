@@ -17,18 +17,21 @@
      51.4843
     ],
     [
-     -0.0235,
-     51.4827
-    ],
-    [
      -0.0203,
      51.4832
     ]
-   ]
+   ],
+   "avoid": {
+    "Evelyn Street": 4,
+    "Grove Street": 2
+   },
+   "gate": 110
   },
   "8": {
    "why": "Prefer the riverside path up the west side of the Isle of Dogs wherever cycling is allowed, in place of Westferry Road.",
-   "via": []
+   "via": [],
+   "keep_old": true,
+   "keep_old_reason": "The router finds no cycling riverside path on the west side. Its own best line leaves Westferry Road entirely for East Ferry Road, Marsh Wall and Millharbour in the middle of the island (3.7 km against 3.1 km, with a loop round the start). Both asides for this segment speak of 'this road' (Westferry Road), so the old line stays."
   },
   "10": {
    "why": "Stay by the river: Narrow Street, then through King Edward Memorial Park, not along The Highway.",
@@ -37,7 +40,10 @@
      -0.0445,
      51.5088
     ]
-   ]
+   ],
+   "avoid": {
+    "The Highway": 4
+   }
   },
   "11": {
    "why": "See old Wapping: west along Wapping High Street, north up Wapping Lane, over The Highway into Cannon Street Road.",
