@@ -18,14 +18,14 @@ interface Rig {
   playNav: MockInstance<Mixer["playNav"]>;
 }
 
-function rig(patch: Partial<Settings> = {}): Rig {
+function rig(patch: Partial<Settings> = {}, withPack: Pack = pack): Rig {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   const mixer = createMixer({ baseUrl: "", virtual: true });
   const playNav = vi.spyOn(mixer, "playNav");
   const log: DirectorLogEntry[] = [];
   const now: NowPlaying[] = [];
   const d = createDirector({
-    pack, mixer, settings: () => settings, clock: () => Date.now(), timeScale: 1,
+    pack: withPack, mixer, settings: () => settings, clock: () => Date.now(), timeScale: 1,
     onNowPlaying: (n) => now.push(n), onLog: (e) => log.push(e),
   });
   return { d, mixer, log, now, settings, playNav };
@@ -389,5 +389,87 @@ describe("turn cues", () => {
     const r = rig();
     r.d.handle([{ type: "finished" }], nav({ status: "finished" }));
     expect(whats(r)).toEqual(["finished"]);
+  });
+});
+
+describe("way back after going off route", () => {
+  const withClips: Pack = {
+    ...pack,
+    system: { ...pack.system, rerouting: "audio/system/rerouting.mp3", turns: { left: "audio/system/turn-left.mp3", slight_right: "audio/system/bear-right.mp3" } },
+  };
+  const detour = (found: boolean): NavEvent[] => [{ type: "detour", found }];
+  const turn = (t: "left" | "slight_right" | "sharp_left"): NavEvent[] => [{ type: "detour_turn", turn: t, name: "Mill Lane" }];
+
+  it("speaks the rerouting clip once per detour event, and logs it", () => {
+    const r = rig({}, withClips);
+    r.d.handle(detour(true), nav({ offRoute: true }));
+    expect(r.playNav).toHaveBeenCalledTimes(1);
+    expect(r.playNav).toHaveBeenCalledWith("audio/system/rerouting.mp3", expect.anything());
+    expect(whats(r)).toEqual(["detour"]);
+  });
+
+  it("says nothing for a failed search, with nav voice off, or when the pack has no clip", () => {
+    const r = rig({}, withClips);
+    r.d.handle(detour(false), nav({ offRoute: true }));
+    expect(r.playNav).not.toHaveBeenCalled();
+    const quiet = rig({ navVoice: false }, withClips);
+    quiet.d.handle(detour(true), nav({ offRoute: true }));
+    quiet.d.handle(turn("left"), nav({ offRoute: true }));
+    expect(quiet.playNav).not.toHaveBeenCalled();
+    const bare = rig();
+    bare.d.handle(detour(true), nav({ offRoute: true }));
+    bare.d.handle(turn("left"), nav({ offRoute: true }));
+    expect(bare.playNav).not.toHaveBeenCalled();
+  });
+
+  it("speaks each turn clip once, in order, and skips a turn the pack has no clip for", () => {
+    const r = rig({}, withClips);
+    r.d.handle([...detour(true), ...turn("left"), ...turn("sharp_left"), ...turn("slight_right")], nav({ offRoute: true }));
+    expect(r.playNav.mock.calls.map((c) => c[0])).toEqual([
+      "audio/system/rerouting.mp3", "audio/system/turn-left.mp3", "audio/system/bear-right.mp3",
+    ]);
+    expect(whats(r)).toEqual(["detour", "detour_turn:left:Mill Lane", "detour_turn:sharp_left:Mill Lane", "detour_turn:slight_right:Mill Lane"]);
+  });
+
+  it("markHeard stops a heard core story from auto-playing", async () => {
+    const r = rig();
+    r.d.markHeard?.(["peter-the-great-0"]);
+    expect(r.d.heard.has("peter-the-great-0")).toBe(true);
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await ms(400_000);
+    const ids = whats(r).filter((w) => w.startsWith("story_start"));
+    expect(ids).toEqual(["story_start:peter-the-great-1"]);
+  });
+
+  it("an aside gets a soft bed from the stop last left, and the bed stops with the aside", async () => {
+    const r = rig();
+    r.d.handle([], nav());
+    await ms(61_000);
+    expect(r.mixer.bed).toBeNull();
+    r.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 4 }));
+    await ms(1300);
+    expect(last(r)?.kind).toBe("aside");
+    expect(r.mixer.bed).toEqual({ ambience: pack.stops[3]!.ambience, mood: null });
+    await ms(120_000);
+    expect(last(r)).toBeNull();
+    expect(r.mixer.bed).toBeNull();
+  });
+
+  it("an aside bed stops when an arrival cuts the aside, and is not started with ambience off", async () => {
+    const r = rig({ autoPlayStories: false });
+    r.d.handle([], nav());
+    await ms(61_000);
+    r.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 2 }));
+    await ms(5000);
+    expect(r.mixer.bed).not.toBeNull();
+    r.d.handle(arrive(2), nav({ status: "at_stop", seg: 3 }));
+    expect(r.mixer.bed).toBeNull();
+    const q = rig({ ambience: false });
+    q.d.handle([], nav());
+    await ms(61_000);
+    q.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 2 }));
+    await ms(5000);
+    expect(last(q)?.kind).toBe("aside");
+    expect(q.mixer.bed).toBeNull();
   });
 });
