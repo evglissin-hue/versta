@@ -315,7 +315,8 @@ pack = {"format": 1, "id": PACK_ID, "name": route["name"], "mode": route["mode"]
         "hero": {"src": "img/" + pics[PACK_ID][0], "caption": pics[PACK_ID][1]},
         "legs": route["legs"], "stops": stops_out, "segments": seg_tracks, "cues": cues, "asides": asides,
         "system": {"arrive": [f"system/arrive-{s['id']}.mp3" for s in stops_out], "offRoute": "system/off-route.mp3", "backOnRoute": "system/back-on-route.mp3",
-                   "rerouting": "system/rerouting.mp3", "turns": {t: f"system/turn-{t.replace('_', '-')}.mp3" for t in ("left", "right", "slight_left", "slight_right", "sharp_left", "sharp_right", "straight")}},
+                   "rerouting": "system/rerouting.mp3", "turns": {t: f"system/turn-{t.replace('_', '-')}.mp3" for t in ("left", "right", "slight_left", "slight_right", "sharp_left", "sharp_right", "straight")},
+                   "distances": {str(d): f"system/in-{d}.mp3" for d in (50, 100, 150, 200, 300)}, "wrongWay": "system/wrong-way.mp3"},
         "graph": "graph.json",
         "credits": ["Pictures are public domain works from Wikimedia Commons.", "Map data © OpenStreetMap contributors."]}
 out = os.path.join(ROOT, "public", "packs", PACK_ID, "pack.json")

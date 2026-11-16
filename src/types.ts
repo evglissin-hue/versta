@@ -90,6 +90,10 @@ export interface Pack {
     rerouting?: string;
     /** Generic turn clips for detours, where street names are not recorded: "Turn left", "Bear right" and so on. */
     turns?: Partial<Record<TurnKind, string>>;
+    /** Spoken before a turn cue: "In one hundred metres," keyed by the distance in metres ("50", "100", "150", "200", "300"). */
+    distances?: Record<string, string>;
+    /** Spoken when the rider is following the route backwards. */
+    wrongWay?: string;
   };
   /** Pack-relative path of the corridor road graph used to find a way back when off route. */
   graph?: string;
@@ -189,6 +193,13 @@ export interface NavState {
   detour?: Detour | null;
   /** While `to_start`: the nearest point of the route, for a rider who wants to join part way. */
   nearest?: { at: LngLat; seg: number; dist: number } | null;
+  /** The manoeuvre after `nextCue`, when it follows within 120 m of it, and the metres between the two. */
+  thenCue?: Cue | null;
+  toThen?: number | null;
+  /** Smoothed speed over the last 20 s or so, metres per second. Null before there is enough data. */
+  speedAvg?: number | null;
+  /** The rider is on the line but heading against it. */
+  wrongWay?: boolean;
 }
 
 export type NavEvent =
@@ -202,6 +213,8 @@ export type NavEvent =
   | { type: "detour"; found: boolean }
   /** A turn on the detour is coming up. */
   | { type: "detour_turn"; turn: TurnKind; name: string }
+  /** The rider has been following the route backwards for a while. Fires once per spell. */
+  | { type: "wrong_way" }
   | { type: "finished" };
 
 export interface NavOptions {
@@ -245,11 +258,18 @@ export interface Settings {
   keepAwake: boolean;
   /** Rotate the map so the direction of travel points up. */
   courseUp: boolean;
+  /** Bring the map back to the rider a few seconds after they stop touching it. */
+  autoRecentre: boolean;
+  /** How loud the soundscape and music sit under the narrator. */
+  bedLevel: "soft" | "balanced" | "rich";
+  /** Vibrate at turns and arrivals (where the device can). */
+  haptics: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   storyVoice: true, navVoice: true, ambience: true, music: true,
   asides: "sparse", autoPlayStories: true, keepAwake: true, courseUp: true,
+  autoRecentre: true, bedLevel: "balanced", haptics: true,
 };
 
 /* ------------------------------------------------------------------ sound */
@@ -285,6 +305,12 @@ export interface Mixer {
   /** Generated soundscape and music under a story. Names come from Stop.ambience and Story.mood. */
   startBed(ambience: string | null, mood: Story["mood"] | null): void;
   stopBed(fadeSeconds?: number): void;
+  /** A short non-verbal tick on the nav channel: "the turn is here". */
+  tick?(): void;
+  /** Move the voice playhead by this many seconds (negative to go back). Does nothing when no voice clip is loaded. */
+  seekVoice?(deltaSeconds: number): void;
+  /** Scale the soundscape and music: 1 is the designed balance. */
+  setBedLevel?(level: number): void;
   /** True while the nav channel is speaking. */
   readonly navBusy: boolean;
   /** True while the voice channel is playing or paused mid-clip. */
@@ -321,7 +347,7 @@ export interface DirectorLogEntry {
   at: number;
   what:
     | "cue_spoken" | "cue_shown" | "arrive" | "story_start" | "story_end" | "story_stopped"
-    | "aside_played" | "aside_skipped" | "off_route" | "back_on_route" | "detour" | "detour_turn" | "finished";
+    | "aside_played" | "aside_skipped" | "off_route" | "back_on_route" | "detour" | "detour_turn" | "wrong_way" | "finished";
   id?: string;
   reason?: string;
 }
@@ -346,5 +372,7 @@ export interface Director {
   readonly heard: ReadonlySet<string>;
   /** Mark stories and asides as already heard (resuming an earlier ride). */
   markHeard?(ids: string[]): void;
+  /** Go back in the story or aside that is playing ("what did he just say?"). */
+  rewind?(seconds: number): void;
   dispose(): void;
 }

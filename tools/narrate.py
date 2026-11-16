@@ -47,6 +47,10 @@ record("You are off the route.", sysp["offRoute"], voice.SPEED_CUE, voice.LEAD_C
 record("Back on the route.", sysp["backOnRoute"], voice.SPEED_CUE, voice.LEAD_CUE)
 if sysp.get("rerouting"): record("Finding a way back to the route.", sysp["rerouting"], voice.SPEED_CUE, voice.LEAD_CUE)
 for kind, rel in sysp.get("turns", {}).items(): record(TURN_SAY[kind], rel, voice.SPEED_CUE, voice.LEAD_CUE)
+DIST_SAY = {"50": "In fifty metres,", "100": "In one hundred metres,", "150": "In one hundred and fifty metres,", "200": "In two hundred metres,", "300": "In three hundred metres,"}
+# distance prefixes run straight into the turn cue that follows, so they get no tail silence to speak of
+for d, rel in sysp.get("distances", {}).items(): record(DIST_SAY[d], rel, voice.SPEED_CUE, voice.LEAD_CUE)
+if sysp.get("wrongWay"): record("You are riding against the route. Turn around when you can.", sysp["wrongWay"], voice.SPEED_CUE, voice.LEAD_CUE)
 for a in pack["asides"]: record(a["text"], a["audio"], voice.SPEED_STORY, voice.LEAD_ASIDE, 0.5)
 # remove cue files that no longer belong to the pack
 want = {c["audio"] for c in pack["cues"] if not c.get("quiet")}

@@ -6,13 +6,18 @@ import { createNavEngine } from "./nav/engine";
 import { createGpsSource, createSimSource } from "./nav/sources";
 import { geoDistance } from "./geo";
 import { createMixer } from "./audio/mixer";
+import { effect } from "@preact/signals";
 import { createDirector } from "./story/director";
 import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, screen, settings, simulated } from "./state";
 import type { Director, FixSource, Mixer, NavEngine, Pack, RouteGraph } from "./types";
 
 export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean }
 
-interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number }
+interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number; stopEffects: () => void }
+const BED_LEVELS = { soft: 0.6, balanced: 1, rich: 1.6 } as const;
+function buzz(pattern: number | number[]): void {
+  try { if (settings.value.haptics && !simulated.value && "vibrate" in navigator) navigator.vibrate(pattern); } catch {}
+}
 let ride: Ride | null = null;
 
 /** A ride in progress, kept on the device so closing the app does not lose it. */
@@ -82,7 +87,9 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       if (entry.what === "arrive" || entry.what === "story_start" || entry.what === "aside_played" || entry.what === "finished") saveRide();
     },
   });
-  ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now() };
+  // the rider's soundscape level follows the setting, live
+  const stopEffects = effect(() => { mixer.setBedLevel?.(BED_LEVELS[settings.value.bedLevel] ?? 1); });
+  ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects };
   if (resume && resume.packId === p.id) {
     director.markHeard?.(resume.heard);
     engine.jumpToSegment(Math.min(resume.seg, p.stops.length - 1));
@@ -102,7 +109,9 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       nav.value = { ...engine.state };
       director.handle(events, engine.state);
       for (const e of events) {
-        if (e.type === "arrive") openStop.value = e.stop;
+        if (e.type === "arrive") { openStop.value = e.stop; buzz([60, 80, 60]); }
+        else if (e.type === "cue" && e.phase === "now" && e.cue.turn !== "depart" && e.cue.turn !== "straight") buzz(40);
+        else if (e.type === "off_route" || e.type === "wrong_way") buzz([30, 60, 30, 60, 30]);
         // riding away puts the map and the turn banner back in view without a tap
         else if (e.type === "leave" && openStop.value === e.stop) openStop.value = null;
       }
@@ -116,7 +125,7 @@ export function endRide(forget = true): void {
   if (!ride) return;
   if (forget) forgetSavedRide();
   document.removeEventListener("visibilitychange", onVisible);
-  ride.source.stop(); ride.director.stopAll(); ride.director.dispose();
+  ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose();
   void ride.wake?.release().catch(() => {});
   ride = null;
   nav.value = IDLE_NAV; nowPlaying.value = null; openStop.value = null; screen.value = "home";
