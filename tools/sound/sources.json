@@ -1,0 +1,10 @@
+[
+  {"name": "water", "file": "Shallow small river with stony riverbed.ogg", "start": 0, "length": 18},
+  {"name": "shore", "file": "On a pebble beach.ogg", "start": 0, "length": 40, "highpass": 100},
+  {"name": "wharf", "file": "Boat by a wharf 2.ogg", "length": 40, "highpass": 100},
+  {"name": "wind", "file": "Howling wind.ogg", "length": 40},
+  {"name": "gulls", "file": "Gull 1.ogg", "start": 0, "length": 18},
+  {"name": "murmur", "file": "360703 eguobyte large-crowd-medium-distance-stereo.wav", "length": 40},
+  {"name": "tick", "file": "Clock (tic tac).ogg", "start": 0, "length": 18},
+  {"name": "bells", "file": "Church bells - Leverkusen, 2007.oga", "start": 0, "length": 40}
+]

@@ -45,6 +45,7 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   let bedState: { ambience: string | null; mood: Story["mood"] | null } | null = null;
 
   const resolveUrl = (src: string): string => (/^([a-z][a-z0-9+.-]*:|\/)/i.test(src) ? src : opts.baseUrl + src);
+  let routed = false;
   let voiceEl: HTMLAudioElement | null = null;
   let navEl: HTMLAudioElement | null = null;
   let voiceFactory: ClipFactory;
@@ -66,14 +67,16 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
 
   const held = (): boolean => navCurrent !== null || resumeTimer !== undefined;
 
+  /** Where the elements are not routed through Web Audio, tell the bed's pocket when speech is sounding. */
   function updateDuck(): void {
-    bed.duck(navCurrent !== null || (voice !== null && voice.playing));
+    bed.graph?.hint(navCurrent !== null || (voice !== null && voice.playing));
   }
 
   /** Make the voice clip match what it should be doing: sounding only when the rider has not paused it and nav is quiet. */
   function applyVoice(): void {
     const v = voice;
     if (!v) { updateDuck(); return; }
+    if (routed) bed.ensure(); // resumes the context if the system suspended it
     const want = !v.userPaused && !held();
     if (want && !v.playing) {
       if (!v.clip) {
@@ -125,7 +128,19 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   const mixer: MixerWithBed = {
     async unlock() {
       if (!real) return;
-      bed.ensure();
+      if (bed.ensure() && bed.graph) {
+        // route both elements through Web Audio, but only if the context really runs: otherwise play them directly
+        const ctx = bed.graph.synth.ctx;
+        if (ctx.state !== "running") {
+          try { await Promise.race([ctx.resume(), new Promise<void>((res) => setTimeout(res, 1000))]); } catch {}
+        }
+        if (ctx.state === "running" && !routed) {
+          routed = true;
+          if (voiceEl && !bed.graph.route(voiceEl, "voice")) routed = false;
+          if (navEl && routed && !bed.graph.route(navEl, "nav")) routed = false;
+        }
+        bed.preload();
+      }
       const uri = silentWavUri();
       for (const el of [voiceEl, navEl]) {
         if (!el) continue;

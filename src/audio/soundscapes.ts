@@ -1,4 +1,5 @@
-/** The generated soundscapes (layers and the named presets) and the underscore music. Ported from the v1 prototype. */
+/** Soundscape recipes (recorded loops plus generated layers) and the generated music under a story. */
+import type { LoopLib } from "./loops";
 import { type Session, type Synth, every, filter, gain, lfo, noise, rnd } from "./synth";
 
 const when = (x: Synth, t: number): number => x.ctx.currentTime + t;
@@ -122,52 +123,159 @@ export const L = {
   },
 };
 
-type Preset = (x: Synth, s: Session) => void;
+export type Preset = (x: Synth, s: Session) => void;
 
-export const AMB: Record<string, Preset> = {
-  river: (x, s) => { L.water(x, s, 0.8); L.gulls(x, s, 0.8); L.foghorn(x, s, 1); L.creak(x, s, 0.4); },
-  wharf: (x, s) => { L.water(x, s, 0.4); L.creak(x, s, 0.9); L.gulls(x, s, 0.6); },
-  ship: (x, s) => { L.water(x, s, 0.7); L.wind(x, s, 0.4); L.creak(x, s, 1); },
-  arctic: (x, s) => { L.wind(x, s, 1); L.water(x, s, 0.8); L.creak(x, s, 0.7); },
-  yard: (x, s) => { L.water(x, s, 0.4); L.hammer(x, s, 1); L.gulls(x, s, 0.5); },
-  sail: (x, s) => { L.wind(x, s, 0.9); L.water(x, s, 0.6); L.creak(x, s, 0.8); },
-  solemn: (x, s) => { L.water(x, s, 0.5); L.wind(x, s, 0.3); L.toll(x, s, 1, 220, 6, 7); },
-  tunnel: (x, s) => { L.rumble(x, s, 1); L.drips(x, s, 1); },
-  dock: (x, s) => { L.water(x, s, 0.6); L.creak(x, s, 0.6); L.gulls(x, s, 0.5); },
-  tavern: (x, s) => { L.murmur(x, s, 1); L.clink(x, s, 1); L.water(x, s, 0.25); L.creak(x, s, 0.4); },
-  sailortown: (x, s) => { L.murmur(x, s, 0.7); L.bells(x, s, 1); },
-  canal: (x, s) => { L.water(x, s, 0.35); L.wind(x, s, 0.15); },
-  clock: (x, s) => { L.wind(x, s, 0.45); L.tick(x, s, 1); },
+/**
+ * One part of a soundscape. With `loop`, the recording plays when it has loaded; `gen` is the generated layer that
+ * plays in its place when the recording is missing. A part with only `gen` always plays.
+ */
+export interface Part { loop?: string; level?: number; gen?: Preset }
+
+const P = (gen: Preset): Part => ({ gen });
+const R = (loop: string, level: number, gen?: Preset): Part => (gen ? { loop, level, gen } : { loop, level });
+
+/** Level of a recorded loop (they are normalised to about -26 LUFS) relative to the generated layers. */
+export const LOOP_LEVEL = 1.6;
+
+/**
+ * Recorded loops: water (a shallow river), shore (a pebble beach), wharf (a boat at a wharf), wind, gulls, murmur
+ * (a crowd), tick (a clock), bells (church bells). Creaking, hammering, dripping, the foghorn and the low rumble are
+ * generated: no recording of them with a free enough licence was found.
+ */
+export const RECIPES: Record<string, Part[]> = {
+  river: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("gulls", 0.6, (x, s) => L.gulls(x, s, 0.8)), P((x, s) => L.foghorn(x, s, 1)), P((x, s) => L.creak(x, s, 0.4))],
+  wharf: [R("wharf", 1, (x, s) => L.water(x, s, 0.4)), P((x, s) => L.creak(x, s, 0.9)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.6))],
+  ship: [R("wharf", 0.9, (x, s) => L.water(x, s, 0.7)), R("wind", 0.5, (x, s) => L.wind(x, s, 0.4)), P((x, s) => L.creak(x, s, 1))],
+  arctic: [R("wind", 1, (x, s) => L.wind(x, s, 1)), R("shore", 0.5, (x, s) => L.water(x, s, 0.8)), P((x, s) => L.creak(x, s, 0.7))],
+  yard: [R("wharf", 0.7, (x, s) => L.water(x, s, 0.4)), P((x, s) => L.hammer(x, s, 1)), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5))],
+  sail: [R("wind", 0.9, (x, s) => L.wind(x, s, 0.9)), R("shore", 0.6, (x, s) => L.water(x, s, 0.6)), P((x, s) => L.creak(x, s, 0.8))],
+  solemn: [R("water", 0.5, (x, s) => L.water(x, s, 0.5)), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3)), R("bells", 0.7, (x, s) => L.toll(x, s, 1, 220, 6, 7))],
+  tunnel: [P((x, s) => L.rumble(x, s, 1)), P((x, s) => L.drips(x, s, 1))],
+  dock: [R("shore", 0.9, (x, s) => L.water(x, s, 0.6)), P((x, s) => L.creak(x, s, 0.6)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.5))],
+  tavern: [R("murmur", 1, (x, s) => L.murmur(x, s, 1)), P((x, s) => L.clink(x, s, 1)), P((x, s) => L.water(x, s, 0.25)), P((x, s) => L.creak(x, s, 0.4))],
+  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.5, (x, s) => L.bells(x, s, 1))],
+  canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15))],
+  clock: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.45)), R("tick", 1, (x, s) => L.tick(x, s, 1))],
 };
 
-/** Start the named soundscape on a session. Unknown names fall back to the river. */
-export function buildAmbience(x: Synth, s: Session, name: string): void {
-  (AMB[name] ?? AMB["river"]!)(x, s);
+const recipeFor = (name: string): Part[] => RECIPES[name] ?? RECIPES["river"]!;
+
+/** Names of the recorded loops a soundscape would use, so they can be loaded before it starts. */
+export function loopsFor(name: string): string[] {
+  return recipeFor(name).flatMap((p) => (p.loop ? [p.loop] : []));
 }
 
-/** A slow drone with the occasional bell-like note. "bright" lifts the third. */
-export function buildMusic(x: Synth, s: Session, mood: "minor" | "bright"): void {
-  const third = mood === "bright" ? 185.0 : 174.61;
-  const lp = filter(x, "lowpass", 900);
-  lp.connect(s.bus);
-  lfo(x, s, 0.05, 320, lp.frequency);
-  [73.42, 110, 146.83, third, 220].forEach((f, i) => {
-    [-4, 4].forEach((c, j) => {
+/** Every loop name any recipe mentions. */
+export function allLoops(): string[] {
+  return [...new Set(Object.keys(RECIPES).flatMap(loopsFor))];
+}
+
+/** Start the named soundscape on a session. Unknown names fall back to the river. */
+export function buildAmbience(x: Synth, s: Session, name: string, loops: LoopLib | null): void {
+  for (const part of recipeFor(name)) {
+    const buf = part.loop ? loops?.get(part.loop) : undefined;
+    if (part.loop && buf) {
+      const src = x.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const g = gain(x, (part.level ?? 1) * LOOP_LEVEL);
+      src.connect(g); g.connect(s.bus);
+      src.start(0, Math.random() * buf.duration);
+      s.srcs.push(src);
+    } else if (part.gen) {
+      part.gen(x, s);
+    }
+  }
+}
+
+/** Keep a one-shot source in the session so ending the session stops it, and let go of it when it ends. */
+function track(s: Session, o: AudioScheduledSourceNode): void {
+  s.srcs.push(o);
+  o.onended = () => { const i = s.srcs.indexOf(o); if (i >= 0) s.srcs.splice(i, 1); };
+}
+
+/** A chord: frequencies in Hz, low to high. */
+type Chord = number[];
+
+const CHORDS: Record<"minor" | "bright", Chord[]> = {
+  // D minor, B flat, G minor, A minor
+  minor: [[146.83, 174.61, 220, 293.66], [116.54, 146.83, 174.61, 233.08], [98, 146.83, 196, 233.08], [110, 164.81, 220, 261.63]],
+  // D major, G major seventh, A major, B minor
+  bright: [[146.83, 185, 220, 293.66], [98, 146.83, 185, 246.94], [110, 164.81, 220, 277.18], [123.47, 185, 246.94, 293.66]],
+};
+
+const LINE: Record<"minor" | "bright", number[]> = {
+  minor: [293.66, 329.63, 349.23, 392, 440, 466.16, 523.25],
+  bright: [293.66, 329.63, 369.99, 440, 493.88, 587.33],
+};
+
+/** One chord of the pad: soft attack, long release, two slightly detuned voices per note. */
+function padChord(x: Synth, s: Session, chord: Chord, hold: number): void {
+  const t = x.ctx.currentTime, attack = 5, release = 7;
+  const lp = filter(x, "lowpass", 1100);
+  const env = gain(x, 0);
+  lp.connect(env); env.connect(s.bus);
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(1, t + attack);
+  env.gain.setValueAtTime(1, t + hold);
+  env.gain.linearRampToValueAtTime(0, t + hold + release);
+  chord.forEach((f, i) => {
+    [-5, 5].forEach((c, j) => {
       const o = x.ctx.createOscillator();
-      o.type = j ? "triangle" : "sine"; o.frequency.value = f; o.detune.value = c;
-      const g = gain(x, 0.02 - i * 0.0018);
-      o.connect(g); g.connect(lp); lfo(x, s, 0.03 + i * 0.011, 0.008, g.gain); o.start(); s.srcs.push(o);
+      o.type = j ? "triangle" : "sine";
+      o.frequency.value = f;
+      o.detune.value = c;
+      const g = gain(x, 0.05 - i * 0.006);
+      o.connect(g); g.connect(lp);
+      o.start(t); o.stop(t + hold + release + 0.1);
+      track(s, o);
     });
   });
+}
+
+/**
+ * Generated music: a slow modal pad that changes chord every 20 to 30 seconds, and a sparse line over it. The line is
+ * reed-like in the minor mood and plucked in the bright one.
+ */
+export function buildMusic(x: Synth, s: Session, mood: "minor" | "bright"): void {
+  const chords = CHORDS[mood];
+  let idx = Math.floor(Math.random() * chords.length);
+  const next = (): void => {
+    if (s.dead) return;
+    const hold = rnd(20, 30);
+    padChord(x, s, chords[idx % chords.length]!, hold + 2);
+    idx++;
+    s.timers.push(setTimeout(next, hold * 1000));
+  };
+  next();
+
   const d = x.ctx.createDelay(1);
-  d.delayTime.value = 0.42;
-  const fb = gain(x, 0.38);
-  d.connect(fb); fb.connect(d); d.connect(s.bus);
-  const scale = mood === "bright" ? [293.66, 329.63, 369.99, 440, 493.88, 587.33] : [293.66, 329.63, 392, 440, 523.25, 587.33];
-  every(s, 4.5, 9, () => {
-    const t = x.ctx.currentTime, o = x.ctx.createOscillator(), g = gain(x, 0);
-    o.type = "triangle"; o.frequency.value = scale[Math.floor(Math.random() * scale.length)]!;
-    g.gain.linearRampToValueAtTime(0.03, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0006, t + 3.5);
-    o.connect(g); g.connect(s.bus); g.connect(d); o.start(t); o.stop(t + 3.7);
+  d.delayTime.value = 0.45;
+  const fb = gain(x, 0.35);
+  const dlp = filter(x, "lowpass", 1800);
+  d.connect(dlp); dlp.connect(fb); fb.connect(d); dlp.connect(s.bus);
+  const line = LINE[mood];
+  let last = -1;
+  every(s, 5, 10, () => {
+    let k = Math.floor(Math.random() * line.length);
+    if (k === last) k = (k + 1) % line.length;
+    last = k;
+    const t = x.ctx.currentTime, f = line[k]!;
+    const o = x.ctx.createOscillator(), g = gain(x, 0), lp = filter(x, "lowpass", 1500);
+    if (mood === "minor") {
+      // reed-like: slow attack, a little vibrato
+      o.type = "sawtooth"; o.frequency.value = f;
+      lp.frequency.value = 1100;
+      lfo(x, s, 5.2, 4, o.frequency);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.35); g.gain.setValueAtTime(0.05, t + 1.4); g.gain.linearRampToValueAtTime(0, t + 2.6);
+    } else {
+      // plucked: instant attack, quick decay, the filter closes as it rings
+      o.type = "triangle"; o.frequency.value = f;
+      lp.frequency.setValueAtTime(3200, t); lp.frequency.exponentialRampToValueAtTime(700, t + 1.2);
+      g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.0006, t + 3);
+    }
+    o.connect(lp); lp.connect(g); g.connect(s.bus); g.connect(d);
+    o.start(t); o.stop(t + 3.1);
+    track(s, o);
   }, 3);
 }
