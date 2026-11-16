@@ -76,8 +76,10 @@ function biquad(ctx: AudioContext, type: BiquadFilterType, f: number, q = 0.707,
 /** The narrator chain: high-pass, a little warmth and presence, light compression. Subtle by design. */
 function speechChain(ctx: AudioContext): { input: AudioNode; output: AudioNode } {
   const hp = biquad(ctx, "highpass", 70);
-  const warmth = biquad(ctx, "peaking", 200, 0.9, 1.5);
-  const presence = biquad(ctx, "peaking", 3000, 0.9, 2);
+  // The narration files are mastered with their warmth and presence already in them (tools/voice.py),
+  // so these stay flat. They are kept in the chain for packs recorded without that mastering.
+  const warmth = biquad(ctx, "peaking", 200, 0.9, 0);
+  const presence = biquad(ctx, "peaking", 3000, 0.9, 0);
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -24;
   comp.knee.value = 18;
