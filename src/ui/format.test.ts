@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtDist, minutesOf, turnAngle } from "./format";
+import { avgKmh, fmtDist, fmtLeft, fmtListening, minutesOf, storyLeft, turnAngle } from "./format";
 
 describe("format", () => {
   it("rounds distances to 10 m and switches to km", () => {
@@ -57,5 +57,17 @@ describe("format, iteration 3", () => {
     expect(thenText("slight_left", "The Highway")).toBe("then bear left onto The Highway");
     expect(thenText("sharp_right", "")).toBe("then sharp right");
     expect(thenText("straight", "Wapping Wall")).toBe("then continue onto Wapping Wall");
+  });
+  it("says the time left in a story", () => {
+    expect(fmtLeft(20)).toBe("under a minute left");
+    expect(fmtLeft(185)).toBe("3 min left");
+    expect(storyLeft({ audio: { dur: 100, marks: [0, 40, 70] } }, 1)).toBe(60);
+    expect(storyLeft({}, 0)).toBeNull();
+  });
+  it("describes the listening time and the average speed", () => {
+    expect(fmtListening(32)).toBe("about 30 min of listening");
+    expect(fmtListening(8)).toBe("about 8 min of listening");
+    expect(avgKmh(20, 3600000)).toBe(20);
+    expect(avgKmh(1, 30000)).toBeNull();
   });
 });

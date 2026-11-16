@@ -93,3 +93,27 @@ export function thenText(turn: TurnKind, name: string): string {
   if (!name) return `then ${word}`;
   return `then ${word} onto ${name}`;
 }
+
+/** Time left in a story, as a rider says it: "3 min left", "under a minute left". */
+export function fmtLeft(seconds: number): string {
+  if (seconds < 60) return "under a minute left";
+  return `${Math.round(seconds / 60)} min left`;
+}
+
+/** Seconds left in a recorded story, estimated from the start of the paragraph now playing. Null when it has no recording. */
+export function storyLeft(story: { audio?: { dur: number; marks: number[] } }, para: number): number | null {
+  const a = story.audio;
+  if (!a) return null;
+  return Math.max(0, a.dur - (a.marks[para] ?? 0));
+}
+
+/** "about 30 min of listening": minutes rounded to the nearest five once past ten. */
+export function fmtListening(minutes: number): string {
+  const m = minutes > 10 ? Math.round(minutes / 5) * 5 : minutes;
+  return `about ${m} min of listening`;
+}
+
+/** Average speed in km/h, or null when the time is too short to mean anything. */
+export function avgKmh(km: number, ms: number): number | null {
+  return ms >= 60000 ? km / (ms / 3600000) : null;
+}
