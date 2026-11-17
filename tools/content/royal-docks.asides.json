@@ -1,0 +1,272 @@
+[
+ {
+  "id": "lunardi",
+  "seg": 1,
+  "street": "City Road",
+  "near": [
+   -0.088,
+   51.5226
+  ],
+  "frac": 0.3,
+  "title": "The first balloon over London",
+  "tags": [],
+  "text": "Behind the wall is the Artillery Ground. On the fifteenth of September 1784 an Italian called Vincenzo Lunardi rose from it in a hydrogen balloon, watched by a crowd put at two hundred thousand, the Prince of Wales among them. He took a dog, a cat and a pigeon. The cat felt unwell, so he landed in Hertfordshire to let it off, then flew on."
+ },
+ {
+  "id": "royal-mint",
+  "seg": 2,
+  "street": "Royal Mint Street",
+  "near": [
+   -0.0723,
+   51.5093
+  ],
+  "frac": 0.4,
+  "title": "From the Mint to an embassy",
+  "tags": [
+   "Spies"
+  ],
+  "text": "Just south of this street stands the old Royal Mint. It moved here from the Tower in the reign of George the Third and struck the nation's coins until 1975. In 2018 China bought the site for a new embassy, the biggest in Europe. Critics warned of spying and of the data cables under these streets that serve the City. Ministers approved it in January 2026, and the High Court upheld that in July."
+ },
+ {
+  "id": "swedenborg",
+  "seg": 2,
+  "street": "Cable Street",
+  "near": [
+   -0.0633,
+   51.5102
+  ],
+  "frac": 0.75,
+  "title": "The mystic's skull",
+  "tags": [],
+  "text": "The little park just south of here is Swedenborg Gardens. A Swedish church stood on it, and in 1772 the scientist turned mystic Emanuel Swedenborg was buried there. In 1908 Sweden took him home to Uppsala Cathedral. His skull had a busier time. It went missing from the coffin, and in 1978 the Royal Swedish Academy of Sciences bought what it believed was the real one at a sale in London."
+ },
+ {
+  "id": "st-katharine",
+  "seg": 3,
+  "street": "Butcher Row",
+  "near": [
+   -0.0409,
+   51.5121
+  ],
+  "frac": 0.4,
+  "title": "The queen's foundation",
+  "tags": [],
+  "text": "The quiet precinct on Butcher Row is the Royal Foundation of St Katharine. Queen Matilda founded it beside the Tower in 1147, and queens have been its patrons since. It survived Henry the Eighth but not the docks: in 1825 it was pulled down to dig St Katharine Docks, which kept its name. After a century by Regent's Park it came back east in 1948."
+ },
+ {
+  "id": "limehouse-chinatown",
+  "seg": 3,
+  "street": "Limehouse Causeway",
+  "near": [
+   -0.0277,
+   51.5093
+  ],
+  "frac": 0.5,
+  "title": "The first Chinatown",
+  "tags": [],
+  "text": "This street, Limehouse Causeway, and Pennyfields just north of it were London's first Chinatown. Chinese seamen, hired by the East India Company and the shipping lines, settled here from the late nineteenth century. Even at its peak only about three hundred lived here for good. The thrillers of Sax Rohmer turned it into a land of opium dens and his villain Fu Manchu. The Blitz and slum clearance finished it."
+ },
+ {
+  "id": "blackwall-yard",
+  "seg": 4,
+  "street": "Naval Row",
+  "near": [
+   -0.0032,
+   51.5083
+  ],
+  "frac": 0.5,
+  "title": "Blackwall Yard",
+  "tags": [],
+  "text": "Between you and the river lay Blackwall Yard. The East India Company started it in 1614 to build its own ships, and for more than three and a half centuries ships were built and mended here. East Indiamen came off its slips, then warships, then the handsome Blackwall frigates that carried passengers to India and Australia, then tea clippers. The yard closed only in 1987."
+ },
+ {
+  "id": "pervenets",
+  "seg": 5,
+  "street": "Lower Lea Crossing",
+  "near": [
+   0.0049,
+   51.5092
+  ],
+  "frac": 0.3,
+  "title": "The tsar's firstborn",
+  "tags": [
+   "Russia"
+  ],
+  "text": "Below you, where Bow Creek meets the Thames, stood the Thames Ironworks. In 1860 it launched HMS Warrior, one of the first iron hulled, armoured warships in the world. That winter was so cold she froze to the slipway. Russia took note. No Russian yard could yet build such a ship, so the Imperial Navy ordered one here. She was launched in 1863 and named Pervenets, the firstborn."
+ },
+ {
+  "id": "trinity-buoy-lighthouse",
+  "seg": 5,
+  "street": "Lower Lea Crossing",
+  "near": [
+   0.0083,
+   51.5077
+  ],
+  "frac": 0.6,
+  "title": "London's only lighthouse",
+  "tags": [],
+  "text": "Look downstream for a small lighthouse on the point. It is Trinity Buoy Wharf, where Trinity House kept and mended the buoys that marked the Thames. The tower went up in the 1860s, and Michael Faraday carried out lighting experiments here. It is the only lighthouse left in London. Since the first day of the year 2000 it has been playing Longplayer, a piece of music meant to last a thousand years."
+ },
+ {
+  "id": "albion-launch",
+  "seg": 6,
+  "street": "Leaway",
+  "near": [
+   0.01013,
+   51.51278
+  ],
+  "frac": 0.05,
+  "title": "The launch of the Albion",
+  "tags": [],
+  "text": "In June 1898 thousands came to the Thames Ironworks to watch the Duchess of York launch the battleship Albion. The huge hull drove a wave up the creek and swept away a crowded wooden staging. More than thirty people drowned, most of them women and children. The battleship herself went on to war, and in 1915 she shelled the forts of the Dardanelles."
+ },
+ {
+  "id": "bow-creek-loops",
+  "seg": 6,
+  "street": "Leaway",
+  "near": [
+   0.00751,
+   51.51503
+  ],
+  "frac": 0.15,
+  "title": "The loops of Bow Creek",
+  "tags": [],
+  "text": "Just west of here the River Lea, called Bow Creek on its last stretch, doubles back on itself twice before it reaches the Thames. The loops leave two tongues of land. On the western one, about a hundred and fifty years ago, a coal wharf fed the furnaces of the Thames Ironworks. After long years of dereliction it is the Bow Creek Ecology Park, and at low tide the mud is full of wading birds."
+ },
+ {
+  "id": "cody-dock-gasworks",
+  "seg": 6,
+  "street": "Leaway",
+  "near": [
+   -0.003,
+   51.5187
+  ],
+  "frac": 0.6,
+  "title": "Coal for the gasworks",
+  "tags": [],
+  "text": "Cody Dock was dug in 1871 so barges could bring coal to a vast new gasworks just upstream. The Imperial Gas Light and Coke Company built it to rival Beckton, on about a hundred and seventy acres. Its gasholders, built in the 1870s, still stand ahead of you, seven iron skeletons. In a quiet garden by them the gas company remembers its workers who died in the two world wars."
+ },
+ {
+  "id": "gandhi-lea",
+  "seg": 6,
+  "street": "River Lea path",
+  "near": [
+   -0.00752,
+   51.52647
+  ],
+  "frac": 0.7,
+  "title": "Gandhi by the Lea",
+  "tags": [],
+  "text": "In the autumn of 1931 a small man in a white shawl walks by the canal near here every morning at six, after his prayers, talking to the workmen he meets. Gandhi is in London for talks on the future of India. He has refused a hotel and stays instead at Kingsley Hall, a few streets west of here, Muriel Lester's settlement for the poor. The children there call him Uncle Gandhi."
+ },
+ {
+  "id": "langthorne-abbey",
+  "seg": 7,
+  "street": "Three Mills Wall River",
+  "near": [
+   -0.0035,
+   51.53267
+  ],
+  "frac": 0.5,
+  "title": "The abbey's mills",
+  "tags": [],
+  "text": "Why Abbey Mills? Just beyond it, around Abbey Road, stood Stratford Langthorne, founded in 1135 and one of the richest Cistercian abbeys in England. Its monks owned tide mills on these channels and ground flour for the bakers of the City. Henry the Third made peace with his rebel barons there in 1267. Henry the Eighth closed it in 1538. Hardly a stone is left."
+ },
+ {
+  "id": "match-women",
+  "seg": 8,
+  "street": "Bow Road",
+  "near": [
+   -0.01921,
+   51.52811
+  ],
+  "frac": 0.3,
+  "title": "The match women",
+  "tags": [],
+  "text": "Up Fairfield Road stands the old Bryant and May match factory, now flats. In July 1888 about fourteen hundred women and girls walked out, over fines, long hours and the white phosphorus that rotted their jaws. Annie Besant had written about them, but the strike was their own, and Sarah Chapman was among its leaders. In two weeks they won, and founded the largest union of women in the country."
+ },
+ {
+  "id": "the-irons",
+  "seg": 8,
+  "street": "Greenway",
+  "near": [
+   -0.0058,
+   51.53374
+  ],
+  "frac": 0.5,
+  "title": "The Irons",
+  "tags": [],
+  "text": "The big bowl to the north west is the Olympic stadium of 2012, home of West Ham United. The club began in 1895 as the works team of the Thames Ironworks, the shipyard at the mouth of the Lea that you rode past earlier, which built warships of iron. In 1900 the team became West Ham United. Its fans still call it the Irons."
+ },
+ {
+  "id": "bow-bridge",
+  "seg": 8,
+  "street": "Stratford High Street",
+  "near": [
+   -0.0141,
+   51.5296
+  ],
+  "frac": 0.95,
+  "title": "The queen who fell in",
+  "tags": [],
+  "text": "You are crossing the Lea at Bow. The story goes that early in the twelfth century Queen Matilda, wife of Henry the First, tried to ford the river on her way to Barking Abbey, and she or some of her company ended up in the water. So she had a bridge built, with an arch curved like a bow. The village took its name from it."
+ },
+ {
+  "id": "jubilee-street",
+  "seg": 9,
+  "street": "Mile End Road",
+  "near": [
+   -0.0529,
+   51.5185
+  ],
+  "frac": 0.75,
+  "title": "The club on Jubilee Street",
+  "tags": [
+   "Russia"
+  ],
+  "text": "Jubilee Street, just here, once had the liveliest club in the East End. In February 1906 Yiddish speaking anarchists, most of them from the Russian Empire, opened the Workers' Friend Club in an old chapel, with a hall for eight hundred, a library and a stage. Its leader, Rudolf Rocker, was a German who had learned Yiddish. On opening night Peter Kropotkin, the Russian prince turned anarchist, walked in to applause."
+ },
+ {
+  "id": "monteagle-letter",
+  "seg": 10,
+  "street": "Hoxton Street",
+  "near": [
+   -0.0801,
+   51.5303
+  ],
+  "frac": 0.5,
+  "title": "The letter at supper",
+  "tags": [
+   "Spies"
+  ],
+  "text": "On the twenty sixth of October 1605 Lord Monteagle was at supper in his house in Hoxton when an unsigned letter arrived, warning him to stay away from the opening of Parliament. He took it straight to Robert Cecil, the King's chief minister. Nine nights later Guy Fawkes was caught under the House of Lords. Who wrote the letter is still argued over. Some suspect Cecil himself."
+ },
+ {
+  "id": "lady-vanishes",
+  "seg": 10,
+  "street": "New North Road",
+  "near": [
+   -0.08729,
+   51.5311
+  ],
+  "frac": 0.5,
+  "title": "Hitchcock's studio",
+  "tags": [
+   "Spies"
+  ],
+  "text": "Up New North Road, by the canal, the flats called Gainsborough Studios keep a giant head of Alfred Hitchcock in their courtyard. This was a film studio, built in an old power station. Hitchcock started here as a young man, lettering title cards for silent films. In 1938 he shot most of The Lady Vanishes here, the spy thriller in which a kindly old governess carries a secret message across Europe, hidden in a tune."
+ },
+ {
+  "id": "nova-scotia-gardens",
+  "seg": 10,
+  "street": "Columbia Road",
+  "near": [
+   -0.0735,
+   51.5287
+  ],
+  "frac": 0.6,
+  "title": "Before the flowers",
+  "tags": [],
+  "text": "This was once Nova Scotia Gardens, a slum of sunken cottages. In November 1831 John Bishop, who lived here, was caught selling a boy's body to the anatomy school at King's College. He and Thomas Williams had murdered the boy for it. Both were hanged before a crowd of thirty thousand. In 1869 Angela Burdett-Coutts built a grand Gothic food market on the spot. It failed. The street market outlived it."
+ }
+]

@@ -1,10 +1,10 @@
 import { useEffect } from "preact/hooks";
 import { geoDistance } from "../geo";
-import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packIndex, screen, settings, simulated } from "../state";
+import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated } from "../state";
 import type { Detour, LngLat, NavState, Pack, PackIndexEntry } from "../types";
 import { demoRide, finishOpen, finishedAt, following, joinTarget, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
 
-/** Preview route /?demo=ride&step=N: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
+/** Preview route /?demo=ride&step=N[&pack=<id>]: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
 export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
@@ -45,7 +45,7 @@ function demoState(p: Pack, step: string): void {
       break;
     }
     case "off-route": nav.value = lost; break;
-    case "detour-turn": nav.value = { ...lost, detour: way({ turn: "left", name: p.cues[3]?.name ?? "Bermondsey Wall East", at: seg[Math.min(seg.length - 1, k + 2)]!, dist: 120 }) }; break;
+    case "detour-turn": nav.value = { ...lost, detour: way({ turn: "left", name: p.cues[3]?.name ?? "the next street", at: seg[Math.min(seg.length - 1, k + 2)]!, dist: 120 }) }; break;
     case "detour-plain": nav.value = { ...lost, detour: way(null) }; break;
     case "at-stop": nav.value = { ...base, status: "at_stop", toStop: 0, nextCue: null, toCue: null, arrived: [0, 1, 2] }; openStop.value = 2; break;
     case "stop-sheet": nav.value = base; openStop.value = 5; break;
@@ -96,11 +96,17 @@ function demoState(p: Pack, step: string): void {
   }
 }
 
+/** The demo shows the pack named by ?pack=<id>, or else the first pack in the index. */
 export async function enterDemo(step: string): Promise<void> {
-  const res = await fetch(`${import.meta.env.BASE_URL}packs/thames-loop/pack.json`);
+  let entries: PackIndexEntry[] = [];
+  try { entries = ((await (await fetch(`${import.meta.env.BASE_URL}packs/index.json`)).json()) as { packs: PackIndexEntry[] }).packs; } catch {}
+  const id = new URLSearchParams(location.search).get("pack") ?? entries[0]?.id;
+  if (!id) return;
+  const res = await fetch(`${packBase(id)}pack.json`);
   const p = (await res.json()) as Pack;
+  // set the state in one go, before Home renders: the continue step writes the saved ride Home reads
   pack.value = p;
-  try { packIndex.value = ((await (await fetch(`${import.meta.env.BASE_URL}packs/index.json`)).json()) as { packs: PackIndexEntry[] }).packs; } catch { packIndex.value = []; }
+  packIndex.value = entries;
   demoState(p, step);
 }
 

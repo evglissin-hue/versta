@@ -16,7 +16,13 @@ plan = json.load(open(os.path.join(ROOT, "tools", "content", PACK + ".plan.json"
 pk = os.path.join(ROOT, "public", "packs", PACK, "pack.json")
 pack = json.load(open(pk)) if os.path.exists(pk) else None
 net = router.load()
-stops = pack["stops"] if pack else []
+rf = os.path.join(ROOT, "tools", "content", PACK + ".route.json")
+if pack: stops = pack["stops"]
+elif os.path.exists(rf):   # no pack built yet: the stops of the route file
+    stops = [{"at": [st["lng"], st["lat"]]} for st in json.load(open(rf))[0]["stops"]]
+else:   # nor a route file: the segment ends (segment i leads to stop i)
+    sk = sorted(track["segments"], key=int)
+    stops = [{"at": track["segments"][sk[0]][0]}] + [{"at": track["segments"][k][-1]} for k in sk]
 
 def draw(sids, fn, pad=350, title="", box=None):
     fig, ax = plt.subplots(figsize=(11, 11 * 0.8), dpi=110)
@@ -62,5 +68,5 @@ box = next((tuple(float(v) for v in a[6:].split(",")) for a in sys.argv if a.sta
 if box:
     draw([int(s) for s in plan], "/tmp/line-zoom.png", title="zoom", box=box); sys.exit(0)
 for sid in plan: draw([int(sid)], f"/tmp/line-{sid}.png", title=f"segment {sid}: " + plan[sid]["why"][:90])
-if "--all" in sys.argv: draw(list(range(1, 13)), "/tmp/line-all.png", pad=200, title="whole route")
+if "--all" in sys.argv: draw(sorted(int(k) for k in track["segments"]), "/tmp/line-all.png", pad=200, title="whole route")
 print("rendered")

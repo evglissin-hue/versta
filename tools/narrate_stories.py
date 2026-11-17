@@ -1,13 +1,16 @@
 """Record the main story narration with paragraph marks (Kokoro text-to-speech).
-Writes public/packs/<id>/audio/<stop>-<n>.mp3 and tools/content/<id>.audio.json (src, marks, dur).
-Usage: KOKORO_DIR=/path/to/models python3 tools/narrate_stories.py"""
+Writes public/packs/<id>/audio/<stop>-<n>.mp3 and tools/content/<id>.audio.json, keyed <id>/<stop>-<n> (src, marks, dur).
+Records only stories that have no manifest entry or no file. Extra pronunciations for a pack can go in
+tools/content/<id>.say.json as [["written", "spoken"], ...].
+Usage: KOKORO_DIR=/path/to/models python3 tools/narrate_stories.py [pack_id=thames-loop]"""
 import json, re, os, sys, time, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import voice
 from kokoro_onnx import Kokoro
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-KD = os.environ.get("KOKORO_DIR", "/home/claude/tts")
-PACK = "thames-loop"
+KD = os.environ.get("KOKORO_DIR", "/home/claude/kokoro")
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+PACK = args[0] if args else "thames-loop"
 ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
 TENS = "x x twenty thirty forty fifty sixty seventy eighty ninety".split()
 def two(n):
@@ -25,13 +28,22 @@ def year(m):
 SUBS = [("MI5","M I five"),("Deptford","Detford"),("Greenwich","Grennitch"),("Wapping","Wopping"),("Thames","Tems"),
         ("St Nicholas","Saint Nicholas"),("St Petersburg","Saint Petersburg"),("Lody","Loady"),("Josef Jakobs","Yosef Yakobs"),
         ("Okhrana","Okrahna"),("Skeres","Skeers"),("Spitsbergen","Spitsbergen")]
+say_f = os.path.join(ROOT, "tools", "content", PACK + ".say.json")
+if os.path.exists(say_f): SUBS += [tuple(x) for x in json.load(open(say_f))]
 def norm(t):
     t = re.sub(r"\b(1[5-9]\d\d)(s?)\b", year, t)
     for a, b in SUBS: t = t.replace(a, b)
     assert not re.search(r"\d", t), t
     return t
+rf = os.path.join(ROOT, "tools", "content", PACK + ".route.json")
+if not os.path.exists(rf): sys.exit(f"No route file {os.path.relpath(rf, ROOT)}")
+routes = [r for r in json.load(open(rf)) if r["id"] == PACK]
+if not routes: sys.exit(f"{os.path.relpath(rf, ROOT)} has no route with id {PACK}")
+for r in routes:
+    for s in r["stops"]:
+        for st in s["stories"]:
+            for p in st["paras"]: norm(p)   # fail on unspoken digits before loading the model
 k = Kokoro(os.path.join(KD, "kokoro-v1.0.onnx"), os.path.join(KD, "voices-v1.0.bin"))
-routes = json.load(open(os.path.join(ROOT, "tools", "content", PACK + ".route.json")))
 man = {}
 mpath = os.path.join(ROOT, "tools", "content", PACK + ".audio.json")
 if os.path.exists(mpath): man = json.load(open(mpath))
@@ -50,7 +62,7 @@ for r in routes:
                 gap = 0.7; parts.append(np.zeros(int(sr*gap), dtype=np.float32)); pos += gap
             audio = np.concatenate(parts)
             voice.encode(audio, sr, fn)
-            man[key] = {"src": f"audio/{key}.mp3", "marks": marks, "dur": round(len(audio)/sr, 1)}
+            man[key] = {"src": f"audio/{s['id']}-{ki}.mp3", "marks": marks, "dur": round(len(audio)/sr, 1)}
             json.dump(man, open(mpath, "w"))
             print(key, man[key]["dur"], "elapsed %.0fs" % (time.time()-t0), flush=True)
 print("DONE", flush=True)

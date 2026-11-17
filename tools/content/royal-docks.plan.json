@@ -1,0 +1,128 @@
+{
+ "comment": "Segments listed here are planned again by tools/router.py. via points are [lng, lat] gates, in order. Line ends sit on OSM nodes next to each stop (the Cycleway 3 track past the mural, the Greenway east of the Abbey Lane bridge, the end of Wharf Road for home).",
+ "replan": {
+  "1": {
+   "why": "Bunhill Fields City Road gate south on City Road to Finsbury Square, then the quiet streets west of Moorgate (Finsbury Street, Moorfields) to number 49.",
+   "via": [
+    [
+     -0.0874,
+     51.5218
+    ]
+   ],
+   "gate": 30
+  },
+  "2": {
+   "why": "Moorgate to Tower Hill by the calmest reasonable way (Lombard Street, Eastcheap, Great Tower Street), then Cycleway 3 on Tower Hill, Royal Mint Street and Cable Street to the mural.",
+   "via": [
+    [
+     -0.07,
+     51.5105
+    ]
+   ]
+  },
+  "3": {
+   "why": "Cycleway 3: Cable Street, Butcher Row, Horseferry Road, Narrow Street, Limehouse Causeway, Ming Street, Poplar High Street, then up Woodstock Terrace to the park gate by the memorial.",
+   "via": [
+    [
+     -0.0381,
+     51.5105
+    ]
+   ],
+   "gate": 25
+  },
+  "4": {
+   "why": "Back down Woodstock Terrace, Cycleway 3 along Poplar High Street, Naval Row and the Leamouth estate (one-way streets make a small box), then Orchard Place to the basin.",
+   "via": [
+    [
+     -0.0069,
+     51.5085
+    ]
+   ]
+  },
+  "5": {
+   "why": "East India Dock Basin, the Lower Lea Crossing path over the Lea, then Western Gateway to the west end of Royal Victoria Dock, where the north quay begins (the turnaround).",
+   "via": []
+  },
+  "6": {
+   "why": "The Leaway north to Three Mills: Silvertown Way track to Canning Town, quiet streets (Clarence Road, Star Lane, Cody Road, South Crescent) round the riverside gap, through Cody Dock and over its rolling bridge, the riverside path round the bend of Bow Creek to Twelvetrees Crescent and the ramp, then the Lea path up to Three Mill Lane.",
+   "via": [
+    [
+     -0.00262,
+     51.51859
+    ],
+    [
+     -0.00557,
+     51.5237
+    ]
+   ],
+   "gate": 30
+  },
+  "7": {
+   "why": "Three Mills to Abbey Mills on ways shown open: Shortwall and the Three Mills Wall River Path north to Stratford High Street, then east along the open Greenway (Cycleway 22) to the stop above Abbey Mills. Long Wall is avoided: it meets the Greenway at the works by the Long Wall Ecology Garden.",
+   "via": [
+    [
+     -0.00792,
+     51.53263
+    ],
+    [
+     -0.00624,
+     51.53394
+    ],
+    [
+     -0.00279,
+     51.53234
+    ]
+   ],
+   "gate": 8,
+   "avoid": {
+    "Long Wall": 20
+   }
+  },
+  "8": {
+   "why": "Back west along the Greenway to Stratford High Street, Cycleway 2 over Bow roundabout and along Bow Road, then quiet streets (Addington Road, Malmesbury Road, Lichfield Road) to the Grove Road railway bridge from the east.",
+   "via": [
+    [
+     -0.00624,
+     51.53394
+    ]
+   ],
+   "gate": 15
+  },
+  "9": {
+   "why": "Through Mile End Park to Cycleway 2, west along Mile End Road, then into Sidney Street to Wexford House, the site of No. 100.",
+   "via": [
+    [
+     -0.045,
+     51.5222
+    ],
+    [
+     -0.051,
+     51.5208
+    ],
+    [
+     -0.05535,
+     51.518
+    ]
+   ],
+   "gate": 25
+  },
+  "10": {
+   "why": "From Wexford House on Sidney Street (site of No. 100) west at once: a few metres south on Sidney Street, Stepney Way, a jog on Cavell Street, Stepney Way again, then Turner Street north, Fulbourne Street, Buxton Street, Quaker Street, Arnold Circus, Columbia Road by Ravenscroft Park, Falkirk Street, Hoxton Street, New North Road, Murray Grove, Wharf Road. Not Brick Lane and Shoreditch (the Thames Loop way).",
+   "via": [
+    [
+     -0.058,
+     51.51765
+    ],
+    [
+     -0.0801,
+     51.5297
+    ]
+   ],
+   "avoid": {
+    "Brick Lane": 5,
+    "Hanbury Street": 3
+   },
+   "gate": 25
+  }
+ }
+}

@@ -1,5 +1,5 @@
 /* Throwaway harness for the map. Served by `npx vite --port 5181`, open /src/map/dev/index.html.
-   Query: ?state=overview|riding|stop|off  and  &seg=4  and  &along=300 */
+   Query: ?state=overview|riding|stop|off  and  &seg=4  and  &along=300  and  &pack=<id> (default thames-loop) */
 import { render } from "preact";
 import "@fontsource/barlow-condensed/600.css";
 import "../../styles/tokens.css";
@@ -18,7 +18,7 @@ function bearing(a: [number, number], b: [number, number]): number {
 }
 
 async function main(): Promise<void> {
-  const pack = (await (await fetch("/packs/thames-loop/pack.json")).json()) as Pack;
+  const pack = (await (await fetch(`/packs/${q.get("pack") ?? "thames-loop"}/pack.json`)).json()) as Pack;
   const seg = Number(q.get("seg") ?? 4);
   const state = q.get("state") ?? "overview";
   settings.value = { ...settings.value, courseUp: q.get("courseUp") !== "0" };

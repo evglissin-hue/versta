@@ -4,6 +4,10 @@ import { expect, test, type Page } from "@playwright/test";
 const override = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.PW_BASE_URL;
 if (override) test.use({ baseURL: override });
 
+/** The card of the pack the demo screens show (the first in the index). Home lists one card per pack. */
+const demoCard = (page: Page) => page.getByTestId("route-card").first();
+const thamesCard = (page: Page) => page.getByTestId("route-card").filter({ has: page.getByRole("heading", { name: "Thames Loop", exact: true }) });
+
 function watchConsole(page: import("@playwright/test").Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
@@ -15,7 +19,7 @@ test("home shows the Thames Loop card", async ({ page }) => {
   const errors = watchConsole(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Versta" })).toBeVisible();
-  const card = page.getByTestId("route-card");
+  const card = thamesCard(page);
   await expect(card).toContainText("Thames Loop");
   await expect(card).toContainText("km");
   await expect(card.getByRole("button", { name: "Ride" })).toBeVisible();
@@ -54,7 +58,7 @@ test("continue card on Home offers Continue ride and Start again", async ({ page
   await expect(card.getByRole("button", { name: "Continue ride" })).toBeVisible();
   await expect(card).toContainText("You reached 05 Deptford & the Tsar");
   await expect(card.getByRole("button", { name: "Start again" })).toBeVisible();
-  await expect(page.getByTestId("route-card").getByRole("button", { name: "Ride", exact: true })).toHaveCount(0);
+  await expect(demoCard(page).getByRole("button", { name: "Ride", exact: true })).toHaveCount(0);
   const small = await page.$$eval("button, a.linkbtn", (els) => els.filter((e) => e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().height < 47.5).map((e) => e.textContent));
   expect(small).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
@@ -129,7 +133,7 @@ test("the Stops button counts the stops done, and the aside card shows its tags"
 
 test("home: what is inside the route, the Android line, no offline warning online", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("inside")).toHaveText("13 stops, 18 stories, 21 passing-by stories, about 30 min of listening");
+  await expect(thamesCard(page).getByTestId("inside")).toHaveText("13 stops, 18 stories, 21 passing-by stories, about 30 min of listening");
   await expect(page.getByTestId("android-link")).toHaveAttribute("href", "https://github.com/evglissin-hue/versta/releases/tag/android-latest");
   await expect(page.getByTestId("offline-note")).toHaveCount(0);
 });
@@ -138,18 +142,18 @@ test("home preview states: first ride sheet, loading, load failure, offline, all
   await page.setViewportSize({ width: 360, height: 740 });
   for (const step of ["first-ride", "loading", "load-failed", "offline"]) {
     await page.goto(`/?demo=ride&step=${step}`);
-    await expect(page.getByTestId("route-card")).toBeVisible();
+    await expect(demoCard(page)).toBeVisible();
     if (step === "first-ride") {
       const sheet = page.getByTestId("first-ride");
       await expect(sheet).toContainText("Versta follows your ride by GPS and talks to you as you go.");
       await expect(sheet.getByRole("button", { name: "Start the ride" })).toBeVisible();
     }
-    if (step === "loading") await expect(page.getByTestId("route-card").getByRole("button", { name: "Loading the route" })).toBeDisabled();
+    if (step === "loading") await expect(demoCard(page).getByRole("button", { name: "Loading the route" })).toBeDisabled();
     if (step === "load-failed") {
       await expect(page.getByTestId("load-failure")).toContainText("Could not load the route. Check your connection and try again.");
       await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
     }
-    if (step === "offline") await expect(page.getByTestId("offline-note")).toContainText("offline");
+    if (step === "offline") await expect(demoCard(page).getByTestId("offline-note")).toContainText("offline");
     const small = await page.$$eval("button, a.linkbtn", (els) => els.filter((e) => e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().height < 47.5).map((e) => e.textContent));
     expect(small, `small targets in ${step}`).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), `overflow in ${step}`).toBe(false);
@@ -160,7 +164,7 @@ test("the first-ride sheet shows once, before the browser asks for anything, and
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 51.5, longitude: -0.1 });
   await page.goto("/");
-  await page.getByTestId("route-card").getByRole("button", { name: "Ride", exact: true }).click();
+  await demoCard(page).getByRole("button", { name: "Ride", exact: true }).click();
   const sheet = page.getByTestId("first-ride");
   await expect(sheet).toBeVisible();
   await expect(page.getByTestId("ride")).toHaveCount(0);
@@ -168,7 +172,7 @@ test("the first-ride sheet shows once, before the browser asks for anything, and
   await expect(page.getByTestId("ride")).toBeVisible({ timeout: 20_000 });
   expect(await page.evaluate(() => localStorage.getItem("versta:firstride"))).toBe("1");
   await page.goto("/");
-  await page.getByTestId("route-card").getByRole("button", { name: /^Ride|Continue/ }).first().click();
+  await demoCard(page).getByRole("button", { name: /^Ride|Continue/ }).first().click();
   await expect(page.getByTestId("ride")).toBeVisible({ timeout: 20_000 });
 });
 

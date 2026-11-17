@@ -129,10 +129,14 @@ export function packFiles(pack: Pack): string[] {
     }
   }
   for (const a of pack.asides) files.add(a.audio);
-  for (const c of pack.cues) files.add(c.audio);
-  for (const s of pack.system.arrive) files.add(s);
-  files.add(pack.system.offRoute);
-  files.add(pack.system.backOnRoute);
+  // quiet cues are shown, never spoken, and have no file: asking for one fails the whole save
+  for (const c of pack.cues) if (!c.quiet) files.add(c.audio);
+  const sys = pack.system;
+  for (const s of sys.arrive) files.add(s);
+  for (const s of [sys.offRoute, sys.backOnRoute, sys.rerouting, sys.wrongWay]) if (s) files.add(s);
+  for (const s of Object.values(sys.turns ?? {})) if (s) files.add(s);
+  for (const s of Object.values(sys.distances ?? {})) if (s) files.add(s);
+  if (pack.graph) files.add(pack.graph);
   return [...files].filter(Boolean);
 }
 

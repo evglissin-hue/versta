@@ -8,3 +8,4 @@ playwright-report
 *.apk
 local.properties
 .gradle
+__pycache__/

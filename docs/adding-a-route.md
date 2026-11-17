@@ -24,22 +24,44 @@ A route pack is built by Claude in a working session, then committed. The app on
      `--box=lng0,lat0,lng1,lat1` draws a zoomed view.
 2. Write the content: `tools/content/<id>.route.json` (stops and stories, see the Thames Loop file for the shape) and
    `<id>.asides.json` (passing-by stories, each anchored to a segment and a street name the route really uses).
-   Follow the house style in `CLAUDE.md`. Check every fact.
+   Follow the house style in `CLAUDE.md`. Check every fact. The number of stops is whatever the route file lists: the
+   track needs segments 1 to stops - 1. Optional route fields: `card_blurb` (a shorter blurb for the Home card); on a
+   stop, `pack_id` and `pack_name` (the id and name the stop gets in the pack, as the Thames Loop's `home` becomes
+   `wenlock-basin`) and `arrive_radius` (metres, default 45: make it smaller when the first turn after the stop is closer than that, as on a\n   short out and back; the builder warns) and `fixed_segment` (`{"name", "kind", "len", "say"}`: the segment to this stop is a straight walk
+   from the previous stop with that one cue, as through the Greenwich Foot Tunnel). Ambience names come from
+   `RECIPES` in `src/audio/soundscapes.ts`.
 3. Pictures: public domain works only (Wikimedia Commons is a good source). Look at every image before using it.
-   Put them in `public/packs/<id>/img/` at about 820px wide, and list them with captions in `<id>.pics.json`.
+   Put them in `public/packs/<id>/img/` at about 820px wide, and list them with captions in `<id>.pics.json`, keyed
+   `<id>` for the hero and `<id>/<stop id>-<story index>` for a story; each value is `[file, caption]` or
+   `{"file": ..., "caption": ...}`. A story without a picture simply has no entry.
 4. Map data: already fetched in step 1 (re-run `fetch_osm.py` after changing the line or the via points).
-5. Narration of the stories: `python3 tools/narrate_stories.py` records them with their paragraph marks. Delete
-   `audio/` and the audio manifest to re-record. Run this before the build, because the pack carries the marks.
-6. Build: `OSM_DIR=/tmp/osm python3 tools/build_pack.py` writes `pack.json` (track, turn cues, asides, system clips, km) and
-   `graph.json` (the corridor road graph the app uses to find a way back, about 360 KB, with a check that every stop
-   and every 100 m of the line has a node within 40 m) and updates `km` in `public/packs/index.json`. Asides are
+5. Narration of the stories: `python3 tools/narrate_stories.py <id>` records them with their paragraph marks into
+   `public/packs/<id>/audio/` and `tools/content/<id>.audio.json` (keyed `<id>/<stop id>-<story index>`). It records only
+   stories with no entry or no file: delete both to re-record one. Run this before the build, because the pack
+   carries the marks. Pronunciations for new names can go in `tools/content/<id>.say.json` as
+   `[["written", "spoken"], ...]`; both narration tools read it.
+6. Build: `OSM_DIR=/tmp/osm python3 tools/build_pack.py <id>` writes `pack.json` (track, turn cues, asides, system clips,
+   km) and `graph.json` (the corridor road graph the app uses to find a way back, about 360 KB, with a check that every
+   stop and every 100 m of the line has a node within 40 m) and creates or updates the pack's whole entry in
+   `public/packs/index.json` (id, name, mode, km, stops, hero, blurb, stories, asides, minutes), keeping pack order.
+   Before any map work it checks the content and stops, writing nothing, with a list of every problem: a missing
+   segment, a story without audio, a picture file that is not there, an unknown ambience, an aside on a segment the
+   route does not have. It warns when a stop is more than 30 m from the line. `--out=DIR` writes the pack and an index
+   under `DIR` instead, for a trial build that leaves `public/` alone. Never rebuild a pack whose cue audio is
+   already recorded unless you mean to re-record its cues: map data moves on, and cue ids follow the line. Asides are
    anchored by their `street` when the line uses it, else by their `near` point ([lng, lat]; the builder warns when
    the line is more than 250 m from it). Read the printed cue list: it should read like directions a person would give.
 7. More narration: `python3 tools/narrate.py <id>` records the turn cues, the arrival, off route, back on route and
-   rerouting clips, the generic turn clips and the asides, and deletes cue files the pack no longer uses. Pass
-   `--force` to record everything again.
-8. Add the pack to `public/packs/index.json`, run `npm run check` and the simulated ride (`npm run e2e`).
+   rerouting clips, the generic turn clips and the asides, deletes cue files the pack no longer uses, and sets the
+   listening minutes in the index from the recorded files. Pass `--force` to record everything again.
+8. Run `npm run check` and the simulated rides (`npm run e2e`). The pack integrity checks
+   (`tests/unit/packs.test.ts`), the whole rides with a detour (`tests/unit/ride.integration.test.ts`), the way-back
+   search (`tests/unit/reroute.real.test.ts`) and the browser rides (`tests/e2e/ride.spec.ts`) run over every pack in
+   the index, so a new pack needs no test change. On Home the packs show in index order; the demo screens
+   (`/?demo=ride&step=...`) show the first pack, or the one named by `&pack=<id>`.
 
-The voice, speeds and ffmpeg chain are in `tools/voice.py`, the one place to change the narrator. The narration tools need the Kokoro model files (`kokoro-v1.0.onnx`, `voices-v1.0.bin`) in `KOKORO_DIR`, the
-`kokoro-onnx` and `soundfile` Python packages, and `ffmpeg`. The pack tools are currently written for one pack id;
-generalising the paths is a small job for the second route.
+The voice, speeds and ffmpeg chain are in `tools/voice.py`, the one place to change the narrator. The narration tools
+need the Kokoro model files (`kokoro-v1.0.onnx`, `voices-v1.0.bin`, from the `model-files-v1.0` release of
+kokoro-onnx on GitHub) in `KOKORO_DIR` (default `/home/claude/kokoro`), the `kokoro-onnx` and `soundfile` Python
+packages (`pip install --break-system-packages kokoro-onnx soundfile`), and `ffmpeg`. Every pack tool takes the pack
+id as its first argument and defaults to `thames-loop`.

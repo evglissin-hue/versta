@@ -24,7 +24,7 @@ def densify(pts, step=12):
 def length(pts): return sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
 
 def report(tag, st, ln):
-    top = sorted(st["names"].items(), key=lambda kv: -kv[1])[:8]
+    top = [(n, m) for n, m in st["names"].items() if m >= 20]   # in ride order (first time each street is used)
     print(f"  {tag}: {ln:.0f} m | cycle routes/cycleways {100 * st['cycle'] / max(st['len'], 1):.0f}% | walking {st['walk']:.0f} m | primary/secondary {st['main']:.0f} m")
     print("     streets: " + ", ".join(f"{n} {m:.0f}" for n, m in top))
 

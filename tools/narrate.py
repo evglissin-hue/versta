@@ -1,14 +1,17 @@
 """Record narration for a route pack with the Kokoro text-to-speech model (kokoro-onnx).
 Generates only files that are missing: passing-by stories (asides), turn cues and system clips.
 Main story narration is produced by tools/narrate_stories.py, which also writes paragraph marks.
-Usage: KOKORO_DIR=/path/to/models python3 tools/narrate.py thames-loop"""
+Run it after tools/build_pack.py; at the end it sets the listening minutes of the pack in public/packs/index.json.
+Extra pronunciations for a pack can go in tools/content/<id>.say.json as [["written", "spoken"], ...].
+Usage: KOKORO_DIR=/path/to/models python3 tools/narrate.py [pack_id=thames-loop] [--force]"""
 import json, os, re, sys, numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import voice
+import voice, pack_index
 from kokoro_onnx import Kokoro
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PACK = sys.argv[1] if len(sys.argv) > 1 else "thames-loop"
-KD = os.environ.get("KOKORO_DIR", "/home/claude/tts")
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+PACK = ARGS[0] if ARGS else "thames-loop"
+KD = os.environ.get("KOKORO_DIR", "/home/claude/kokoro")
 ONES = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split()
 TENS = "x x twenty thirty forty fifty sixty seventy eighty ninety".split()
 def two(n): return ONES[n] if n < 20 else TENS[n // 10] + ("" if n % 10 == 0 else " " + ONES[n % 10])
@@ -20,14 +23,17 @@ SUBS = [("MI5", "M I five"), ("Deptford", "Detford"), ("Greenwich", "Grennitch")
         ("St ", "Saint "), ("Glamis", "Glahms"), ("Okhrana", "Okrahna"), ("Skeres", "Skeers"), ("Lody", "Loady"), ("Josef Jakobs", "Yosef Yakobs"),
         (" & ", " and "), ("Haakon", "Hawkon"), ("Temeraire", "Temmerair"), ("Ravensbourne", "Ravensborn"), ("Hawksmoor", "Hawksmore"),
         ("Bunhill", "Bunnhill"), ("Fournier", "Foornier"), ("Whitby", "Witby")]
+say_f = os.path.join(ROOT, "tools", "content", PACK + ".say.json")
+if os.path.exists(say_f): SUBS += [tuple(x) for x in json.load(open(say_f))]
 def norm(t):
     t = re.sub(r"\b(1[3-9]\d\d)(s?)\b", year, t)
     for a, b in SUBS: t = t.replace(a, b)
     assert not re.search(r"\d", t), t
     return t
-k = Kokoro(os.path.join(KD, "kokoro-v1.0.onnx"), os.path.join(KD, "voices-v1.0.bin"))
 base = os.path.join(ROOT, "public", "packs", PACK)
+if not os.path.exists(os.path.join(base, "pack.json")): sys.exit(f"No public/packs/{PACK}/pack.json: run tools/build_pack.py {PACK} first")
 pack = json.load(open(os.path.join(base, "pack.json")))
+k = Kokoro(os.path.join(KD, "kokoro-v1.0.onnx"), os.path.join(KD, "voices-v1.0.bin"))
 FORCE = "--force" in sys.argv
 def record(text, rel, speed, lead, tail=0.25):
     out = os.path.join(base, rel)
@@ -54,7 +60,8 @@ if sysp.get("wrongWay"): record("You are riding against the route. Turn around w
 for a in pack["asides"]: record(a["text"], a["audio"], voice.SPEED_STORY, voice.LEAD_ASIDE, 0.5)
 # remove cue files that no longer belong to the pack
 want = {c["audio"] for c in pack["cues"] if not c.get("quiet")}
-for fn in sorted(os.listdir(os.path.join(base, "cues"))):
+for fn in sorted(os.listdir(os.path.join(base, "cues")) if os.path.isdir(os.path.join(base, "cues")) else []):
     if "cues/" + fn not in want:
         os.remove(os.path.join(base, "cues", fn)); print("removed orphan cue", fn)
+print("listening minutes in index:", pack_index.update_minutes(os.path.join(ROOT, "public", "packs", "index.json"), pack, base))
 print("NARRATE_DONE", flush=True)

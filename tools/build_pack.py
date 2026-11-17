@@ -1,6 +1,16 @@
 """Build a route pack (public/packs/<id>/pack.json) and its corridor graph (graph.json) from: the route content JSON, the planned line
-(<id>.track.json, written by plan_line.py), cached OpenStreetMap extracts (see fetch_osm.py) and the asides JSON.
-Usage: python3 tools/build_pack.py   (paths are set in the CONFIG block below)"""
+(<id>.track.json, written by plan_line.py), cached OpenStreetMap extracts (see fetch_osm.py), the asides JSON, the story audio
+manifest (<id>.audio.json, written by narrate_stories.py) and the pictures list (<id>.pics.json). Creates or updates the
+pack's entry in public/packs/index.json, keeping pack order.
+Usage: OSM_DIR=/path/to/osm python3 tools/build_pack.py [pack_id=thames-loop] [--out=DIR]
+  --out=DIR writes DIR/<id>/pack.json, DIR/<id>/graph.json and DIR/index.json instead (for a trial build). Audio and
+  pictures are always checked in public/packs/<id>/.
+The stop count comes from the route file: segment i of the track leads to stop i, for i = 1 to stops - 1. Before any
+map work the builder checks the content and stops with a list of problems when a segment, a story's audio or a picture
+file is missing.
+Optional route fields: "card_blurb" (a shorter blurb for the Home card); on a stop, "pack_id" and "pack_name" (the id and
+name the stop gets in the pack, when they differ from the content file) and "fixed_segment" ({"name", "kind", "len",
+"say"}: the segment to this stop is a straight walk from the previous stop with this one cue, as through a foot tunnel)."""
 import glob, json, math, re, subprocess, sys, time, os
 import xml.etree.ElementTree as ET
 
@@ -9,16 +19,88 @@ KX = 111320 * math.cos(math.radians(LAT0)); KY = 110540
 def P(lat, lon): return ((lon - LON0) * KX, (LAT0 - lat) * KY)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import pack_index
 CONTENT = os.path.join(ROOT, "tools", "content")
 OSM_DIR = os.environ.get("OSM_DIR", "/home/claude/osm")
-PACK_ID = "thames-loop"
-routes = json.load(open(os.path.join(CONTENT, PACK_ID + ".route.json")))
-stops = routes[0]["stops"]
-SP = [P(s["lat"], s["lng"]) for s in stops]
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+OPTS = dict(a[2:].split("=", 1) if "=" in a else (a[2:], "") for a in sys.argv[1:] if a.startswith("--"))
+PACK_ID = ARGS[0] if ARGS else "thames-loop"
+ASSETS = os.path.join(ROOT, "public", "packs", PACK_ID)          # audio, cues, asides and pictures live here
+OUT_BASE = os.path.abspath(OPTS["out"]) if OPTS.get("out") else os.path.join(ROOT, "public", "packs")
+OUT_DIR = os.path.join(OUT_BASE, PACK_ID)
 
-TRACK = json.load(open(os.path.join(CONTENT, PACK_ID + ".track.json")))
-segs = [[]] + [[P(ll[1], ll[0]) for ll in TRACK["segments"][str(i)]] for i in range(1, 13)]   # segs[i] leads to stop i
-assert len(segs) == 13
+# ---------- read and check the content before any map work ----------
+problems = []
+def content(ext, required=True):
+    fn = os.path.join(CONTENT, f"{PACK_ID}.{ext}.json")
+    if not os.path.exists(fn):
+        if required: problems.append(f"missing content file {os.path.relpath(fn, ROOT)}")
+        return None
+    try: return json.load(open(fn))
+    except json.JSONDecodeError as e: problems.append(f"{os.path.relpath(fn, ROOT)} is not valid JSON: {e}"); return None
+def fail_if_problems():
+    if problems:
+        print(f"Cannot build {PACK_ID}: {len(problems)} problem(s). Nothing was written.", file=sys.stderr)
+        for p in problems: print("  - " + p, file=sys.stderr)
+        sys.exit(1)
+routes = content("route"); TRACK = content("track"); aud = content("audio"); pics = content("pics"); aside_src = content("asides")
+fail_if_problems()
+route = next((r for r in routes if r.get("id") == PACK_ID), None) if isinstance(routes, list) else None
+if route is None: problems.append(f"{PACK_ID}.route.json has no route with id {PACK_ID}"); fail_if_problems()
+stops = route.get("stops") or []
+N = len(stops)
+if N < 2: problems.append(f"the route has {N} stop(s); a pack needs at least 2")
+for k in ("name", "mode", "blurb", "legs"):
+    if k not in route: problems.append(f"the route has no {k}")
+AMBIENCES = set(re.findall(r"^  (\w+): \[", open(os.path.join(ROOT, "src", "audio", "soundscapes.ts")).read().split("RECIPES")[1].split("};")[0], re.M))
+for si, st in enumerate(stops):
+    for k in ("id", "name", "lat", "lng", "amb", "note", "stories"):
+        if k not in st: problems.append(f"stop {si} ({st.get('id', '?')}) has no {k}")
+    if st.get("amb") and st["amb"] not in AMBIENCES: problems.append(f"stop {si} ({st.get('id')}): unknown ambience {st['amb']!r}")
+    for ki, story in enumerate(st.get("stories", [])):
+        key = f"{PACK_ID}/{st.get('id')}-{ki}"
+        for k in ("title", "kind", "mood", "paras"):
+            if k not in story: problems.append(f"story {key} has no {k}")
+        if story.get("amb") and story["amb"] not in AMBIENCES: problems.append(f"story {key}: unknown ambience {story['amb']!r}")
+        if not (aud or {}).get(key): problems.append(f"story {key} has no entry in {PACK_ID}.audio.json (run tools/narrate_stories.py {PACK_ID})")
+        elif not os.path.exists(os.path.join(ASSETS, "audio", f"{st['id']}-{ki}.mp3")): problems.append(f"story {key}: audio file public/packs/{PACK_ID}/audio/{st['id']}-{ki}.mp3 is missing")
+for lg in route.get("legs", []):
+    if not (0 <= lg.get("from", -1) <= lg.get("to", -1) < N): problems.append(f"leg {lg.get('name')!r} runs from {lg.get('from')} to {lg.get('to')}, outside stops 0 to {N - 1}")
+if TRACK is not None:
+    want = {str(i) for i in range(1, N)}; have = set(TRACK.get("segments", {}))
+    for k in sorted(want - have, key=int): problems.append(f"{PACK_ID}.track.json has no segment {k} (the line to stop {k}, {stops[int(k)].get('id')})")
+    for k in sorted(have - want, key=lambda x: int(x) if x.isdigit() else 0): problems.append(f"{PACK_ID}.track.json has segment {k}, but the route has only {N} stops")
+    for k in sorted(want & have, key=int):
+        if len(TRACK["segments"][k]) < 2 and not stops[int(k)].get("fixed_segment"): problems.append(f"segment {k} of {PACK_ID}.track.json has fewer than 2 points")
+def pic_of(key):
+    """(file, caption) of a picture entry: a [file, caption] pair, or {"file", "caption", ...} as the writers deliver them."""
+    v = (pics or {}).get(key)
+    if v is None: return None
+    return (v[0], v[1]) if isinstance(v, list) else (v.get("file"), v.get("caption"))
+if pics is not None:
+    if pic_of(PACK_ID) is None: problems.append(f"{PACK_ID}.pics.json has no hero picture (key {PACK_ID!r})")
+    story_keys = {f"{PACK_ID}/{st.get('id')}-{ki}" for st in stops for ki in range(len(st.get("stories", [])))}
+    for key in pics:
+        if key != PACK_ID and key not in story_keys: print(f"WARNING {PACK_ID}.pics.json: {key} matches no story, ignored")
+    for key in sorted(story_keys | {PACK_ID}):
+        pc = pic_of(key)
+        if pc is None: continue
+        if not pc[0] or not pc[1]: problems.append(f"picture {key} needs a file and a caption")
+        elif not os.path.exists(os.path.join(ASSETS, "img", pc[0])): problems.append(f"picture {key}: file public/packs/{PACK_ID}/img/{pc[0]} is missing")
+if aside_src is not None:
+    seen = set()
+    for a in aside_src:
+        for k in ("id", "seg", "street", "frac", "title", "tags", "text"):
+            if k not in a: problems.append(f"aside {a.get('id', '?')} has no {k}")
+        if a.get("id") in seen: problems.append(f"aside id {a.get('id')} is used twice")
+        seen.add(a.get("id"))
+        if "seg" in a and not (isinstance(a["seg"], int) and 1 <= a["seg"] < N): problems.append(f"aside {a.get('id')}: seg {a['seg']} is not a segment of this route (1 to {N - 1})")
+fail_if_problems()
+
+SP = [P(s["lat"], s["lng"]) for s in stops]
+segs = [[]] + [[P(ll[1], ll[0]) for ll in TRACK["segments"][str(i)]] for i in range(1, N)]   # segs[i] leads to stop i
+assert len(segs) == N
 ALL = [p for s in segs for p in s]
 
 # spatial hash of the route for distance queries
@@ -32,6 +114,10 @@ def droute(p, cap=600):
                 d = math.dist(p, q)
                 if d < best: best = d
     return best
+
+for si in range(1, N):
+    d = min(droute(SP[si], 200), math.dist(SP[si], segs[si][-1]) if segs[si] else 1e9)
+    if d > 30: print(f"WARNING stop {si} ({stops[si]['id']}) is {round(d)} m from the line")
 
 # ---------- parse OSM ----------
 nodes, ways, rels = {}, {}, {}
@@ -208,12 +294,12 @@ def phrase(turn, name, kind):
     return f"{verb} onto {what}." if turn != "depart" else f"Head along {what}."
 
 seg_tracks, cues = [[]], []
-for si in range(1, 13):
+for si in range(1, N):
     s = segs[si]
-    if si == 6:
-        seg_tracks.append([LL(SP[5]), LL(SP[6])])
-        cues.append({"seg": 6, "i": 0, "at": LL(SP[5]), "turn": "depart", "name": "Greenwich Foot Tunnel", "kind": "footpath", "len": 370,
-                     "say": "Take the lift or stairs down into the Greenwich Foot Tunnel. Walk the bike through."})
+    fx = stops[si].get("fixed_segment")
+    if fx:
+        seg_tracks.append([LL(SP[si - 1]), LL(SP[si])])
+        cues.append({"seg": si, "i": 0, "at": LL(SP[si - 1]), "turn": "depart", "name": fx["name"], "kind": fx["kind"], "len": fx["len"], "say": fx["say"]})
         continue
     labs = []
     for i, p in enumerate(s):
@@ -278,7 +364,7 @@ def nearest_on(si, ll):
         if d < best[0]: best = (d, [round(LON0 + q[0] / KX, 6), round(LAT0 - q[1] / KY, 6)])
     return best[1], best[0]
 asides = []; aside_report = []
-for a in json.load(open(os.path.join(CONTENT, PACK_ID + ".asides.json"))):
+for a in aside_src:
     cs = [c for c in cues if c["seg"] == a["seg"] and c["name"] == a["street"]]
     at = how = None
     if cs:
@@ -292,47 +378,60 @@ for a in json.load(open(os.path.join(CONTENT, PACK_ID + ".asides.json"))):
     aside_report.append((a["id"], a["seg"], how))
     asides.append({"id": a["id"], "seg": a["seg"], "at": at, "title": a["title"], "tags": a["tags"], "text": a["text"], "audio": f"asides/{a['id']}.mp3"})
 
-route = routes[0]; aud = json.load(open(os.path.join(CONTENT, PACK_ID + ".audio.json")))
-pics = json.load(open(os.path.join(CONTENT, PACK_ID + ".pics.json")))
+# A turn that comes straight after a stop, inside that stop's arrival radius, is passed before the rider is told of it:
+# arrival happens at the radius, the rider is already at the turn, and on the way back from the stop it is not said again.
+for si in range(1, len(stops)):
+    rad = stops[si - 1].get("arrive_radius", 45)
+    first = next((c for c in cues if c["seg"] == si and c["turn"] != "depart"), None)
+    dep = next((c for c in cues if c["seg"] == si and c["turn"] == "depart"), None)
+    if first and dep and dep["len"] < rad + 20:
+        print(f"WARNING stop {stops[si - 1]['id']}: the first turn after it ({first['say']}) is {dep['len']} m away, inside or near its arrival radius of {rad} m. Set a smaller arrive_radius on the stop or move the stop.")
+
 stops_out = []
 for si, st in enumerate(stops):
-    so = {"id": st["id"], "name": st["name"], "at": [st["lng"], st["lat"]], "note": st["note"], "ambience": st["amb"], "arriveRadius": 45, "stories": []}
+    so = {"id": st["id"], "name": st["name"], "at": [st["lng"], st["lat"]], "note": st["note"], "ambience": st["amb"], "arriveRadius": st.get("arrive_radius", 45), "stories": []}
     if st.get("pint"): so["pint"] = True
     for ki, story in enumerate(st["stories"]):
-        key = f"{PACK_ID}/{st['id']}-{ki}"; a = aud.get(key); p = pics.get(key)
+        key = f"{PACK_ID}/{st['id']}-{ki}"; a = aud.get(key); p = pic_of(key)
         o = {"id": f"{st['id']}-{ki}", "title": story["title"], "kind": story["kind"], "mood": story["mood"], "tags": story.get("tags", []), "paras": story["paras"]}
         if story.get("amb"): o["ambience"] = story["amb"]
         if a: o["audio"] = {"src": f"audio/{st['id']}-{ki}.mp3", "marks": a["marks"], "dur": a["dur"]}
         if p: o["pic"] = {"src": "img/" + p[0], "caption": p[1]}
         so["stories"].append(o)
     stops_out.append(so)
-stops_out[-1]["name"] = "Wenlock Basin"; stops_out[-1]["id"] = "wenlock-basin"
-for o in stops_out[-1]["stories"]: o["id"] = o["id"].replace("home-", "wenlock-basin-")
+for st, so in zip(stops, stops_out):
+    if st.get("pack_name"): so["name"] = st["pack_name"]
+    if st.get("pack_id"):
+        so["id"] = st["pack_id"]
+        for o in so["stories"]: o["id"] = st["pack_id"] + o["id"][len(st["id"]):]
 for c in cues: c["id"] = f"s{c['seg']:02d}-{c['i']:03d}"; c["audio"] = f"cues/{c['id']}.mp3"
 def seg_len(t): return sum(math.dist(M(a), M(b)) for a, b in zip(t, t[1:]))
 KM = round(sum(seg_len(t) for t in seg_tracks[1:]) / 1000)
 pack = {"format": 1, "id": PACK_ID, "name": route["name"], "mode": route["mode"], "km": KM, "blurb": route["blurb"],
-        "hero": {"src": "img/" + pics[PACK_ID][0], "caption": pics[PACK_ID][1]},
+        "hero": {"src": "img/" + pic_of(PACK_ID)[0], "caption": pic_of(PACK_ID)[1]},
         "legs": route["legs"], "stops": stops_out, "segments": seg_tracks, "cues": cues, "asides": asides,
         "system": {"arrive": [f"system/arrive-{s['id']}.mp3" for s in stops_out], "offRoute": "system/off-route.mp3", "backOnRoute": "system/back-on-route.mp3",
                    "rerouting": "system/rerouting.mp3", "turns": {t: f"system/turn-{t.replace('_', '-')}.mp3" for t in ("left", "right", "slight_left", "slight_right", "sharp_left", "sharp_right", "straight")},
                    "distances": {str(d): f"system/in-{d}.mp3" for d in (50, 100, 150, 200, 300)}, "wrongWay": "system/wrong-way.mp3"},
         "graph": "graph.json",
         "credits": ["Pictures are public domain works from Wikimedia Commons.", "Map data © OpenStreetMap contributors."]}
-out = os.path.join(ROOT, "public", "packs", PACK_ID, "pack.json")
+os.makedirs(OUT_DIR, exist_ok=True)
+out = os.path.join(OUT_DIR, "pack.json")
 json.dump(pack, open(out, "w"), separators=(",", ":"), ensure_ascii=False)
 print("pack bytes", os.path.getsize(out), "| cues", len(cues), "spoken", sum(1 for c in cues if not c.get("quiet")), "| asides", len(asides), "| track pts", sum(len(t) for t in seg_tracks))
 for c in cues: print(c["id"], c["say"], c["len"], "(quiet)" if c.get("quiet") else "")
 
 for aid, sg, how in aside_report: print("aside", aid, "seg", sg, how)
 print("km", KM, "| per segment m:", [round(seg_len(t)) for t in seg_tracks[1:]])
-# index.json
-ip = os.path.join(ROOT, "public", "packs", "index.json"); idx = json.load(open(ip))
-for e in idx["packs"]:
-    if e["id"] == PACK_ID: e["km"] = KM
-json.dump(idx, open(ip, "w"), separators=(",", ":"), ensure_ascii=False)
+# index.json: the whole entry for this pack, in place, keeping pack order
+ip = os.path.join(OUT_BASE, "index.json")
+if not os.path.exists(ip) and os.path.exists(os.path.join(ROOT, "public", "packs", "index.json")):
+    json.dump(json.load(open(os.path.join(ROOT, "public", "packs", "index.json"))), open(ip, "w"), separators=(",", ":"), ensure_ascii=False)
+entry = pack_index.entry_for(pack, pack_index.listening_minutes(pack, ASSETS), route.get("card_blurb"))
+pack_index.upsert(ip, entry)
+print("index entry", json.dumps(entry, ensure_ascii=False))
 # corridor graph
 import router
 net = router.load()
-gr = router.write_graph(net, [t for t in TRACK["segments"].values()], [[st["lng"], st["lat"]] for st in stops], os.path.join(ROOT, "public", "packs", PACK_ID, "graph.json"))
+gr = router.write_graph(net, [TRACK["segments"][str(i)] for i in range(1, N)], [[st["lng"], st["lat"]] for st in stops], os.path.join(OUT_DIR, "graph.json"))
 print("graph", gr)
