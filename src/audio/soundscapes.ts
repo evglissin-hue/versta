@@ -178,6 +178,22 @@ export const RECIPES: Record<string, Part[]> = {
   oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls", 0.25, (x, s) => L.gulls(x, s, 0.25), 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
 };
 
+/**
+ * Level trim per soundscape, in dB, measured through the real mixer (each alone, from the Sound check screen) so that
+ * every one sits near -21.5 dBFS in the speech band and no louder than -21 dBFS overall: there the pocket leaves the
+ * bed 14 to 18 dB under the voice while it speaks (tools/sound/check-mix.mjs). The tunnel and the pumping station are
+ * mostly low rumble and are capped at +5 dB rather than lifted to the speech band. Measure again after a recipe or a
+ * recording changes.
+ */
+export const TRIM_DB: Record<string, number> = {
+  river: 1.2, wharf: 2.6, ship: 2.7, arctic: 2.1, yard: 5.5, sail: 4.4, solemn: 3.8, tunnel: 5, dock: 4.9, tavern: 0.7,
+  sailortown: 3.1, canal: 5.6, clock: 1.6, burial: 7.2, office: 7.7, rally: 1.6, park: 9.6, basin: 4, "working-dock": 4.4,
+  mill: 0.6, pumping: 5, towpath: 6.6, oldstreet: 2.5,
+};
+
+/** The gain the trim of a soundscape stands for (the river's for an unknown name, as with its recipe). */
+export const trimOf = (name: string): number => 10 ** ((TRIM_DB[name] ?? TRIM_DB["river"] ?? 0) / 20);
+
 const recipeFor = (name: string): Part[] => RECIPES[name] ?? RECIPES["river"]!;
 
 /** The loop names a soundscape uses and the `fx/<name>` names of its sparse layers, so they can be loaded before it starts. */

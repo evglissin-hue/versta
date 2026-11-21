@@ -6,12 +6,13 @@ import type { SoundEvent } from "../types";
 import catalogue from "./catalogue.json";
 import { type Graph, type Levels, createGraph } from "./graph";
 import { type LoopLib, createLoopLib } from "./loops";
-import { buildAmbience, loopsFor } from "./soundscapes";
+import { buildAmbience, loopsFor, trimOf } from "./soundscapes";
 import { type Session, endSession, session } from "./synth";
 
 /** Soundscape, music and effect levels on the bed bus. The music sits under the soundscape. The master tunes these. */
 export const AMB_LEVEL = 0.9;
-export const MUS_LEVEL = 0.55;
+/** About 8 dB under the soundscapes overall (measured: themes -29 to -33 dBFS alone, soundscapes -21 to -24). */
+export const MUS_LEVEL = 1.1;
 export const EFFECT_LEVEL = 0.7;
 /** How long a starting soundscape waits for its recordings before it starts without them. */
 const LOAD_WAIT_MS = 1500;
@@ -130,7 +131,7 @@ export function createBed(hooks: BedHooks): Bed {
         // the old layer fades out as the new one fades in
         retire(kind, fadeOut);
         if (kind === "music" && !music) return; // a theme that failed to load means no music
-        const s = session(x, kind === "ambience" ? AMB_LEVEL : MUS_LEVEL, fadeIn);
+        const s = session(x, kind === "ambience" ? AMB_LEVEL * trimOf(name) : MUS_LEVEL, fadeIn);
         if (kind === "ambience") buildAmbience(x, s, name, lib);
         else if (music) {
           const src = x.ctx.createBufferSource();

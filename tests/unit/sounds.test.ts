@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import catalogue from "../../src/audio/catalogue.json";
-import { RECIPES, allLoops, loopsFor } from "../../src/audio/soundscapes";
+import { RECIPES, TRIM_DB, allLoops, loopsFor } from "../../src/audio/soundscapes";
 
 const SOUNDS = join(__dirname, "../../public/sounds");
 const exists = (name: string): boolean => existsSync(join(SOUNDS, `${name}.mp3`));
@@ -45,6 +45,11 @@ describe("sound library", () => {
     expect(Object.keys(RECIPES).sort()).toEqual(names);
     for (const n of names) expect(RECIPES[n]!.length, n).toBeGreaterThan(1);
     expect(loopsFor("no-such-soundscape")).toEqual(loopsFor("river"));
+  });
+
+  it("has a level trim for every soundscape, within 10 dB", () => {
+    expect(Object.keys(TRIM_DB).sort()).toEqual(Object.keys(catalogue.soundscapes).sort());
+    for (const [n, db] of Object.entries(TRIM_DB)) expect(Math.abs(db), n).toBeLessThanOrEqual(10);
   });
 
   it("keeps panning gentle and sparse layers quiet", () => {
