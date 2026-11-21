@@ -344,3 +344,51 @@ test("with autoRecentre off the map stays where the rider put it", async ({ page
   await followBtn(page).click();
   await expect(followBtn(page)).toHaveAttribute("data-state", "course");
 });
+
+test("sound check opens from Home, lists every sound, toggles the narrator, closes and answers Back", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sound check" }).click();
+  const sc = page.getByTestId("sound-check");
+  await expect(sc).toBeVisible();
+  for (const [id, n] of [["sc-soundscapes", 23], ["sc-music", 6], ["sc-signals", 4], ["sc-effects", 21]] as const) {
+    const rows = page.getByTestId(id).getByTestId("sc-row");
+    await expect(rows).toHaveCount(n);
+    await expect(rows.getByRole("button", { name: /^Play/ })).toHaveCount(n);
+  }
+  const narrator = sc.getByRole("switch", { name: /With the narrator/ });
+  await expect(narrator).toHaveAttribute("aria-checked", "false");
+  await narrator.click();
+  await expect(narrator).toHaveAttribute("aria-checked", "true");
+  await narrator.click();
+  await expect(narrator).toHaveAttribute("aria-checked", "false");
+  await page.getByTestId("sc-soundscapes").getByRole("button", { name: /^Play/ }).first().click();
+  await expect(page.getByTestId("sc-soundscapes").getByRole("button", { name: /^Stop/ })).toHaveCount(1);
+  await page.getByTestId("sc-effects").getByRole("button", { name: /^Play/ }).first().click();
+  await expect(page.getByTestId("sc-effects").getByRole("button", { name: /^Playing/ })).toHaveCount(1);
+  await sc.getByRole("button", { name: "Stop all" }).click();
+  await expect(page.getByTestId("sc-soundscapes").getByRole("button", { name: /^Stop/ })).toHaveCount(0);
+  const small = await page.$$eval("[data-testid=sound-check] button", (els) => els.filter((e) => e.getBoundingClientRect().height > 0 && (e.getBoundingClientRect().height < 47.5 || e.getBoundingClientRect().width < 47.5)).map((e) => e.textContent));
+  expect(small).toEqual([]);
+  await sc.getByRole("button", { name: "Close" }).click();
+  await expect(sc).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Versta" })).toBeVisible();
+  await page.getByRole("button", { name: "Sound check" }).click();
+  await expect(sc).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("versta:back", { cancelable: true })));
+  await expect(sc).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("sound check opens from the ride's sound sheet and closing it returns to the ride", async ({ page }) => {
+  const errors = watchConsole(page);
+  await startSim(page);
+  await page.getByRole("button", { name: "Sound", exact: true }).click();
+  await page.getByTestId("sound-sheet").getByRole("button", { name: "Sound check" }).click();
+  const sc = page.getByTestId("sound-check");
+  await expect(sc).toBeVisible();
+  await sc.getByRole("button", { name: "Close" }).click();
+  await expect(sc).toHaveCount(0);
+  await expect(page.getByTestId("sound-sheet")).toBeVisible();
+  expect(errors).toEqual([]);
+});

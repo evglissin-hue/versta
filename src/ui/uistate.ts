@@ -7,6 +7,8 @@ import type { LngLat, NavState, Pack } from "../types";
 export const sceneOpen = signal(true);
 export const stopsOpen = signal(false);
 export const soundOpen = signal(false);
+/** The Sound check screen: every sound, to hear before a ride. Reachable from Home and from the sound sheet. */
+export const soundCheckOpen = signal(false);
 /** Map camera follows the rider. */
 export const following = signal(true);
 /** The map shows the whole route with the rider. Following is off while it does. */

@@ -4,6 +4,8 @@ import type { PackIndexEntry } from "./types";
 import { enterDemo, useDemoKeys } from "./ui/Demo";
 import { Home } from "./ui/Home";
 import { Ride } from "./ui/Ride";
+import { SoundCheck } from "./ui/SoundCheck";
+import { soundCheckOpen } from "./ui/uistate";
 
 const query = new URLSearchParams(location.search);
 const demo = query.get("demo") === "ride";
@@ -17,5 +19,10 @@ export function App() {
       .catch(() => { /* offline on first visit: the home screen shows no routes */ });
   }, []);
   useDemoKeys(demo);
-  return screen.value === "ride" ? <Ride /> : <Home />;
+  return (
+    <>
+      {screen.value === "ride" ? <Ride /> : <Home />}
+      {soundCheckOpen.value ? <SoundCheck /> : null}
+    </>
+  );
 }

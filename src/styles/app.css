@@ -274,3 +274,16 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .finish { max-height: 78%; }
 .finish .acts { position: sticky; bottom: 0; background: var(--paper); padding: 8px 0 2px; }
 .btn.busy:disabled { opacity: .85; }
+
+/* sound check: a full-height sheet over Home or the ride */
+.sc-layer { position: fixed; inset: 0; z-index: 40; display: flex; }
+.sc-layer .sheet { position: relative; flex: 1; }
+.sc-lead { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.3; }
+.sc-note { margin: 0; color: var(--warn); font-size: 16px; }
+.scrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 64px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.scbtn { flex: none; min-width: 96px; }
+.sc-credits { font-size: 14px; color: var(--muted); line-height: 1.35; }
+.sc-credits ul { margin: 4px 0 12px; padding-left: 18px; }
+.sc-credits li { margin-bottom: 2px; }
+.sc-credits b { font-family: var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.sc-credits .linkbtn { font-size: 14px; }
