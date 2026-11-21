@@ -354,7 +354,10 @@ test("sound check opens from Home, lists every sound, toggles the narrator, clos
   for (const [id, n] of [["sc-soundscapes", 23], ["sc-music", 6], ["sc-signals", 4], ["sc-effects", 21]] as const) {
     const rows = page.getByTestId(id).getByTestId("sc-row");
     await expect(rows).toHaveCount(n);
-    await expect(rows.getByRole("button", { name: /^Play/ })).toHaveCount(n);
+    // a sound with no recording yet says so in place of its Play button
+    const missing = await rows.getByTestId("sc-missing").count();
+    await expect(rows.getByRole("button", { name: /^Play/ })).toHaveCount(n - missing);
+    if (id !== "sc-effects") expect(missing, id).toBe(0);
   }
   const narrator = sc.getByRole("switch", { name: /With the narrator/ });
   await expect(narrator).toHaveAttribute("aria-checked", "false");
@@ -364,8 +367,12 @@ test("sound check opens from Home, lists every sound, toggles the narrator, clos
   await expect(narrator).toHaveAttribute("aria-checked", "false");
   await page.getByTestId("sc-soundscapes").getByRole("button", { name: /^Play/ }).first().click();
   await expect(page.getByTestId("sc-soundscapes").getByRole("button", { name: /^Stop/ })).toHaveCount(1);
-  await page.getByTestId("sc-effects").getByRole("button", { name: /^Play/ }).first().click();
-  await expect(page.getByTestId("sc-effects").getByRole("button", { name: /^Playing/ })).toHaveCount(1);
+  const fx = page.getByTestId("sc-effects").getByRole("button", { name: /^Play/ });
+  if (await fx.count()) {
+    await fx.first().click();
+    await expect(page.getByTestId("sc-effects").getByRole("button", { name: /^Playing/ })).toHaveCount(1);
+  }
+  await page.getByTestId("sc-signals").getByRole("button", { name: /^Play/ }).first().click();
   await sc.getByRole("button", { name: "Stop all" }).click();
   await expect(page.getByTestId("sc-soundscapes").getByRole("button", { name: /^Stop/ })).toHaveCount(0);
   const small = await page.$$eval("[data-testid=sound-check] button", (els) => els.filter((e) => e.getBoundingClientRect().height > 0 && (e.getBoundingClientRect().height < 47.5 || e.getBoundingClientRect().width < 47.5)).map((e) => e.textContent));

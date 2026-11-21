@@ -11,7 +11,7 @@ const VOICES: FlagRow[] = [
   { key: "navVoice", label: "Turn instructions", hint: "Says each turn aloud before you reach it." },
 ];
 const ATMOSPHERE: FlagRow[] = [
-  { key: "ambience", label: "Soundscape", hint: "Quiet sounds of the place under a story." },
+  { key: "ambience", label: "Soundscape", hint: "Quiet sounds of the place under a story, and the short signals at stops." },
   { key: "music", label: "Music", hint: "A soft tune under a story." },
 ];
 const RIDING: FlagRow[] = [

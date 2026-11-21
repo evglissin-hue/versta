@@ -69,7 +69,7 @@ SR = 48000
 TPB = 480
 TAIL = 1.5
 THEMES = ["noir", "river", "solemn", "russia", "bright", "voyage"]
-SIGNALS = ["arrive", "close", "finish"]
+SIGNALS = ["arrive", "close", "finish", "aside"]
 
 # Limits for the check command.
 MUSIC_LUFS = -28.0
@@ -78,7 +78,7 @@ MUSIC_PEAK = -3.0
 MONO_DIFF = 3.0
 MID_OVER_LOW = 3.0
 SEAM_DB = -18.0  # seam error as dB below the loop's own level, measured on the mp3 (encoder noise included)
-SIGNAL_TARGET = {"arrive": -24.0, "close": -26.0, "finish": -24.0}
+SIGNAL_TARGET = {"arrive": -24.0, "close": -26.0, "finish": -24.0, "aside": -24.0}
 SIGNAL_LUFS_TOL = 2.0
 SIGNAL_PEAK = -6.0
 MUSIC_BYTES = 5_000_000

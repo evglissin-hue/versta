@@ -7,7 +7,7 @@ import type { Mixer, SignalName } from "../types";
 import { Sheet } from "./Sheet";
 import { soundCheckOpen } from "./uistate";
 
-interface Credit { file: string; title: string; author: string; licence: string; source: string }
+interface Credit { file: string; title: string; author: string; licence: string; source: string; note?: string }
 type Entry = { label: string; seconds?: number };
 type Section = Record<string, Entry>;
 
@@ -21,6 +21,11 @@ const creditFiles = import.meta.glob("../audio/credits-*.json", { eager: true, i
 const creditGroups = (["sounds", "music"] as const)
   .map((g) => ({ group: g, list: creditFiles[`../audio/credits-${g}.json`] ?? [] }))
   .filter((g) => Array.isArray(g.list) && g.list.length > 0);
+/** Every file is credited (tests/unit/sounds.test.ts), so a sound with no credit has no file yet. */
+const credited = new Set(creditGroups.flatMap((g) => g.list.map((c) => c.file)));
+const recorded = (path: string): boolean => credited.has(`sounds/${path}.mp3`);
+/** "Gull 1.ogg" reads as "Gull 1". */
+const plainTitle = (t: string): string => t.replace(/\.(ogg|oga|wav|flac|mp3)$/i, "");
 
 const NARRATOR_PACK = "thames-loop";
 const NARRATOR_STORY = "tower-bridge-0";
@@ -39,11 +44,13 @@ function loadClip(): Promise<Clip | null> {
   return clipPromise;
 }
 
-function Row({ name, entry, busy, label, onPress }: { name: string; entry: Entry; busy: boolean; label: string; onPress: () => void }) {
+function Row({ name, entry, busy, label, onPress, missing = false }: { name: string; entry: Entry; busy: boolean; label: string; onPress: () => void; missing?: boolean }) {
   return (
     <div class="scrow" data-testid="sc-row">
       <span class="swtext"><b>{entry.label}</b><small>{name}</small></span>
-      <button type="button" class={`btn small ${busy ? "ghost" : "play"} scbtn`} aria-label={`${label} ${entry.label}`} onClick={onPress}>{label}</button>
+      {missing
+        ? <span class="sc-missing" data-testid="sc-missing">Not recorded yet</span>
+        : <button type="button" class={`btn small ${busy ? "ghost" : "play"} scbtn`} aria-label={`${label} ${entry.label}`} onClick={onPress}>{label}</button>}
     </div>
   );
 }
@@ -134,7 +141,7 @@ export function SoundCheck() {
   return (
     <div class="sc-layer">
       <Sheet title="Sound check" onClose={close} testid="sound-check">
-        <p class="sc-lead">Hear every sound before you ride. Plays through this device only.</p>
+        <p class="sc-lead">Hear every sound before you ride. Nothing here changes your settings.</p>
         <div class="switchlist">
           <button type="button" role="switch" aria-checked={narrator} class="switchrow" onClick={toggleNarrator}>
             <span class="swtext"><b>With the narrator</b><small>Plays a story over the sound, as on a ride.</small></span>
@@ -164,7 +171,7 @@ export function SoundCheck() {
         <div class="switchlist" data-testid="sc-signals">
           {Object.entries(SIGNALS).map(([name, e]) => {
             const on = signalNow === name;
-            return <Row key={name} name={name} entry={e} busy={on} label={on ? "Playing" : "Play"} onPress={() => { if (!on) void playSignal(name); }} />;
+            return <Row key={name} name={name} entry={e} busy={on} label={on ? "Playing" : "Play"} missing={!recorded(`signals/${name}`)} onPress={() => { if (!on) void playSignal(name); }} />;
           })}
         </div>
 
@@ -172,7 +179,7 @@ export function SoundCheck() {
         <div class="switchlist" data-testid="sc-effects">
           {Object.entries(EFFECTS).map(([name, e]) => {
             const on = effects.includes(name);
-            return <Row key={name} name={name} entry={e} busy={on} label={on ? "Playing" : "Play"} onPress={() => { if (!on) void playEffect(name); }} />;
+            return <Row key={name} name={name} entry={e} busy={on} label={on ? "Playing" : "Play"} missing={!recorded(`fx/${name}`)} onPress={() => { if (!on) void playEffect(name); }} />;
           })}
         </div>
 
@@ -185,8 +192,8 @@ export function SoundCheck() {
               <ul>
                 {list.map((c) => (
                   <li key={c.file}>
-                    {c.title}, {c.author}, {c.licence}.{" "}
-                    {/^https?:\/\//.test(c.source) ? <a class="linkbtn" href={c.source} target="_blank" rel="noopener">Source</a> : <span class="sc-src">{c.source}</span>}
+                    {plainTitle(c.title)}, {c.author}, {c.licence}.{" "}
+                    {/^https?:\/\//.test(c.source) ? <a class="linkbtn" href={c.source} target="_blank" rel="noopener">Source</a> : c.note ?? null}
                   </li>
                 ))}
               </ul>

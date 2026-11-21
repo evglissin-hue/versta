@@ -14,18 +14,18 @@ function mp3s(dir: string): string[] {
   });
 }
 
-interface Credit { file: string; title: string; author: string; licence: string; source: string; cut: string }
+interface Credit { file: string; title: string; author: string; licence: string; source: string; cut: string; note?: string }
 
 const found = import.meta.glob<Credit[]>("../../src/audio/credits-*.json", { eager: true, import: "default" });
 const credits: Credit[] = Object.values(found).flat();
 
 /**
- * Effects and signals whose recordings are listed in tools/sound/sources.json but could not be downloaded yet:
+ * Effects whose recordings are listed in tools/sound/sources.json but could not be downloaded yet:
  * Wikimedia answered every download with 429 and retry-after 600 for the whole of the task 16 session. Run
  * `python3 tools/sound/build_sounds.py fetch && ... process && ... check && ... credits` once the host lets requests
- * through, then empty this list.
+ * through, then empty this list. The ship's bell (signals/aside) is a rendered stand-in from tools/music/signals.py meanwhile.
  */
-const AWAITING_FETCH: string[] = [...Object.keys(catalogue.effects).map((n) => `fx/${n}`), "signals/aside"];
+const AWAITING_FETCH: string[] = Object.keys(catalogue.effects).map((n) => `fx/${n}`);
 
 describe("sound library", () => {
   it("has every loop and fx file a recipe uses", () => {
