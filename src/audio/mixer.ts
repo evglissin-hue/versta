@@ -129,9 +129,10 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   const siteBase = typeof import.meta.env?.BASE_URL === "string" ? import.meta.env.BASE_URL : "/";
 
   const timeline: SoundEvent[] = [];
-  const logEvent = (ch: SoundEvent["ch"], ev: "on" | "off", src: string, pos?: number): void => {
+  const logEvent = (ch: SoundEvent["ch"], ev: "on" | "off", src: string, pos?: number, ended = false): void => {
     const e: SoundEvent = { at: clock(), ch, ev, src };
     if (pos !== undefined) e.pos = pos;
+    if (ended) e.ended = true;
     timeline.push(e);
     if (timeline.length > TIMELINE_MAX) timeline.shift();
   };
@@ -224,10 +225,10 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
 
   /* ------------------------------------------------------------ the voice state machine */
 
-  function logVoice(v: VoiceEntry, ev: "on" | "off"): void {
+  function logVoice(v: VoiceEntry, ev: "on" | "off", ended = false): void {
     if (ev === "on") v.sounding = true;
     else { if (!v.sounding) return; v.sounding = false; }
-    logEvent("voice", ev, v.src, v.clip?.position() ?? 0);
+    logEvent("voice", ev, v.src, v.clip?.position() ?? 0, ended);
   }
 
   function clearTimers(v: VoiceEntry): void {
@@ -342,7 +343,7 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
     if (voice !== v) return;
     clearTimers(v);
     voice = null;
-    logVoice(v, "off");
+    logVoice(v, "off", how === "end");
     if (how === "end") v.def.resolve(); else v.def.reject("error");
     updateDuck();
     reconcile();

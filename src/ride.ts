@@ -15,6 +15,8 @@ export interface SimOptions { speed: number; scale: number; from: number; virtua
 
 interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number; stopEffects: () => void }
 const BED_LEVELS = { soft: 0.6, balanced: 1, rich: 1.6 } as const;
+/** How long the simulated rider stands after arriving before a story has started: the director's arrival lead plus a margin. */
+const ARRIVAL_HOLD_MS = 4000;
 function buzz(pattern: number | number[]): void {
   try { if (settings.value.haptics && !simulated.value && "vibrate" in navigator) navigator.vibrate(pattern); } catch {}
 }
@@ -110,7 +112,15 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       nav.value = { ...engine.state };
       director.handle(events, engine.state);
       for (const e of events) {
-        if (e.type === "arrive") { openStop.value = e.stop; buzz([60, 80, 60]); }
+        if (e.type === "arrive") {
+          openStop.value = e.stop; buzz([60, 80, 60]);
+          // the simulated rider stands through the short lead before a stop's first story, as a real one would
+          if (sim && source.hold) {
+            source.hold(true);
+            const at = e.stop;
+            setTimeout(() => { if (ride?.source === source && nowPlaying.value === null && engine.state.seg === at) source.hold?.(false); }, ARRIVAL_HOLD_MS / (sim.scale > 0 ? sim.scale : 1));
+          }
+        }
         else if (e.type === "cue" && e.phase === "now" && e.cue.turn !== "depart" && e.cue.turn !== "straight") buzz(40);
         else if (e.type === "off_route" || e.type === "wrong_way") buzz([30, 60, 30, 60, 30]);
         // riding away puts the map and the turn banner back in view without a tap

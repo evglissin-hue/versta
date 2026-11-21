@@ -1,31 +1,73 @@
 /**
  * Dead-end hunt without a browser: the real engine and the real director ride every pack in the index together,
- * with the virtual mixer and fake timers. One simulated second per fix.
+ * with the virtual mixer and fake timers. One simulated second per fix. The sound timeline the mixer records is
+ * checked by tests/unit/timeline.ts. To see what happened around a flagged moment, run with HUNT_DEBUG set to ride
+ * seconds, for example `HUNT_DEBUG=424,2896 npx vitest run tests/unit/ride.integration.test.ts -t "fast rider"`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMixer } from "../../src/audio/mixer";
 import { createNavEngine } from "../../src/nav/engine";
 import { createDirector } from "../../src/story/director";
 import { cumulative, makeProjection, pointAlong, project, unproject } from "../../src/geo";
-import { DEFAULT_SETTINGS, type DirectorLogEntry, type Fix, type Mixer, type NowPlaying, type Pack, type Settings } from "../../src/types";
+import { DEFAULT_SETTINGS, type DirectorLogEntry, type Fix, type Mixer, type NowPlaying, type Pack, type Settings, type SoundEvent } from "../../src/types";
 import { PACKS, loaded, segInfo, straySide } from "./packs";
+import { bedAfterLeave, effectProblems, heldVoice, lateCues, speechOverlaps, waitedTooLong } from "./timeline";
 
-interface RideResult { log: DirectorLogEntry[]; arrived: number[]; status: string; overlaps: string[]; seconds: number; late: string[]; leads: number[] }
+interface RideResult {
+  log: DirectorLogEntry[]; arrived: number[]; status: string; overlaps: string[]; seconds: number; late: string[]; leads: number[];
+  /** The sound timeline, when the rider left each stop, when each turn was passed, and when the director stopped or paused the voice. */
+  timeline: readonly SoundEvent[]; leaves: number[]; turnAt: Map<string, number>; deliberate: number[];
+}
+
+const T0 = 1_700_000_000_000;
+
+/** Everything the sound timeline must show on a whole ride: the dead-end hunt of docs/build/it5-00-audio.md. */
+function soundProblems(pack: Pack, r: RideResult): string[] {
+  const dbg = process.env.HUNT_DEBUG;
+  if (dbg) {
+    for (const at of dbg.split(",").map(Number)) {
+      const lo = T0 + (at - 20) * 1000, hi = T0 + (at + 8) * 1000;
+      const rows = [
+        ...r.timeline.filter((e) => e.at >= lo && e.at <= hi).map((e) => ({ at: e.at, s: `${e.ch} ${e.ev} ${e.src}${e.pos !== undefined ? " @" + e.pos.toFixed(2) : ""}` })),
+        ...r.log.filter((e) => e.at >= lo && e.at <= hi).map((e) => ({ at: e.at, s: `LOG ${e.what} ${e.id ?? ""} ${e.reason ?? ""}` })),
+        ...r.leaves.filter((t) => t >= lo && t <= hi).map((t) => ({ at: t, s: "LEAVE" })),
+        ...[...r.turnAt].filter(([, t]) => t >= lo && t <= hi).map(([id, t]) => ({ at: t, s: `TURN ${id}` })),
+      ].sort((a, b) => a.at - b.at);
+      console.log(`--- ${pack.id} around ${at} s\n` + rows.map((x) => `${((x.at - T0) / 1000).toFixed(2).padStart(8)}  ${x.s}`).join("\n"));
+    }
+  }
+  return [
+    ...speechOverlaps(r.timeline, T0),
+    ...lateCues(r.timeline, r.log, pack, 3500, T0),
+    ...waitedTooLong(r.timeline, r.log, pack, r.turnAt, 5000, T0),
+    ...heldVoice(r.timeline, r.deliberate, 1000, T0),
+    ...bedAfterLeave(r.timeline, r.leaves, 30_000, T0),
+    ...effectProblems(r.timeline, r.log, pack, 0.5),
+  ];
+}
 
 /** A detour: at `at` (0 to 1) along segment `seg`, leave the line by `metres` towards heading `rad` for `seconds`, then come back. */
 interface Detour { seg: number; at: number; metres: number; seconds: number; rad: number }
 
-/** The mixer, watched: a voice clip started while another is still sounding or paused is talking over it. */
-function watched(inner: Mixer, overlaps: string[], clock: () => number): Mixer {
+/**
+ * The mixer, watched: a voice clip started while another is still sounding or paused is talking over it. Records when
+ * the director stops, replaces or pauses the voice, so the hunt can tell a yield from a deliberate stop.
+ */
+function watched(inner: Mixer, overlaps: string[], clock: () => number, deliberate: number[]): Mixer {
   let current = "";
   return new Proxy(inner, {
     get(t, k) {
       if (k === "playVoice") {
         return (src: string, o?: Parameters<Mixer["playVoice"]>[1]) => {
-          if (t.voiceBusy) overlaps.push(`${src} started over ${current} at ${Math.round((clock() - 1_700_000_000_000) / 1000)} s`);
+          if (t.voiceBusy) overlaps.push(`${src} started over ${current} at ${Math.round((clock() - T0) / 1000)} s`);
           current = src;
+          deliberate.push(clock());
           return t.playVoice(src, o);
         };
+      }
+      if (k === "stopVoice" || k === "pauseVoice" || k === "seekVoice") {
+        const f = Reflect.get(t, k, t) as (...a: unknown[]) => unknown;
+        return (...a: unknown[]) => { deliberate.push(clock()); return f.apply(t, a); };
       }
       const v: unknown = Reflect.get(t, k, t);
       return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(t) : v;
@@ -37,7 +79,12 @@ function watched(inner: Mixer, overlaps: string[], clock: () => number): Mixer {
 async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fromSeg = 1, detour: Detour | null = null): Promise<RideResult> {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   const proj = makeProjection(pack.stops[0]!.at);
-  let clock = 1_700_000_000_000;
+  // the mixer stamps its timeline with Date.now (faked), which runs in step with the ride's clock
+  vi.setSystemTime(T0);
+  let clock = T0;
+  const leaves: number[] = [];
+  const turnAt = new Map<string, number>();
+  const deliberate: number[] = [];
   const log: DirectorLogEntry[] = [];
   const overlaps: string[] = [];
   let now: NowPlaying = null;
@@ -45,16 +92,20 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
   const late: string[] = [];
   const leads: number[] = [];
   const warned = new Set<string>();
-  const mixer = watched(createMixer({ baseUrl: "", virtual: true }), overlaps, () => clock);
+  const inner = createMixer({ baseUrl: "", virtual: true });
+  const mixer = watched(inner, overlaps, () => Date.now(), deliberate);
   const engine = createNavEngine(pack);
   const director = createDirector({
-    pack, mixer, settings: () => settings, clock: () => clock, timeScale: 1,
+    pack, mixer, settings: () => settings, clock: () => Date.now(), timeScale: 1,
     onNowPlaying: (n) => { now = n; }, onLog: (e) => log.push(e),
   });
   const feed = async (lng: number, lat: number, heading: number | null, moving: boolean): Promise<void> => {
     const fix: Fix = { lng, lat, accuracy: 6, heading, speed: moving ? speed : 0, time: clock };
     const events = engine.update(fix);
+    const passed = engine.state.currentCue?.id;
+    if (passed && !turnAt.has(passed)) turnAt.set(passed, clock);
     for (const e of events) {
+      if (e.type === "leave") leaves.push(clock);
       if (e.type !== "cue" || e.cue.turn === "depart" || e.cue.quiet) continue;
       if (e.phase === "approach") { warned.add(e.cue.id); leads.push(engine.state.toCue ?? 0); }
       else if (!warned.has(e.cue.id)) late.push(e.cue.id);
@@ -65,6 +116,8 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
   };
   const standWhileStory = async (lng: number, lat: number): Promise<void> => {
     let guard = 0;
+    // the first story follows "Arriving at" after a short lead (src/story/director.ts): stand through it
+    for (let i = 0; i < 4 && (now as NowPlaying) === null; i++) await feed(lng, lat, null, false);
     // stand while a story of this stop plays, wherever the status says the rider is
     while ((now as NowPlaying)?.kind === "story") {
       await feed(lng, lat, null, false);
@@ -106,7 +159,12 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
   }
   // let any last story finish
   for (let i = 0; i < 600 && now !== null; i++) await feed(pack.stops.at(-1)!.at[0], pack.stops.at(-1)!.at[1], null, false);
-  const result = { log, arrived: [...engine.state.arrived], status: engine.state.status, overlaps, seconds: (clock - 1_700_000_000_000) / 1000, late, leads };
+  // let the bed fade and the last sounds finish
+  for (let i = 0; i < 40; i++) { clock += 1000; await vi.advanceTimersByTimeAsync(1000); }
+  const result: RideResult = {
+    log, arrived: [...engine.state.arrived], status: engine.state.status, overlaps, seconds: (clock - T0) / 1000, late, leads,
+    timeline: [...inner.timeline], leaves, turnAt, deliberate,
+  };
   director.dispose();
   return result;
 }
@@ -167,6 +225,7 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("whole rides of %s, en
     expect(r.late).toEqual([]);
     expect(Math.min(...r.leads)).toBeGreaterThanOrEqual(20);
     expect(r.overlaps).toEqual([]);
+    expect(soundProblems(pack, r)).toEqual([]);
   }, 120_000);
 
   it("a fast rider still hears every turn", async () => {
@@ -178,7 +237,15 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("whole rides of %s, en
     expect(r.log.some((e) => e.what === "wrong_way")).toBe(false);
     expect(r.late).toEqual([]);
     expect(Math.min(...r.leads)).toBeGreaterThanOrEqual(20);
+    expect(soundProblems(pack, r)).toEqual([]);
   }, 120_000);
+
+  it("a walker on the last stretch: the sound timeline holds at walking pace", async () => {
+    const from = Math.max(1, pack.stops.length - 3);
+    const r = await ride(pack, 1.4, {}, from);
+    expect(r.status).toBe("finished");
+    expect(soundProblems(pack, r)).toEqual([]);
+  }, 180_000);
 
   it("rich mode plays more passing-by stories than sparse, and off plays none", async () => {
     const sparse = (await ride(pack, 4.5)).log.filter((e) => e.what === "aside_played").length;
@@ -199,6 +266,7 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("whole rides of %s, en
     expect(r.status).toBe("finished");
     expect(ids(r.log, "arrive").map(Number).filter((n) => n >= half)).toEqual(pack.stops.map((_, i) => i).filter((i) => i >= half));
     expect(r.overlaps).toEqual([]);
+    expect(soundProblems(pack, r)).toEqual([]);
   }, 120_000);
 
   it("a slow rider who strays 150 m off the route for a minute is told, comes back and still finishes", async () => {
@@ -212,6 +280,7 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("whole rides of %s, en
     expect(new Set(spoken).size).toBe(spoken.length);
     expect(pack.cues.filter((c) => !c.quiet && !spoken.includes(c.id)).map((c) => c.id)).toEqual([]);
     expect(r.overlaps).toEqual([]);
+    expect(soundProblems(pack, r)).toEqual([]);
   }, 180_000);
 
   it("at every stop the rider counts as at the stop until they ride away", async () => {

@@ -328,6 +328,8 @@ export interface SoundEvent {
   src: string;
   /** voice and nav: the playhead in seconds at this moment. */
   pos?: number;
+  /** On an `off`: the clip reached its own end (not stopped, paused or made to yield). */
+  ended?: true;
 }
 
 /**

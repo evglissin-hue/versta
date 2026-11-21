@@ -4,7 +4,7 @@
  */
 import type { DirectorLogEntry, Pack, SoundEvent } from "../../src/types";
 
-export interface Interval { ch: SoundEvent["ch"]; src: string; on: number; off: number; onPos?: number; offPos?: number }
+export interface Interval { ch: SoundEvent["ch"]; src: string; on: number; off: number; onPos?: number; offPos?: number; ended?: boolean }
 
 const SPEECH: SoundEvent["ch"][] = ["voice", "nav", "signal"];
 
@@ -29,6 +29,7 @@ export function intervals(tl: readonly SoundEvent[]): { list: Interval[]; open: 
       if (!iv) continue;
       iv.off = e.at;
       if (e.pos !== undefined) iv.offPos = e.pos;
+      if (e.ended) iv.ended = true;
       list.push(iv);
     }
   }
@@ -116,18 +117,27 @@ export function effectProblems(tl: readonly SoundEvent[], log: readonly Director
   return out;
 }
 
-/** A cue that waited for a break (started more than 0.3 s after it was decided) still ends `minMs` before its turn. */
+/**
+ * A cue decided while the narration was sounding, that waited for a phrase break (its utterance, the distance call or
+ * else the cue, started more than 0.3 s after it was decided), still ends `minMs` before its turn.
+ */
 export function waitedTooLong(tl: readonly SoundEvent[], log: readonly DirectorLogEntry[], pack: Pack, turnAt: ReadonlyMap<string, number>, minMs = 5000, t0 = 0): string[] {
   const out: string[] = [];
   const { list } = intervals(tl);
+  const distances = new Set(Object.values(pack.system.distances ?? {}));
   for (const e of log) {
     if (e.what !== "cue_spoken" || !e.id) continue;
     const cue = pack.cues.find((c) => c.id === e.id);
     const turn = turnAt.get(e.id);
     if (!cue || turn === undefined || cue.turn === "depart") continue;
+    // only a cue decided while the narration was sounding can have waited for a phrase break
+    if (!list.some((i) => i.ch === "voice" && i.on <= e.at && i.off > e.at)) continue;
     const own = list.find((i) => i.ch === "nav" && i.src === cue.audio && i.on >= e.at);
-    if (!own || own.on - e.at <= 300) continue;
-    if (own.off > turn - minMs) out.push(`${cue.id} waited ${((own.on - e.at) / 1000).toFixed(1)} s and ended ${((turn - own.off) / 1000).toFixed(1)} s before its turn at ${sec(turn, t0)}`);
+    if (!own) continue;
+    const call = list.find((i) => i.ch === "nav" && distances.has(i.src) && i.on >= e.at && i.off <= own.on + 200);
+    const start = call && call.on <= own.on ? call.on : own.on;
+    if (start - e.at <= 300) continue;
+    if (own.off > turn - minMs) out.push(`${cue.id} waited ${((start - e.at) / 1000).toFixed(1)} s and ended ${((turn - own.off) / 1000).toFixed(1)} s before its turn at ${sec(turn, t0)}`);
   }
   return out;
 }
@@ -142,7 +152,7 @@ export function heldVoice(tl: readonly SoundEvent[], deliberate: readonly number
   const navs = list.filter((i) => i.ch === "nav" || i.ch === "signal");
   const out: string[] = [];
   for (const v of voice) {
-    if (!Number.isFinite(v.off)) continue;
+    if (!Number.isFinite(v.off) || v.ended) continue;
     const first = navs.find((n) => n.on >= v.off && n.on - v.off <= 500);
     if (!first) continue;
     if (deliberate.some((t) => t >= v.on && t <= v.off + 500)) continue;

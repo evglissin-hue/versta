@@ -19,8 +19,12 @@ const LEAVE_FADE = 4;
 const STOP_ALL_FADE = 1;
 /** An effect fires this long before the paragraph it leads into. */
 const EFFECT_LEAD_SECONDS = 1.2;
-/** A turn cue may make the narration wait for a phrase break only when the turn is at least this many seconds away. */
-const MIN_WAIT_SECONDS = 11;
+/**
+ * A turn cue may make the narration wait for a phrase break only when the rider will still reach the turn this long
+ * after the longest wait (3 s, the mixer's limit) and the cue's own speech.
+ */
+const MAX_BREAK_WAIT_SECONDS = 3;
+const SPARE_SECONDS_AFTER_CUE = 5;
 const PARA_LEAD_SECONDS = 0.15;
 const MIN_RIDING_SECONDS = 60;
 const ASIDE_GAP_SECONDS = { sparse: 300, rich: 90 };
@@ -298,16 +302,20 @@ export function createDirector(deps: DirectorDeps): Director {
 
   /* ---------------------------------------------------------------- nav speech */
 
+  const speechSeconds = (say: string): number => Math.max(1, words(say) / WORDS_PER_SECOND);
   const speakNav = (src: string, say: string, urgent = false): void => {
-    const h = mixer.playNav(src, { estimatedSeconds: Math.max(1, words(say) / WORDS_PER_SECOND), urgent });
+    const h = mixer.playNav(src, { estimatedSeconds: speechSeconds(say), urgent });
     h.done.catch(() => {});
   };
 
-  /** An approach is urgent unless the rider takes long enough to reach the turn for the narration to run on to a break. */
-  function approachUrgent(nav: NavState): boolean {
+  /**
+   * An approach is urgent unless the rider takes long enough to reach the turn for the narration to run on to a break,
+   * the cue to be said in full, and 5 s to spare: `speech` is the length of the distance call and the cue together.
+   */
+  function approachUrgent(nav: NavState, speech: number): boolean {
     if (nav.toCue === null) return true;
     const speed = Math.max(1, nav.speedAvg ?? nav.fix?.speed ?? 4);
-    return nav.toCue / speed < MIN_WAIT_SECONDS;
+    return nav.toCue / speed < MAX_BREAK_WAIT_SECONDS + speech + SPARE_SECONDS_AFTER_CUE;
   }
 
   /** Never speak a cue twice. A "now" after a spoken approach is therefore silent; a depart cue has no approach, so it speaks. */
@@ -323,11 +331,12 @@ export function createDirector(deps: DirectorDeps): Director {
     }
     spokenCues.add(cue.id);
     log("cue_spoken", cue.id);
+    const call = phase === "approach" ? distanceCall(nav.toCue) : null;
+    const speech = speechSeconds(cue.say) + (call ? speechSeconds(`In ${call.metres} metres,`) : 0);
     // a depart cue is never urgent; a cue first spoken at the turn itself is
-    const urgent = cue.turn === "depart" ? false : phase === "approach" ? approachUrgent(nav) : true;
+    const urgent = cue.turn === "depart" ? false : phase === "approach" ? approachUrgent(nav, speech) : true;
     if (phase === "approach") {
       approached.add(cue.id);
-      const call = distanceCall(nav.toCue);
       if (call) speakNav(call.src, `In ${call.metres} metres,`, urgent);
     }
     speakNav(cue.audio, cue.say, urgent);
