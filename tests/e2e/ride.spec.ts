@@ -70,6 +70,7 @@ for (const entry of PACKS) test.describe(entry.id, () => {
       expect((asides[i]!.at - asides[i - 1]!.at) / 1000, "passing-by stories stay sparse").toBeGreaterThanOrEqual(300);
     }
     expect(s.log.some((e) => e.what === "off_route"), "the simulated rider never leaves the route").toBe(false);
+    expect(s.log.some((e) => e.what === "wrong_way"), "the simulated rider is never told wrong way").toBe(false);
   });
 
   const from = Math.max(1, entry.stops - 5);

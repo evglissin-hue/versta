@@ -68,12 +68,16 @@ export interface Nearest {
 
 /**
  * Nearest point on a polyline. With `minAlong` and `maxAlong` only the part of the line between those distances
- * is searched, which keeps a rider from snapping to a distant part of a route that doubles back on itself.
+ * is searched, which keeps a rider from snapping to a distant part of a route that doubles back on itself. With
+ * `heading` (degrees, the direction the rider is going), a leg that runs more than 90 degrees against it counts as
+ * `against` metres further away when choosing, so at a hairpin a rider is kept on the leg they are riding even when
+ * the GPS puts them nearer the other. The returned `dist` is always the true distance.
  */
-export function nearestOnPolyline(pts: XY[], p: XY, cum: number[] = cumulative(pts), minAlong = 0, maxAlong = Infinity): Nearest {
+export function nearestOnPolyline(pts: XY[], p: XY, cum: number[] = cumulative(pts), minAlong = 0, maxAlong = Infinity, heading: number | null = null, against = 0): Nearest {
   if (pts.length === 0) return { point: p, along: 0, dist: Infinity, leg: 0 };
   if (pts.length === 1) return { point: pts[0]!, along: 0, dist: dist(p, pts[0]!), leg: 0 };
   let best: Nearest | null = null;
+  let bestScore = Infinity;
   for (let i = 0; i < pts.length - 1; i++) {
     const start = cum[i]!;
     const end = cum[i + 1]!;
@@ -87,11 +91,12 @@ export function nearestOnPolyline(pts: XY[], p: XY, cum: number[] = cumulative(p
     t = Math.min(hi, Math.max(lo, t));
     const point: XY = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
     const d = dist(p, point);
-    if (!best || d < best.dist) best = { point, along: start + t * len, dist: d, leg: i };
+    const score = heading !== null && against > 0 && Math.abs(angleDiff(bearing(a, b), heading)) > 90 ? d + against : d;
+    if (!best || score < bestScore) { best = { point, along: start + t * len, dist: d, leg: i }; bestScore = score; }
   }
   if (best) return best;
   // The window missed the line entirely: search all of it.
-  if (minAlong > 0 || maxAlong < Infinity) return nearestOnPolyline(pts, p, cum);
+  if (minAlong > 0 || maxAlong < Infinity) return nearestOnPolyline(pts, p, cum, 0, Infinity, heading, against);
   return { point: pts[0]!, along: 0, dist: dist(p, pts[0]!), leg: 0 };
 }
 

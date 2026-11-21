@@ -10,6 +10,11 @@ export const DEFAULT_NAV_OPTIONS: NavOptions = {
 const JOIN_MIN_FROM_START = 150;
 const JOIN_MAX_FROM_LINE = 60;
 const END_ARRIVE = 20;
+/**
+ * How much farther than its radius the rest of the line may take a rider from the stop, for the radius to count as
+ * an arrival while the rider is on the line. More than this and the rider is passing the stop on the way in.
+ */
+const ARRIVE_AHEAD_MARGIN = 15;
 const LEAVE_EXTRA = 15;
 /** Along-the-line fallback for leaving a stop. Large on purpose: where a route doubles back past its own stop
  *  (Deptford), the approach already lies some way "along" the next segment, so distance from the stop decides. */
@@ -17,6 +22,15 @@ const LEAVE_ALONG = 150;
 const MISSED_ARRIVAL_LINE = 30;
 const WINDOW_BEHIND = 30;
 const WINDOW_AHEAD = 400;
+/**
+ * While riding, the line is searched only as far ahead as the rider could have got since the last fix: REACH_MIN
+ * plus REACH_FACTOR times the distance at their speed. Without it a fix with a few metres of GPS error at a hairpin
+ * matches the leg coming back, 200 m further along, and the turn at the hairpin is never spoken.
+ */
+const REACH_MIN = 40;
+const REACH_FACTOR = 2;
+/** Metres a leg running against the rider's heading counts as further away, when matching a moving rider to the line. */
+const AGAINST_LEG = 20;
 const BACK_ON_ROUTE = 25;
 const DEPART_ALONG = 15;
 /** Setting off: a rider this far along the next stretch, this close to it, moving with it for this many fixes, has left the stop. */
@@ -61,7 +75,7 @@ const TURN_PASSED = 3;
 interface CueInfo { cue: Cue; along: number; depart: boolean; approached: boolean; done: boolean }
 interface AsideInfo { aside: Aside; along: number; done: boolean }
 interface ActiveDetour { pts: XY[]; cum: number[]; turns: (WayTurn & { said: boolean })[] }
-interface SegInfo { pts: XY[]; cum: number[]; len: number; cues: CueInfo[]; asides: AsideInfo[] }
+interface SegInfo { pts: XY[]; cum: number[]; len: number; cues: CueInfo[]; asides: AsideInfo[]; aheadFar: number[] }
 
 function initialState(): NavState {
   return {
@@ -88,7 +102,11 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
       .filter((a) => a.seg === i)
       .map((aside) => ({ aside, along: nearestOnPolyline(pts, project(proj, aside.at), cum).along, done: false }))
       .sort((a, b) => a.along - b.along);
-    return { pts, cum, len: cum.length ? cum[cum.length - 1]! : 0, cues, asides };
+    // aheadFar[k]: the farthest the line takes the rider from the stop it leads to, from vertex k to its end
+    const aheadFar: number[] = new Array<number>(pts.length).fill(0);
+    const to = stopPts[i];
+    for (let k = pts.length - 1, far = 0; k >= 0 && to; k--) { far = Math.max(far, dist(pts[k]!, to)); aheadFar[k] = far; }
+    return { pts, cum, len: cum.length ? cum[cum.length - 1]! : 0, cues, asides, aheadFar };
   });
   const total = segs.reduce((sum, g) => sum + g.len, 0);
   const before: number[] = [];
@@ -114,6 +132,8 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   let nearestAt: number | null = null;
   /** Motion between usable fixes: the previous one, the first one, and what this one says about speed and heading. */
   let prevFix: { p: XY; time: number } | null = null;
+  /** Seconds since the fix before this one (0 for the first). */
+  let fixGap = 0;
   let firstTime: number | null = null;
   let avg: number | null = null;
   let curSpeed: number | null = null;
@@ -137,6 +157,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   function trackMotion(fix: Fix, p: XY): void {
     const prev = prevFix;
     const dt = prev ? (fix.time - prev.time) / 1000 : 0;
+    fixGap = dt;
     const moved = prev ? dist(prev.p, p) : 0;
     curSpeed = fix.speed ?? (dt > 0 ? moved / dt : null);
     curHeading = fix.heading ?? (prev && moved >= MOVED_MIN ? bearing(prev.p, p) : null);
@@ -370,17 +391,25 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     if (strayingSince !== null && fix.time - strayingSince >= STRAY_SECONDS * 1000 && due) computeDetour(fix, p, ev);
   }
 
+  /** The rider's heading when they are moving fast enough for it to mean something. */
+  const movingHeading = (): number | null => (curHeading !== null && curSpeed !== null && curSpeed > WRONG_MIN_SPEED ? curHeading : null);
+  /** How far ahead along the line the rider can be at this fix. */
+  const reach = (): number => Math.min(WINDOW_AHEAD, REACH_MIN + REACH_FACTOR * Math.max(curSpeed ?? 0, s.speedAvg ?? 0, UNKNOWN_SPEED) * Math.max(1, fixGap));
+
   function riding(fix: Fix, p: XY, ev: NavEvent[], departNow: boolean): void {
     const g = segAt(s.seg);
     const full = needFull || s.offRoute;
     const n = full
       ? nearestOnPolyline(g.pts, p, g.cum)
-      : nearestOnPolyline(g.pts, p, g.cum, s.alongSeg - WINDOW_BEHIND, s.alongSeg + WINDOW_AHEAD);
+      : nearestOnPolyline(g.pts, p, g.cum, s.alongSeg - WINDOW_BEHIND, s.alongSeg + reach(), movingHeading(), AGAINST_LEG);
     const threshold = o.offRouteDistance + Math.min(fix.accuracy, 30);
     s.offBy = n.dist;
 
-    // Arrival by distance to the stop, or by reaching the end of the line while on it.
-    const nearStop = dist(p, stopAt(s.seg)) <= radiusOf(s.seg);
+    // Arrival by distance to the stop, or by reaching the end of the line while on it. A rider on the line whose rest
+    // of it leads well away from the stop first (a path that runs past it before a spur turns back to it) is passing
+    // on the way in, not arriving: there the radius counts only once the rider has left the line.
+    const ahead = g.aheadFar[Math.min(n.leg + 1, g.aheadFar.length - 1)] ?? 0;
+    const nearStop = dist(p, stopAt(s.seg)) <= radiusOf(s.seg) && (ahead <= radiusOf(s.seg) + ARRIVE_AHEAD_MARGIN || n.dist > threshold);
     const atEnd = g.len - n.along <= END_ARRIVE && n.dist <= threshold;
     if (nearStop || atEnd) {
       s.alongSeg = n.along;
@@ -571,7 +600,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function reset(): void {
     s = initialState();
-    prevFix = null; firstTime = null; avg = null; curSpeed = null; curHeading = null;
+    prevFix = null; fixGap = 0; firstTime = null; avg = null; curSpeed = null; curHeading = null;
     wrongSince = null; rightSince = null;
     active = null;
     lastCompute = null;
