@@ -77,10 +77,10 @@ describe("arrival", () => {
   it("starts the bed from the story and stop, and honours the settings", () => {
     const r = rig();
     r.d.playStop(DEPTFORD);
-    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "russia" });
     const q = rig({ ambience: false });
     q.d.playStop(DEPTFORD);
-    expect(q.mixer.bed).toEqual({ ambience: null, music: "bright" });
+    expect(q.mixer.bed).toEqual({ ambience: null, music: "russia" });
     const z = rig({ ambience: false, music: false });
     z.d.playStop(DEPTFORD);
     expect(z.mixer.bed).toBeNull();
@@ -239,12 +239,12 @@ describe("skip and stopAll", () => {
     const r = rig();
     r.d.playStop(DEPTFORD);
     await ms(10_000);
-    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "russia" });
     r.d.skip();
     expect(whats(r)).toContain("story_stopped:peter-the-great-0:skip");
     const n = last(r);
     expect(n?.kind === "story" && n.story.id).toBe("peter-the-great-1");
-    expect(r.mixer.bed).toEqual({ ambience: "tavern", music: "solemn" });
+    expect(r.mixer.bed).toEqual({ ambience: "tavern", music: "noir" });
     await ms(0);
     expect(last(r)?.kind).toBe("story");
   });
@@ -673,7 +673,7 @@ describe("the bed around stories", () => {
     const amb = tl.find((e) => e.ch === "ambience" && e.ev === "on")!;
     const mus = tl.find((e) => e.ch === "music" && e.ev === "on")!;
     expect(amb.src).toBe("yard");
-    expect(mus.src).toBe("bright");
+    expect(mus.src).toBe("russia");
     expect(tl[voice]!.at - amb.at).toBeGreaterThanOrEqual(2500);
     expect(tl[voice]!.at - mus.at).toBeGreaterThanOrEqual(2500);
     expect(whats(r).slice(0, 3)).toEqual(["arrive:4", "signal:arrive", "story_start:peter-the-great-0"]);
@@ -685,7 +685,7 @@ describe("the bed around stories", () => {
     await ms(30_000);
     expect(timeline(r, "signal")).toEqual([]);
     expect(timeline(r, "ambience")).toEqual([]);
-    expect(timeline(r, "music", "on").map((e) => e.src)).toEqual(["bright"]);
+    expect(timeline(r, "music", "on").map((e) => e.src)).toEqual(["russia"]);
     expect(timeline(r, "voice", "on").length).toBeGreaterThan(0);
   });
 
@@ -752,7 +752,7 @@ describe("the bed around stories", () => {
     const r = rig();
     r.d.handle([{ type: "leave", stop: DEPTFORD }], nav());
     r.d.playStory(DEPTFORD, "peter-the-great-0");
-    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "russia" });
   });
 
   it("auto-play off: the soundscape alone for 30 s then a 6 s fade", async () => {
@@ -773,11 +773,11 @@ describe("the bed around stories", () => {
     q.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
     await ms(10_000);
     q.d.playStory(DEPTFORD, "peter-the-great-0");
-    expect(q.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
+    expect(q.mixer.bed).toEqual({ ambience: "yard", music: "russia" });
     await ms(60_000);
     expect(timeline(q, "ambience", "on").map((e) => e.src)).toEqual(["yard"]);
     expect(timeline(q, "ambience", "off")).toEqual([]);
-    expect(timeline(q, "music", "on").map((e) => e.src)).toEqual(["bright"]);
+    expect(timeline(q, "music", "on").map((e) => e.src)).toEqual(["russia"]);
   });
 
   it("an aside: the bell first, then the clip; an arrival fades it out within 0.45 s", async () => {
@@ -957,7 +957,7 @@ describe("prefetch", () => {
     r.d.handle([], nav({ seg: DEPTFORD, toStop: 200 }));
     expect(r.mixer.preloaded).not.toContain(first.audio!.src);
     r.d.handle([], nav({ seg: DEPTFORD, toStop: 150 }));
-    for (const src of [pack.system.arrive[DEPTFORD]!, first.audio!.src, "ambience:yard", "music:bright"]) {
+    for (const src of [pack.system.arrive[DEPTFORD]!, first.audio!.src, "ambience:yard", "music:russia"]) {
       expect(r.mixer.preloaded.filter((s) => s === src)).toHaveLength(1);
     }
     const n = r.mixer.preloaded.length;

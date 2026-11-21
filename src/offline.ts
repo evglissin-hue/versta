@@ -1,3 +1,5 @@
+import catalogue from "./audio/catalogue.json";
+import { loopsFor } from "./audio/soundscapes";
 import { packBase } from "./state";
 import type { LngLat, Pack } from "./types";
 
@@ -10,6 +12,8 @@ const FONT_STACKS = ["Noto Sans Regular", "Noto Sans Bold", "Noto Sans Italic"];
 const GLYPH_RANGES = ["0-255", "256-511"];
 const PACK_CACHE = "versta-packs";
 const TILE_CACHE = "versta-tiles";
+/** The cache the loop library reads (src/audio/loops.ts). */
+const SOUND_CACHE = "versta-sounds";
 const TEMPLATE_KEY = "versta:tileTemplate";
 const META_PREFIX = "versta:offline:";
 const MIN_ZOOM = 11;
@@ -140,9 +144,30 @@ export function packFiles(pack: Pack): string[] {
   return [...files].filter(Boolean);
 }
 
+/**
+ * Every sound the pack can play, as paths under sounds/ without the extension (the loop library's names): the loops
+ * and sparse fx layers of each soundscape a stop or story uses, the music theme of each story (its mood's theme when
+ * it names none), each story effect and every signal.
+ */
+export function packSounds(pack: Pack): string[] {
+  const out = new Set<string>();
+  const scapes = new Set<string>();
+  for (const stop of pack.stops) {
+    scapes.add(stop.ambience);
+    for (const story of stop.stories) {
+      if (story.ambience) scapes.add(story.ambience);
+      out.add(`music/${story.music ?? (story.mood === "bright" ? "bright" : "solemn")}`);
+      for (const e of story.sfx ?? []) out.add(`fx/${e.name}`);
+    }
+  }
+  for (const s of scapes) for (const name of loopsFor(s)) out.add(name);
+  for (const name of Object.keys(catalogue.signals)) out.add(`signals/${name}`);
+  return [...out];
+}
+
 /* ------------------------------------------------------------------ saving */
 
-interface Job { url: string; cache: string; tile: boolean }
+interface Job { url: string; cache: string; tile: boolean; optional?: boolean }
 
 async function runJob(job: Job, caches_: { [name: string]: Cache }): Promise<number> {
   const res = await fetch(job.url);
@@ -161,6 +186,10 @@ export async function savePackOffline(pack: Pack, onProgress: (done: number, tot
   const maxZ = Math.min(MAX_ZOOM, info.maxzoom);
 
   const jobs: Job[] = packFiles(pack).map((f) => ({ url: new URL(f, base).href, cache: PACK_CACHE, tile: false }));
+  // A sound that cannot be saved is a silence, not a broken ride: it never fails the save.
+  for (const s of packSounds(pack)) {
+    jobs.push({ url: new URL(`${import.meta.env.BASE_URL}sounds/${s}.mp3`, location.href).href, cache: SOUND_CACHE, tile: false, optional: true });
+  }
   for (const t of routeTiles(pack, MIN_ZOOM, maxZ)) {
     const [z, x, y] = t.split("/");
     jobs.push({ url: info.template.replace("{z}", z!).replace("{x}", x!).replace("{y}", y!), cache: TILE_CACHE, tile: true });
@@ -169,7 +198,7 @@ export async function savePackOffline(pack: Pack, onProgress: (done: number, tot
     jobs.push({ url: `${GLYPH_BASE}/${encodeURIComponent(stack)}/${range}.pbf`, cache: TILE_CACHE, tile: false });
   }
 
-  const open = { [PACK_CACHE]: await caches.open(PACK_CACHE), [TILE_CACHE]: await caches.open(TILE_CACHE) };
+  const open = { [PACK_CACHE]: await caches.open(PACK_CACHE), [TILE_CACHE]: await caches.open(TILE_CACHE), [SOUND_CACHE]: await caches.open(SOUND_CACHE) };
   let done = 0, bytes = 0, failed = 0, next = 0;
   onProgress(0, jobs.length);
 
@@ -180,7 +209,7 @@ export async function savePackOffline(pack: Pack, onProgress: (done: number, tot
       for (let attempt = 0; attempt < 2 && size < 0; attempt++) {
         try { size = await runJob(job, open); } catch { /* retried once, then counted */ }
       }
-      if (size < 0) failed++; else bytes += size;
+      if (size < 0) { if (!job.optional) failed++; } else bytes += size;
       done++;
       onProgress(done, jobs.length);
     }
@@ -211,5 +240,6 @@ export async function removePackOffline(packId: string): Promise<void> {
   const folder = new URL(packBase(packId), location.href).href;
   for (const req of await cache.keys()) if (req.url.startsWith(folder)) await cache.delete(req);
   // Tiles are shared between packs: drop them only when no other pack is saved.
-  if (savedMetas().length === 0) await caches.delete(TILE_CACHE);
+  // Sounds are shared too, and the loop library may have cached more than a pack lists.
+  if (savedMetas().length === 0) { await caches.delete(TILE_CACHE); await caches.delete(SOUND_CACHE); }
 }

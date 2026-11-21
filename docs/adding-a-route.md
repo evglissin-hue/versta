@@ -58,6 +58,17 @@ A route pack is built by Claude in a working session, then committed. The app on
    second each phrase starts in every story and aside clip, from the pauses in the recording), and
    `python3 tools/pack_sound.py <id>` puts them into `pack.json` without touching the map work. `build_pack.py` runs the
    same step, so a pack built after narration needs the breaks file first. Run both again after re-recording a clip.
+   Sound for the pack, all in the route file, then written by `pack_sound.py`:
+   - `amb` on each stop (and on a story that needs its own) is a soundscape name from `src/audio/catalogue.json`.
+   - `music` on every story is a theme from the same file (`noir`, `river`, `solemn`, `russia`, `bright`, `voyage`).
+     A story without one falls back to its mood, and `pack_sound.py` warns.
+   - `sfx` on a story is a list of `{"para": p, "name": "<effect>"}`: the effect sounds in the pause before paragraph
+     `p` (counting from 0), 1.2 s ahead of that paragraph mark. Rules: only sounds true to what the text says is
+     happening there; nothing that could be mistaken for traffic; no close gunshots or explosions; at least 10 s
+     apart; at most three per story; names from the catalogue `effects`, each with a file in `public/sounds/fx/`.
+     An effect whose file is missing stays in the route file and is left out of `pack.json` with a warning; run the
+     tool again once the file is there.
+   `pack_sound.py` checks every rule, prints every problem and writes nothing until there are none.
 8. Run `npm run check` and the simulated rides (`npm run e2e`). The pack integrity checks
    (`tests/unit/packs.test.ts`), the whole rides with a detour (`tests/unit/ride.integration.test.ts`), the way-back
    search (`tests/unit/reroute.real.test.ts`) and the browser rides (`tests/e2e/ride.spec.ts`) run over every pack in
