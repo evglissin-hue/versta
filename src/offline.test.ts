@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { packFiles, routeTiles } from "./offline";
+import catalogue from "./audio/catalogue.json";
+import { packFiles, packSounds, routeTiles } from "./offline";
 import type { Pack } from "./types";
+import { PACKS } from "../tests/unit/packs";
+
+const SOUND_FILES = new Set(
+  Object.keys(import.meta.glob("../public/sounds/**/*.mp3")).map((k) => k.replace("../public/sounds/", "").replace(/\.mp3$/, "")),
+);
 
 const pack = {
   id: "t", hero: { src: "img/h.jpg", caption: "" },
@@ -23,5 +29,23 @@ describe("offline", () => {
     const tiles = routeTiles(pack, 11, 14);
     for (const z of [11, 12, 13, 14]) expect(tiles.some((t) => t.startsWith(`${z}/`))).toBe(true);
     expect(tiles.length).toBeGreaterThan(4);
+  });
+
+  describe.each(PACKS.map((p) => [p.entry.id, p.pack] as const))("sounds of %s", (_id, p) => {
+    it("lists every sound the pack can play, and each exists", () => {
+      const pk = p as Pack;
+      const sounds = packSounds(pk);
+      expect(new Set(sounds).size).toBe(sounds.length);
+      for (const s of pk.stops) for (const st of s.stories) {
+        expect(sounds, `${st.id} music`).toContain(`music/${st.music ?? (st.mood === "bright" ? "bright" : "solemn")}`);
+        for (const e of st.sfx ?? []) expect(sounds, `${st.id} ${e.name}`).toContain(`fx/${e.name}`);
+      }
+      for (const name of ["aside", "arrive", "close", "finish"]) expect(sounds).toContain(`signals/${name}`);
+      expect(Object.keys(catalogue.signals).sort()).toEqual(["arrive", "aside", "close", "finish"]);
+      // Effect files and the aside bell are not in the repo yet (the downloads were refused): a rerun of the
+      // tools fills them in. Every other sound must be there.
+      const missing = sounds.filter((s) => !SOUND_FILES.has(s) && !s.startsWith("fx/") && s !== "signals/aside");
+      expect(missing).toEqual([]);
+    });
   });
 });

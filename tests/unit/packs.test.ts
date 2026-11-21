@@ -4,6 +4,7 @@
  * the road.
  */
 import { describe, expect, it } from "vitest";
+import catalogue from "../../src/audio/catalogue.json";
 import { RECIPES } from "../../src/audio/soundscapes";
 import { packFiles } from "../../src/offline";
 import { cumulative, geoDistance, makeProjection, nearestOnPolyline, project } from "../../src/geo";
@@ -22,6 +23,11 @@ function texts(p: Pack): string[] {
 
 /** Clip lengths from the pause finder, for the aside clips (a pack records no length for them). */
 const BREAK_FILES = import.meta.glob<Record<string, { dur: number }>>("../../tools/content/*.breaks.json", { eager: true, import: "default" });
+
+/** The route files, for the effects a pack must carry once their files exist. */
+interface RouteFile { id: string; stops: { id: string; pack_id?: string; stories: { sfx?: { para: number; name: string }[] }[] }[] }
+const ROUTE_FILES = import.meta.glob<RouteFile[]>("../../tools/content/*.route.json", { eager: true, import: "default" });
+const FX_FILES = new Set(Object.keys(import.meta.glob("../../public/sounds/fx/*.mp3")).map((k) => k.replace(/^.*\/fx\//, "").replace(/\.mp3$/, "")));
 
 describe("the route index", () => {
   it("lists at least one pack, each id once", () => {
@@ -179,5 +185,49 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("pack %s", (id, p) => 
   it("uses no dashes and no exclamation marks in any text", () => {
     const bad = texts(loaded(p)).filter((t) => /[\u2013\u2014!]/.test(t));
     expect(bad).toEqual([]);
+  });
+
+  it("gives every story a music theme from the catalogue and every soundscape a name with a recipe", () => {
+    const pack = loaded(p);
+    const problems: string[] = [];
+    for (const s of pack.stops) {
+      if (!(s.ambience in catalogue.soundscapes) || !(s.ambience in RECIPES)) problems.push(`${s.id}: soundscape ${s.ambience}`);
+      for (const st of s.stories) {
+        if (!st.music || !(st.music in catalogue.music)) problems.push(`${st.id}: music ${st.music}`);
+        if (st.ambience && (!(st.ambience in catalogue.soundscapes) || !(st.ambience in RECIPES))) problems.push(`${st.id}: soundscape ${st.ambience}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("keeps effects within the rules, with their files, and carries every route file effect whose file exists", () => {
+    const pack = loaded(p);
+    const problems: string[] = [];
+    for (const s of pack.stops) for (const st of s.stories) {
+      const sfx = st.sfx ?? [];
+      if (sfx.length > 3) problems.push(`${st.id}: ${sfx.length} effects`);
+      const at: number[] = [];
+      for (const e of sfx) {
+        if (!(e.name in catalogue.effects)) problems.push(`${st.id}: effect ${e.name} is not in the catalogue`);
+        if (!FX_FILES.has(e.name)) problems.push(`${st.id}: effect file ${e.name}.mp3 missing`);
+        if (!Number.isInteger(e.para) || e.para < 0 || e.para >= st.paras.length) { problems.push(`${st.id}: effect ${e.name} para ${e.para} outside the story`); continue; }
+        const mark = st.audio?.marks[e.para];
+        if (mark === undefined || mark - 1.2 < 0) problems.push(`${st.id}: effect ${e.name} would sound before the start`);
+        else at.push(mark - 1.2);
+      }
+      at.sort((a, b) => a - b);
+      for (let i = 1; i < at.length; i++) if (at[i]! - at[i - 1]! < 10) problems.push(`${st.id}: two effects less than 10 s apart`);
+    }
+    const route = Object.values(ROUTE_FILES).flatMap((r) => r).find((r) => r.id === id);
+    if (route) {
+      for (const stop of route.stops) stop.stories.forEach((story, ki) => {
+        const sid = `${stop.pack_id ?? stop.id}-${ki}`;
+        const have = pack.stops.flatMap((s) => s.stories).find((x) => x.id === sid);
+        for (const e of story.sfx ?? []) {
+          if (FX_FILES.has(e.name) && !have?.sfx?.some((x) => x.para === e.para && x.name === e.name)) problems.push(`${sid}: ${e.name} is in the route file with its file but not in pack.json (rerun tools/pack_sound.py ${id})`);
+        }
+      });
+    }
+    expect(problems).toEqual([]);
   });
 });

@@ -53,7 +53,7 @@ N = len(stops)
 if N < 2: problems.append(f"the route has {N} stop(s); a pack needs at least 2")
 for k in ("name", "mode", "blurb", "legs"):
     if k not in route: problems.append(f"the route has no {k}")
-AMBIENCES = set(re.findall(r"^  (\w+): \[", open(os.path.join(ROOT, "src", "audio", "soundscapes.ts")).read().split("RECIPES")[1].split("};")[0], re.M))
+AMBIENCES = set(json.load(open(os.path.join(ROOT, "src", "audio", "catalogue.json"), encoding="utf-8"))["soundscapes"])
 for si, st in enumerate(stops):
     for k in ("id", "name", "lat", "lng", "amb", "note", "stories"):
         if k not in st: problems.append(f"stop {si} ({st.get('id', '?')}) has no {k}")
