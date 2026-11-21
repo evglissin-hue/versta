@@ -1,7 +1,7 @@
 import { settings, updateSettings } from "../state";
 import type { Settings } from "../types";
 import { Sheet } from "./Sheet";
-import { soundOpen } from "./uistate";
+import { soundCheckOpen, soundOpen } from "./uistate";
 
 type Flag = "storyVoice" | "navVoice" | "ambience" | "music" | "autoPlayStories" | "keepAwake" | "courseUp" | "autoRecentre" | "haptics";
 interface FlagRow { key: Flag; label: string; hint: string }
@@ -77,6 +77,8 @@ export function SoundSheet() {
       <div class="label">Riding</div>
       <Pick title="Passing-by stories" choices={ASIDES} value={s.asides} onPick={(k) => updateSettings({ asides: k })} testid="asides-pick" />
       <Switches rows={canBuzz ? RIDING : RIDING.filter((r) => r.key !== "haptics")} />
+      <div class="label">Sounds</div>
+      <button type="button" class="btn" onClick={() => { soundCheckOpen.value = true; }}>Sound check</button>
     </Sheet>
   );
 }
