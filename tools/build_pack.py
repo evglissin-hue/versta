@@ -20,7 +20,7 @@ def P(lat, lon): return ((lon - LON0) * KX, (LAT0 - lat) * KY)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-import pack_index
+import pack_index, pack_sound
 CONTENT = os.path.join(ROOT, "tools", "content")
 OSM_DIR = os.environ.get("OSM_DIR", "/home/claude/osm")
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -415,6 +415,8 @@ pack = {"format": 1, "id": PACK_ID, "name": route["name"], "mode": route["mode"]
                    "distances": {str(d): f"system/in-{d}.mp3" for d in (50, 100, 150, 200, 300)}, "wrongWay": "system/wrong-way.mp3"},
         "graph": "graph.json",
         "credits": ["Pictures are public domain works from Wikimedia Commons.", "Map data © OpenStreetMap contributors."]}
+problems += pack_sound.apply(pack, PACK_ID)
+fail_if_problems()
 os.makedirs(OUT_DIR, exist_ok=True)
 out = os.path.join(OUT_DIR, "pack.json")
 json.dump(pack, open(out, "w"), separators=(",", ":"), ensure_ascii=False)
