@@ -12,7 +12,25 @@ export type TurnKind =
   | "depart" | "straight" | "left" | "right"
   | "slight_left" | "slight_right" | "sharp_left" | "sharp_right";
 
-export interface StoryAudio { src: string; marks: number[]; dur: number }
+export interface StoryAudio {
+  src: string;
+  marks: number[];
+  dur: number;
+  /**
+   * Seconds at which a new phrase starts (the speech onset after a pause), ascending, inside the clip. Found by
+   * tools/sound/find_breaks.py. The mixer yields to a turn cue at a break and resumes from one. Absent: no marks.
+   */
+  breaks?: number[];
+}
+
+/** A one-shot sound effect timed to the text: it sounds in the pause before paragraph `para`. */
+export interface StorySfx {
+  para: number;
+  /** Effect name from src/audio/catalogue.json (file public/sounds/fx/<name>.mp3). */
+  name: string;
+  /** Gain relative to the effect's designed level (1). */
+  level?: number;
+}
 export interface Picture { src: string; caption: string }
 
 export interface Story {
@@ -24,6 +42,10 @@ export interface Story {
   paras: string[];
   /** Soundscape name; falls back to the stop's. */
   ambience?: string;
+  /** Music theme from src/audio/catalogue.json. Absent: `minor` gives "solemn", `bright` gives "bright". */
+  music?: string;
+  /** Effects timed to the text, at most three, at least 10 s apart. */
+  sfx?: StorySfx[];
   /** Recorded narration. marks[i] is the second at which paras[i] starts. */
   audio?: StoryAudio;
   pic?: Picture;
@@ -68,6 +90,8 @@ export interface Aside {
   tags: string[];
   text: string;
   audio: string;
+  /** Phrase starts in the clip, as for StoryAudio.breaks. */
+  breaks?: number[];
 }
 
 export interface Pack {
@@ -286,32 +310,79 @@ export interface PlayHandle {
   stop(): void;
 }
 
+/** The recorded signature sounds. Files: public/sounds/signals/<name>.mp3. */
+export type SignalName = "aside" | "arrive" | "close" | "finish";
+
 /**
- * All sound goes through the mixer. Three voices never talk over each other:
- * a turn cue pauses a story or an aside, speaks, then the story resumes.
+ * One moment on the sound timeline the mixer records (virtual and real mode): when something starts being heard and
+ * when it is silent again. The dead-end hunt reads it.
+ */
+export interface SoundEvent {
+  /** Mixer clock, milliseconds (MixerOptions.clock, else Date.now()). */
+  at: number;
+  /** voice: stories and asides. nav: cues and system clips. signal: signature sounds (they use the nav queue). */
+  ch: "voice" | "nav" | "signal" | "effect" | "ambience" | "music";
+  /** on: starts being heard (the start of its fade in). off: silent again (the end of its fade out, or its end). */
+  ev: "on" | "off";
+  /** The clip path, signal name, effect name, soundscape name or music theme. */
+  src: string;
+  /** voice and nav: the playhead in seconds at this moment. */
+  pos?: number;
+}
+
+/**
+ * All sound goes through the mixer. Speech never talks over speech: a turn cue makes a story or an aside yield (at
+ * the next phrase break when there is time, else at once with a short fade), speaks, then the narration resumes from
+ * the start of the phrase it cut. Every start, pause, resume, stop and seek of the voice is a short fade.
  */
 export interface Mixer {
   /** Must be called from a tap so the browser allows audio for the rest of the ride. */
   unlock(): Promise<void>;
-  /** Narration channel: stories and asides. `onTime` reports the playhead in seconds. */
-  playVoice(src: string, opts?: { onTime?: (seconds: number) => void; estimatedSeconds?: number }): PlayHandle;
+  /**
+   * Narration channel: stories and asides. `onTime` reports the playhead in seconds. `breaks` are the clip's phrase
+   * starts (StoryAudio.breaks). Replacing a clip fades the old one out before the new one starts.
+   */
+  playVoice(src: string, opts?: { onTime?: (seconds: number) => void; estimatedSeconds?: number; breaks?: number[] }): PlayHandle;
+  /** The rider's pause: fades out. */
   pauseVoice(): void;
+  /** Fades back in. After a pause longer than 20 s it picks up from the start of the phrase. */
   resumeVoice(): void;
-  stopVoice(): void;
-  /** Navigation channel: turn cues and system clips. Pauses the voice channel while it speaks. */
-  playNav(src: string, opts?: { estimatedSeconds?: number }): PlayHandle;
-  /** Two strokes of a ship's bell, used before an aside. Resolves when it has rung. */
-  chime(): Promise<void>;
-  /** Generated soundscape and music under a story. Names come from Stop.ambience and Story.mood. */
-  startBed(ambience: string | null, mood: Story["mood"] | null): void;
+  /** Fades out over `fadeSeconds` (default 0.15) and drops the clip; its `done` rejects with "stopped" at once. */
+  stopVoice(fadeSeconds?: number): void;
+  /**
+   * Navigation channel: turn cues and system clips, queued in order. While it speaks the voice channel yields.
+   * Not urgent: the narration may run on to its next break if that is within 3 s. Urgent: it yields at once.
+   */
+  playNav(src: string, opts?: { estimatedSeconds?: number; urgent?: boolean }): PlayHandle;
+  /** A signature sound, queued on the nav channel so it never sounds over speech. Resolves when it has sounded. */
+  signal(name: SignalName): Promise<void>;
+  /** A one-shot effect (src/audio/catalogue.json) on the bed bus, carved by the pocket like the rest of the bed. */
+  playEffect(name: string, opts?: { level?: number }): void;
+  /**
+   * The bed under a story: a soundscape (recipe name) and a music theme (catalogue name), either may be null.
+   * A layer that is already playing keeps playing; a changed layer crossfades over about 2.5 s; a new bed fades in
+   * over about 3 s.
+   */
+  startBed(ambience: string | null, music: string | null): void;
+  /** Fade the whole bed to silence over `fadeSeconds` (default 1). */
   stopBed(fadeSeconds?: number): void;
+  /**
+   * Get these ready ahead of need. Never throws, never plays. A clip path (pack-relative or absolute) is fetched into
+   * the cache; "ambience:<name>" decodes that soundscape's recordings and "music:<theme>" decodes the theme.
+   */
+  preload(srcs: string[]): void;
   /** A short non-verbal tick on the nav channel: "the turn is here". */
   tick?(): void;
-  /** Move the voice playhead by this many seconds (negative to go back). Does nothing when no voice clip is loaded. */
+  /**
+   * Move the voice playhead by this many seconds (negative to go back), with a short fade. Going back lands on the
+   * last break at or before the target when the clip has breaks. Does nothing when no voice clip is loaded.
+   */
   seekVoice?(deltaSeconds: number): void;
   /** Scale the soundscape and music: 1 is the designed balance. */
   setBedLevel?(level: number): void;
-  /** True while the nav channel is speaking. */
+  /** Stop everything and release the audio context (the Sound check screen makes and drops its own mixer). */
+  dispose?(): void;
+  /** True while the nav channel is speaking (a signal counts). */
   readonly navBusy: boolean;
   /** True while the voice channel is playing or paused mid-clip. */
   readonly voiceBusy: boolean;
@@ -323,6 +394,8 @@ export interface MixerOptions {
   /** Test mode: no real audio. Clips "play" for their estimated length divided by timeScale. */
   virtual?: boolean;
   timeScale?: number;
+  /** Clock for the sound timeline and for the 20 s pause rule, milliseconds. Defaults to Date.now. */
+  clock?: Clock;
 }
 
 /* ------------------------------------------------------------------ director */
@@ -347,7 +420,11 @@ export interface DirectorLogEntry {
   at: number;
   what:
     | "cue_spoken" | "cue_shown" | "arrive" | "story_start" | "story_end" | "story_stopped"
-    | "aside_played" | "aside_skipped" | "off_route" | "back_on_route" | "detour" | "detour_turn" | "wrong_way" | "finished";
+    | "aside_played" | "aside_skipped" | "off_route" | "back_on_route" | "detour" | "detour_turn" | "wrong_way" | "finished"
+    /** A timed effect fired: id is the story id, reason is "<para>:<effect name>". */
+    | "effect"
+    /** A signature sound was asked for: id is the signal name. */
+    | "signal";
   id?: string;
   reason?: string;
 }

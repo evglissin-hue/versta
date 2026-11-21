@@ -1,8 +1,26 @@
 # Iteration 5: the sound of the ride (spec)
 
-Status: spec agreed with Evgeny on 21 November 2026. Not built yet. The session that executes this runs the build and
-review loop of `CLAUDE.md`: its master first traces each task in the code, settles the contract changes in
-`src/types.ts`, and cuts one brief per task (`it5-14-...md` and so on) from the sections below.
+Status: spec agreed with Evgeny on 21 November 2026. Briefs cut the same day (`it5-14-breaks.md` to
+`it5-20-soundcheck.md`), contracts settled in `src/types.ts` and `src/audio/catalogue.json`. Build in progress.
+
+## Decisions made when tracing (master, 21 November)
+
+- Breaks live in `tools/content/<id>.breaks.json`, keyed by clip file, not in `<id>.audio.json`: narration rewrites
+  that file, and two stories can share a clip.
+- `tools/pack_sound.py` writes every sound field (breaks, music, sfx, ambience) into an existing `pack.json`, and
+  `build_pack.py` calls it. A full `build_pack.py` run needs cached OpenStreetMap extracts that are not in the repo, and
+  a fresh download would move lines and cues.
+- `src/audio/catalogue.json` names every soundscape, theme, signal and effect, with labels for the Sound check screen
+  and nominal lengths for the virtual mixer. The validators read it.
+- The aside bell is a recording (task 16); the arrival, close and finish motifs are rendered with the music (task 17).
+- Effects: 21 names over 19 of the 32 stories. Besides traffic sounds, no close gunshots or explosions: a bang in one
+  earbud on a bike is a hazard. The execution and explosion stories have none.
+- The voice fades sit inside the pause before a phrase: a yield fades out from 0.20 s to 0.05 s before the onset, a
+  resume starts 0.25 s before it.
+- A cue may wait only when the turn is at least 11 s away (3 s wait, about 3 s of speech, 5 s to spare).
+- `leave` fades the bed over 4 s even if a story is still playing: the soundscape belongs to the place.
+- Freesound: no token, so the library comes from Wikimedia Commons alone.
+- Sound budget: loops, effects and the bell 8.5 MB, music 5 MB.
 
 ## What Evgeny asked for
 

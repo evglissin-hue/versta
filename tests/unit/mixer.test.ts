@@ -129,18 +129,18 @@ describe("mixer (virtual)", () => {
 
   it("records the bed for the director and treats null as off", () => {
     const m = createMixer({ baseUrl: "", virtual: true });
-    m.startBed("river", "minor");
-    expect(m.bed).toEqual({ ambience: "river", mood: "minor" });
+    m.startBed("river", "solemn");
+    expect(m.bed).toEqual({ ambience: "river", music: "solemn" });
     m.startBed(null, "bright");
-    expect(m.bed).toEqual({ ambience: null, mood: "bright" });
+    expect(m.bed).toEqual({ ambience: null, music: "bright" });
     m.stopBed(1);
     expect(m.bed).toBeNull();
   });
 
-  it("the chime takes about 1.2 s, scaled", async () => {
+  it("the aside signal takes about 1.2 s, scaled", async () => {
     const m = createMixer({ baseUrl: "", virtual: true, timeScale: 2 });
     let done = false;
-    void m.chime().then(() => { done = true; });
+    void m.signal("aside").then(() => { done = true; });
     await ms(599);
     expect(done).toBe(false);
     await ms(1);

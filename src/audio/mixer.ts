@@ -1,10 +1,10 @@
-import type { Mixer, MixerOptions, PlayHandle, Story } from "../types";
+import type { Mixer, MixerOptions, PlayHandle } from "../types";
 import { createBed } from "./bed";
 import { type Clip, type ClipFactory, elementClipFactory, silentWavUri, virtualClipFactory } from "./clips";
 
 /** The mixer plus a view of the bed, so tests can see what the director asked for. */
 export interface MixerWithBed extends Mixer {
-  readonly bed: { ambience: string | null; mood: Story["mood"] | null } | null;
+  readonly bed: { ambience: string | null; music: string | null } | null;
   /** How many times `tick` has been called (any mode), for tests. */
   readonly ticks: number;
   /** The level last given to `setBedLevel`; 1 until then. */
@@ -46,7 +46,7 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   const timeScale = opts.timeScale && opts.timeScale > 0 ? opts.timeScale : 1;
   const real = !opts.virtual && typeof Audio !== "undefined";
   const bed = createBed();
-  let bedState: { ambience: string | null; mood: Story["mood"] | null } | null = null;
+  let bedState: { ambience: string | null; music: string | null } | null = null;
   let tickCount = 0;
   let bedLevel = 1;
 
@@ -202,11 +202,14 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
       };
     },
 
-    chime() {
+    // Interim (task 15 replaces): only the aside bell sounds, still generated; effects and preload do nothing yet.
+    signal(name) {
       if (!real) return new Promise<void>((res) => setTimeout(res, 1200 / timeScale));
-      bed.chime();
+      if (name === "aside") bed.chime();
       return new Promise<void>((res) => setTimeout(res, 1200));
     },
+    playEffect() {},
+    preload() {},
 
     tick() {
       tickCount++;
@@ -221,9 +224,10 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
       if (real) bed.setBedLevel(bedLevel);
     },
 
-    startBed(ambience, mood) {
-      bedState = ambience === null && mood === null ? null : { ambience, mood };
-      if (real) bed.start(ambience, mood);
+    startBed(ambience, music) {
+      bedState = ambience === null && music === null ? null : { ambience, music };
+      // interim: the generated music still takes a mood
+      if (real) bed.start(ambience, music === null ? null : music === "bright" ? "bright" : "minor");
     },
     stopBed(fadeSeconds = DEFAULT_FADE) {
       bedState = null;

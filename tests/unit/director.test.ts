@@ -77,10 +77,10 @@ describe("arrival", () => {
   it("starts the bed from the story and stop, and honours the settings", () => {
     const r = rig();
     r.d.playStop(DEPTFORD);
-    expect(r.mixer.bed).toEqual({ ambience: "yard", mood: "bright" });
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
     const q = rig({ ambience: false });
     q.d.playStop(DEPTFORD);
-    expect(q.mixer.bed).toEqual({ ambience: null, mood: "bright" });
+    expect(q.mixer.bed).toEqual({ ambience: null, music: "bright" });
     const z = rig({ ambience: false, music: false });
     z.d.playStop(DEPTFORD);
     expect(z.mixer.bed).toBeNull();
@@ -237,12 +237,12 @@ describe("skip and stopAll", () => {
     const r = rig();
     r.d.playStop(DEPTFORD);
     await ms(10_000);
-    expect(r.mixer.bed).toEqual({ ambience: "yard", mood: "bright" });
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
     r.d.skip();
     expect(whats(r)).toContain("story_stopped:peter-the-great-0:skip");
     const n = last(r);
     expect(n?.kind === "story" && n.story.id).toBe("peter-the-great-1");
-    expect(r.mixer.bed).toEqual({ ambience: "tavern", mood: "minor" });
+    expect(r.mixer.bed).toEqual({ ambience: "tavern", music: "solemn" });
     await ms(0);
     expect(last(r)?.kind).toBe("story");
   });
@@ -449,7 +449,7 @@ describe("way back after going off route", () => {
     r.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 4 }));
     await ms(1300);
     expect(last(r)?.kind).toBe("aside");
-    expect(r.mixer.bed).toEqual({ ambience: pack.stops[3]!.ambience, mood: null });
+    expect(r.mixer.bed).toEqual({ ambience: pack.stops[3]!.ambience, music: null });
     await ms(120_000);
     expect(last(r)).toBeNull();
     expect(r.mixer.bed).toBeNull();

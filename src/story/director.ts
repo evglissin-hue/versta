@@ -98,11 +98,11 @@ export function createDirector(deps: DirectorDeps): Director {
   function startBed(stop: number, story: Story): void {
     const s = deps.settings();
     const ambience = s.ambience ? (story.ambience ?? pack.stops[stop]?.ambience ?? "river") : null;
-    const mood = s.music ? story.mood : null;
-    const key = `${ambience ?? ""}|${mood ?? ""}`;
+    const music = s.music ? (story.music ?? (story.mood === "minor" ? "solemn" : "bright")) : null;
+    const key = `${ambience ?? ""}|${music ?? ""}`;
     if (key === bedKey) return;
     bedKey = key;
-    mixer.startBed(ambience, mood);
+    mixer.startBed(ambience, music);
   }
   function fadeBed(): void {
     bedKey = null;
@@ -261,7 +261,7 @@ export function createDirector(deps: DirectorDeps): Director {
   function playAside(aside: Aside, nav: NavState): void {
     asidePending = true;
     const my = ++token;
-    void mixer.chime().then(() => {
+    void mixer.signal("aside").then(() => {
       if (my !== token || disposed) return;
       asidePending = false;
       heard.add(aside.id);

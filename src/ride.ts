@@ -9,7 +9,7 @@ import { createMixer } from "./audio/mixer";
 import { effect } from "@preact/signals";
 import { createDirector } from "./story/director";
 import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, screen, settings, simulated } from "./state";
-import type { Director, FixSource, Mixer, NavEngine, Pack, RouteGraph } from "./types";
+import type { Director, FixSource, Mixer, NavEngine, Pack, RouteGraph, SoundEvent } from "./types";
 
 export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean }
 
@@ -70,11 +70,12 @@ function onVisible(): void {
 export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), resume: SavedRide | null = null): Promise<void> {
   endRide(false);
   const source = sim ? createSimSource(p, sim) : createGpsSource();
-  const mixer = createMixer({ baseUrl: packBase(p.id), virtual: sim?.virtualAudio ?? false, timeScale: sim?.scale ?? 1 });
+  const clock = (): number => (source.now ? source.now() : Date.now());
+  const mixer = createMixer({ baseUrl: packBase(p.id), virtual: sim?.virtualAudio ?? false, timeScale: sim?.scale ?? 1, clock });
   await mixer.unlock();
   const engine = createNavEngine(p);
   const director = createDirector({
-    pack: p, mixer, settings: () => settings.value, clock: () => (source.now ? source.now() : Date.now()), timeScale: sim?.scale ?? 1,
+    pack: p, mixer, settings: () => settings.value, clock, timeScale: sim?.scale ?? 1,
     onNowPlaying: (now) => {
       nowPlaying.value = now;
       // the simulated rider stands still while a story plays at the stop it belongs to, as a real one would
@@ -125,13 +126,15 @@ export function endRide(forget = true): void {
   if (!ride) return;
   if (forget) forgetSavedRide();
   document.removeEventListener("visibilitychange", onVisible);
-  ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose();
+  ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose(); ride.mixer.dispose?.();
   void ride.wake?.release().catch(() => {});
   ride = null;
   nav.value = IDLE_NAV; nowPlaying.value = null; openStop.value = null; screen.value = "home";
 }
 
 export function currentDirector(): Director | null { return ride?.director ?? null; }
+/** The ride's mixer, for the Sound check screen while a ride is running. */
+export function currentMixer(): Mixer | null { return ride?.mixer ?? null; }
 /** Rider chose to head for another stop (skipped one, or joined the route part way). */
 export function jumpToStop(stop: number): void {
   if (!ride) return;
@@ -140,5 +143,5 @@ export function jumpToStop(stop: number): void {
 }
 
 // Handle for the end-to-end tests and for debugging on the phone.
-declare global { interface Window { __versta?: { nav: typeof nav; log: typeof directorLog; nowPlaying: typeof nowPlaying; pack: typeof pack } } }
-window.__versta = { nav, log: directorLog, nowPlaying, pack };
+declare global { interface Window { __versta?: { nav: typeof nav; log: typeof directorLog; nowPlaying: typeof nowPlaying; pack: typeof pack; timeline: () => readonly SoundEvent[] } } }
+window.__versta = { nav, log: directorLog, nowPlaying, pack, timeline: () => (ride?.mixer as { timeline?: readonly SoundEvent[] } | undefined)?.timeline ?? [] };
