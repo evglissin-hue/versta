@@ -20,6 +20,9 @@ function texts(p: Pack): string[] {
   ];
 }
 
+/** Clip lengths from the pause finder, for the aside clips (a pack records no length for them). */
+const BREAK_FILES = import.meta.glob<Record<string, { dur: number }>>("../../tools/content/*.breaks.json", { eager: true, import: "default" });
+
 describe("the route index", () => {
   it("lists at least one pack, each id once", () => {
     expect(ENTRIES.length).toBeGreaterThan(0);
@@ -137,6 +140,34 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("pack %s", (id, p) => 
   it("has every file that saving for offline asks for", () => {
     const pack = loaded(p);
     expect(packFiles(pack).filter((f) => !hasFile(id, f))).toEqual([]);
+  });
+
+  it("has phrase breaks for every story and aside clip, ascending, inside the clip, at every paragraph mark", () => {
+    const pack = loaded(p);
+    const bad: string[] = [];
+    let seconds = 0;
+    let count = 0;
+    const check = (label: string, breaks: number[] | undefined, dur: number, marks: number[]) => {
+      if (!breaks || breaks.length === 0) { bad.push(`${label} has no breaks`); return; }
+      seconds += dur;
+      count += breaks.length;
+      for (let i = 0; i < breaks.length; i++) {
+        const b = breaks[i]!;
+        if (b < 0 || b >= dur) bad.push(`${label}: break ${b} is outside the clip (${dur} s)`);
+        if (i > 0 && b <= breaks[i - 1]!) bad.push(`${label}: breaks are not ascending at ${b}`);
+      }
+      for (const m of marks) {
+        if (!breaks.some((b) => Math.abs(b - m) <= 0.15)) bad.push(`${label}: paragraph mark ${m} has no break within 0.15 s`);
+      }
+    };
+    for (const s of pack.stops) for (const st of s.stories) if (st.audio) check(`story ${st.id}`, st.audio.breaks, st.audio.dur, st.audio.marks);
+    for (const a of pack.asides) {
+      const dur = BREAK_FILES[`../../tools/content/${id}.breaks.json`]?.[a.audio]?.dur;
+      if (dur === undefined) bad.push(`aside ${a.id}: no clip length for ${a.audio} in ${id}.breaks.json`);
+      else check(`aside ${a.id}`, a.breaks, dur, []);
+    }
+    expect(bad).toEqual([]);
+    expect(count).toBeGreaterThanOrEqual(seconds / 12);
   });
 
   it("has a corridor graph", () => {

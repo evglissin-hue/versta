@@ -54,6 +54,10 @@ A route pack is built by Claude in a working session, then committed. The app on
 7. More narration: `python3 tools/narrate.py <id>` records the turn cues, the arrival, off route, back on route and
    rerouting clips, the generic turn clips and the asides, deletes cue files the pack no longer uses, and sets the
    listening minutes in the index from the recorded files. Pass `--force` to record everything again.
+   Then find the phrase marks: `python3 tools/sound/find_breaks.py <id>` writes `tools/content/<id>.breaks.json` (the
+   second each phrase starts in every story and aside clip, from the pauses in the recording), and
+   `python3 tools/pack_sound.py <id>` puts them into `pack.json` without touching the map work. `build_pack.py` runs the
+   same step, so a pack built after narration needs the breaks file first. Run both again after re-recording a clip.
 8. Run `npm run check` and the simulated rides (`npm run e2e`). The pack integrity checks
    (`tests/unit/packs.test.ts`), the whole rides with a detour (`tests/unit/ride.integration.test.ts`), the way-back
    search (`tests/unit/reroute.real.test.ts`) and the browser rides (`tests/e2e/ride.spec.ts`) run over every pack in
