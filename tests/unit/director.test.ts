@@ -56,8 +56,8 @@ describe("arrival", () => {
     }
     expect(last(r)).toBeNull();
     expect(whats(r)).toEqual([
-      "arrive:4", "story_start:peter-the-great-0", "story_end:peter-the-great-0",
-      "story_start:peter-the-great-1", "story_end:peter-the-great-1",
+      "arrive:4", "signal:arrive", "story_start:peter-the-great-0", "story_end:peter-the-great-0",
+      "story_start:peter-the-great-1", "story_end:peter-the-great-1", "signal:close",
     ]);
     expect(r.mixer.bed).toBeNull();
     expect(r.mixer.voiceBusy).toBe(false);
@@ -69,7 +69,7 @@ describe("arrival", () => {
     r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
     await ms(20_000);
     expect(r.now.filter((n) => n !== null)).toEqual([]);
-    expect(whats(r)).toEqual(["arrive:4"]);
+    expect(whats(r)).toEqual(["arrive:4", "signal:arrive"]);
     expect(r.playNav).toHaveBeenCalledWith(pack.system.arrive[DEPTFORD], expect.anything());
     expect(r.mixer.voiceBusy).toBe(false);
   });
@@ -104,7 +104,9 @@ describe("a cue in the middle of a story", () => {
     const end = r.log.find((e) => e.what === "story_end")!.at;
     const dur = pack.stops[DEPTFORD]!.stories[0]!.audio!.dur;
     const cueSeconds = cue.say.split(/\s+/).length / 2.6;
-    expect((end - start) / 1000).toBeCloseTo(dur + cueSeconds + 0.25 + 0.15 + 1.5, 1);
+    // with phrase marks the cut sentence is replayed from its start, so a little more than the step back of 1.5 s
+    expect((end - start) / 1000).toBeGreaterThan(dur + cueSeconds + 0.4);
+    expect((end - start) / 1000).toBeLessThan(dur + cueSeconds + 8);
   });
 });
 
@@ -124,7 +126,7 @@ describe("passing-by stories", () => {
     r.d.handle(aside(), nav());
     await ms(3300);
     expect(last(r)).toEqual({ kind: "aside", aside: a0 });
-    expect(whats(r)).toEqual([`aside_played:${a0.id}`]);
+    expect(whats(r)).toEqual(["signal:aside", `aside_played:${a0.id}`]);
     await ms(120_000);
     expect(last(r)).toBeNull();
     expect(r.d.heard.has(a0.id)).toBe(true);
@@ -255,6 +257,9 @@ describe("skip and stopAll", () => {
     r.d.skip();
     expect(last(r)).toBeNull();
     expect(r.mixer.voiceBusy).toBe(false);
+    // the bed lingers after the last story, then fades
+    expect(r.mixer.bed).not.toBeNull();
+    await ms(21_000);
     expect(r.mixer.bed).toBeNull();
   });
 
@@ -323,6 +328,8 @@ describe("read by tapping", () => {
     expect(last(r)).toMatchObject({ story: { id: "peter-the-great-1" } });
     await ms(2600);
     expect(last(r)).toBeNull();
+    expect(r.mixer.bed).not.toBeNull();
+    await ms(21_000);
     expect(r.mixer.bed).toBeNull();
   });
 
@@ -388,7 +395,7 @@ describe("turn cues", () => {
   it("logs finished", () => {
     const r = rig();
     r.d.handle([{ type: "finished" }], nav({ status: "finished" }));
-    expect(whats(r)).toEqual(["finished"]);
+    expect(whats(r)).toEqual(["finished", "signal:finish"]);
   });
 });
 
@@ -463,7 +470,8 @@ describe("way back after going off route", () => {
     await ms(5000);
     expect(r.mixer.bed).not.toBeNull();
     r.d.handle(arrive(2), nav({ status: "at_stop", seg: 3 }));
-    expect(r.mixer.bed).toBeNull();
+    // the aside's bed gives way to the stop's own soundscape (no music: auto-play is off)
+    expect(r.mixer.bed).toEqual({ ambience: pack.stops[2]!.ambience, music: null });
     const q = rig({ ambience: false });
     q.d.handle([], nav());
     await ms(61_000);
@@ -595,8 +603,8 @@ describe("rewind", () => {
     expect(paraNow(r)).toBe(1);
     await ms(1000);
     expect(paraNow(r)).toBe(1); // the clip really is at about 21 s, so the paragraph stays
-    await ms(10_000);
-    expect(paraNow(r)).toBe(2); // and carries on from there
+    await ms(14_000);
+    expect(paraNow(r)).toBe(2); // and carries on from there (the seek lands on a phrase break, a little earlier)
     r.d.rewind!(1000);
     expect(paraNow(r)).toBe(0);
     await ms(500);
@@ -628,5 +636,351 @@ describe("rewind", () => {
     expect(r.now.at(-1)?.kind).toBe("aside");
     r.d.rewind!(10);
     expect(seek).toHaveBeenCalledWith(-10);
+  });
+});
+
+/* ------------------------------------------------------------------ the bed around stories (iteration 5) */
+
+describe("the bed around stories", () => {
+  const first = pack.stops[DEPTFORD]!.stories[0]!;
+  const timeline = (r: Rig, ch: string, ev?: "on" | "off") => r.mixer.timeline.filter((e) => e.ch === ch && (ev === undefined || e.ev === ev));
+  const logAt = (r: Rig, what: string): number[] => r.log.filter((e) => e.what === what).map((e) => e.at);
+  /** Run until the log holds `n` story_end entries. */
+  async function untilEnds(r: Rig, n: number): Promise<void> {
+    for (let i = 0; i < 1000 && logAt(r, "story_end").length < n; i++) await ms(1000);
+  }
+  /** Deptford with both stories on the same soundscape and different themes. */
+  const sameScape: Pack = (() => {
+    const copy = structuredClone(pack);
+    const [a, b] = copy.stops[DEPTFORD]!.stories;
+    a!.music = "river";
+    b!.music = "noir";
+    delete b!.ambience;
+    return copy;
+  })();
+
+  it("arrival with auto-play: signal, arrival clip, then the story, with the bed up at least 2.5 s before the voice", async () => {
+    const r = rig();
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await ms(30_000);
+    const tl = r.mixer.timeline;
+    const sig = tl.findIndex((e) => e.ch === "signal" && e.src === "arrive" && e.ev === "on");
+    const clip = tl.findIndex((e) => e.ch === "nav" && e.src === pack.system.arrive[DEPTFORD] && e.ev === "on");
+    const voice = tl.findIndex((e) => e.ch === "voice" && e.src === first.audio!.src && e.ev === "on");
+    expect(sig).toBeGreaterThanOrEqual(0);
+    expect(sig).toBeLessThan(clip);
+    expect(clip).toBeLessThan(voice);
+    const amb = tl.find((e) => e.ch === "ambience" && e.ev === "on")!;
+    const mus = tl.find((e) => e.ch === "music" && e.ev === "on")!;
+    expect(amb.src).toBe("yard");
+    expect(mus.src).toBe("bright");
+    expect(tl[voice]!.at - amb.at).toBeGreaterThanOrEqual(2500);
+    expect(tl[voice]!.at - mus.at).toBeGreaterThanOrEqual(2500);
+    expect(whats(r).slice(0, 3)).toEqual(["arrive:4", "signal:arrive", "story_start:peter-the-great-0"]);
+  });
+
+  it("arrival with the Soundscape switch off: no signal and no soundscape, but music and the story", async () => {
+    const r = rig({ ambience: false });
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await ms(30_000);
+    expect(timeline(r, "signal")).toEqual([]);
+    expect(timeline(r, "ambience")).toEqual([]);
+    expect(timeline(r, "music", "on").map((e) => e.src)).toEqual(["bright"]);
+    expect(timeline(r, "voice", "on").length).toBeGreaterThan(0);
+  });
+
+  it("two stories at one stop on one soundscape: it does not restart, the music crossfades", async () => {
+    const r = rig({}, sameScape);
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await untilEnds(r, 2);
+    expect(timeline(r, "ambience", "on").map((e) => e.src)).toEqual(["yard"]);
+    expect(timeline(r, "ambience", "off")).toEqual([]);
+    expect(timeline(r, "music", "on").map((e) => e.src)).toEqual(["river", "noir"]);
+    // the first theme goes off only after the second came on (a crossfade, not a gap)
+    const noirOn = timeline(r, "music", "on")[1]!.at;
+    const riverOff = timeline(r, "music", "off").find((e) => e.src === "river")!.at;
+    expect(riverOff).toBeGreaterThan(noirOn);
+  });
+
+  it("after the last story: close, then the bed is off 25 to 27 s after the story ends", async () => {
+    const r = rig();
+    r.d.markHeard?.(["peter-the-great-0"]);
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await untilEnds(r, 1);
+    const end = logAt(r, "story_end")[0]!;
+    await ms(40_000);
+    expect(timeline(r, "signal", "on").map((e) => e.src)).toEqual(["arrive", "close"]);
+    for (const ch of ["ambience", "music"]) {
+      const off = timeline(r, ch, "off")[0]!;
+      expect(off.at - end).toBeGreaterThanOrEqual(25_000);
+      expect(off.at - end).toBeLessThanOrEqual(27_000);
+    }
+  });
+
+  it("a leave 5 s after the last story fades the bed within 4.5 s", async () => {
+    const r = rig();
+    r.d.markHeard?.(["peter-the-great-0"]);
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await untilEnds(r, 1);
+    await ms(5000);
+    const leaveAt = Date.now();
+    r.d.handle([{ type: "leave", stop: DEPTFORD }], nav());
+    await ms(10_000);
+    const off = timeline(r, "ambience", "off")[0]!;
+    expect(off.at - leaveAt).toBeLessThanOrEqual(4500);
+    expect(r.mixer.bed).toBeNull();
+  });
+
+  it("a leave while the story plays fades the bed, the story goes on, and the next story gets no bed", async () => {
+    const r = rig();
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await ms(20_000);
+    expect(r.mixer.bed).not.toBeNull();
+    const leaveAt = Date.now();
+    r.d.handle([{ type: "leave", stop: DEPTFORD }], nav());
+    expect(r.mixer.bed).toBeNull();
+    await ms(5000);
+    expect(timeline(r, "ambience", "off")[0]!.at - leaveAt).toBeLessThanOrEqual(4500);
+    expect(last(r)).toMatchObject({ kind: "story", story: { id: "peter-the-great-0" } });
+    await ms(400_000);
+    expect(whats(r)).toContain("story_start:peter-the-great-1");
+    expect(timeline(r, "ambience", "on").length).toBe(1);
+    expect(timeline(r, "signal", "on").map((e) => e.src)).toEqual(["arrive"]);
+  });
+
+  it("a story tapped away from a stop gets its bed again", () => {
+    const r = rig();
+    r.d.handle([{ type: "leave", stop: DEPTFORD }], nav());
+    r.d.playStory(DEPTFORD, "peter-the-great-0");
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
+  });
+
+  it("auto-play off: the soundscape alone for 30 s then a 6 s fade", async () => {
+    const r = rig({ autoPlayStories: false });
+    const t0 = Date.now();
+    r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    expect(r.mixer.bed).toEqual({ ambience: "yard", music: null });
+    await ms(60_000);
+    expect(timeline(r, "music")).toEqual([]);
+    const off = timeline(r, "ambience", "off")[0]!;
+    expect(off.at - t0).toBeGreaterThanOrEqual(35_500);
+    expect(off.at - t0).toBeLessThanOrEqual(36_500);
+    expect(r.mixer.bed).toBeNull();
+  });
+
+  it("auto-play off: a tap within the 30 s keeps the soundscape and adds the music", async () => {
+    const q = rig({ autoPlayStories: false });
+    q.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    await ms(10_000);
+    q.d.playStory(DEPTFORD, "peter-the-great-0");
+    expect(q.mixer.bed).toEqual({ ambience: "yard", music: "bright" });
+    await ms(60_000);
+    expect(timeline(q, "ambience", "on").map((e) => e.src)).toEqual(["yard"]);
+    expect(timeline(q, "ambience", "off")).toEqual([]);
+    expect(timeline(q, "music", "on").map((e) => e.src)).toEqual(["bright"]);
+  });
+
+  it("an aside: the bell first, then the clip; an arrival fades it out within 0.45 s", async () => {
+    const r = rig({ autoPlayStories: false });
+    r.d.handle([], nav());
+    await ms(61_000);
+    const a = pack.asides[0]!;
+    r.d.handle([{ type: "aside", aside: a }], nav({ seg: 2 }));
+    await ms(10_000);
+    const tl = r.mixer.timeline;
+    const bell = tl.findIndex((e) => e.ch === "signal" && e.src === "aside" && e.ev === "on");
+    const clip = tl.findIndex((e) => e.ch === "voice" && e.src === a.audio && e.ev === "on");
+    expect(bell).toBeGreaterThanOrEqual(0);
+    expect(bell).toBeLessThan(clip);
+    expect(whats(r)).toContain("signal:aside");
+    const arrivedAt = Date.now();
+    r.d.handle(arrive(2), nav({ status: "at_stop", seg: 3 }));
+    await ms(1500);
+    const off = r.mixer.timeline.find((e) => e.ch === "voice" && e.src === a.audio && e.ev === "off")!;
+    expect(off.at - arrivedAt).toBeLessThanOrEqual(450);
+  });
+
+  it("the aside bell rings even with the Soundscape switch off, and the aside is preloaded before it", async () => {
+    const r = rig({ ambience: false });
+    r.d.handle([], nav());
+    await ms(61_000);
+    r.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 2 }));
+    expect(r.mixer.preloaded).toContain(pack.asides[0]!.audio);
+    await ms(5000);
+    expect(timeline(r, "signal", "on").map((e) => e.src)).toEqual(["aside"]);
+    expect(r.mixer.bed).toBeNull();
+  });
+
+  it("finished: the finish signal after the nav queue, none with the Soundscape switch off", async () => {
+    const r = rig();
+    r.d.handle([{ type: "off_route" }, { type: "finished" }], nav({ status: "finished" }));
+    await ms(10_000);
+    const tl = r.mixer.timeline;
+    const nav1 = tl.findIndex((e) => e.ch === "nav" && e.src === pack.system.offRoute && e.ev === "off");
+    const fin = tl.findIndex((e) => e.ch === "signal" && e.src === "finish" && e.ev === "on");
+    expect(nav1).toBeGreaterThanOrEqual(0);
+    expect(fin).toBeGreaterThan(nav1);
+    const q = rig({ ambience: false });
+    q.d.handle([{ type: "off_route" }, { type: "finished" }], nav({ status: "finished" }));
+    await ms(10_000);
+    expect(timeline(q, "signal")).toEqual([]);
+    expect(whats(q)).toEqual(["off_route", "finished"]);
+  });
+});
+
+describe("urgency of spoken guidance", () => {
+  const left = pack.cues.find((c) => c.turn === "left" && !c.quiet)!;
+  const depart = pack.cues.find((c) => c.turn === "depart")!;
+  const withTurns: Pack = { ...pack, system: { ...pack.system, turns: { left: "audio/system/turn-left.mp3" } } };
+  const urgentOf = (r: Rig): boolean[] => r.playNav.mock.calls.map((c) => (c[1] as { urgent?: boolean }).urgent === true);
+
+  it("an approach at 200 m and 5 m/s is not urgent; at 40 m and 5 m/s it is", () => {
+    const far = rig();
+    far.d.handle([{ type: "cue", cue: left, phase: "approach" }], nav({ toCue: 200, speedAvg: 5 }));
+    expect(far.playNav.mock.calls.length).toBeGreaterThan(0);
+    expect(urgentOf(far).every((u) => !u)).toBe(true);
+    const near = rig();
+    near.d.handle([{ type: "cue", cue: left, phase: "approach" }], nav({ toCue: 40, speedAvg: 5 }));
+    expect(urgentOf(near)).toEqual([true, true]); // the distance call and the cue
+  });
+
+  it("the distance call and its cue share the urgency; the speed falls back to the fix", () => {
+    const r = rig();
+    r.d.handle([{ type: "cue", cue: left, phase: "approach" }], nav({ toCue: 50, speedAvg: 5 }));
+    expect(urgentOf(r)).toEqual([true, true]);
+    const slowFix = rig();
+    const fix = { lng: 0, lat: 0, accuracy: 5, heading: null, speed: 2, time: 0 };
+    slowFix.d.handle([{ type: "cue", cue: left, phase: "approach" }], nav({ toCue: 120, fix }));
+    expect(urgentOf(slowFix).every((u) => !u)).toBe(true); // 120 m at 2 m/s is 60 s
+  });
+
+  it("a cue at the turn itself and a detour turn are urgent; depart, arrival and off route are not", () => {
+    const r = rig({}, withTurns);
+    r.d.handle([{ type: "cue", cue: left, phase: "now" }], nav());
+    r.d.handle([{ type: "detour_turn", turn: "left", name: "Mill Lane" }], nav({ offRoute: true }));
+    expect(urgentOf(r)).toEqual([true, true]);
+    const q = rig();
+    q.d.handle([{ type: "cue", cue: depart, phase: "now" }], nav());
+    q.d.handle([{ type: "off_route" }, { type: "back_on_route" }], nav());
+    q.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
+    expect(urgentOf(q)).toEqual([false, false, false, false]);
+  });
+});
+
+describe("effects timed to the text", () => {
+  const storyId = "peter-the-great-0";
+  const withSfx: Pack = (() => {
+    const copy = structuredClone(pack);
+    const st = copy.stops[DEPTFORD]!.stories[0]!;
+    st.sfx = [{ para: 1, name: "hammer" }, { para: 3, name: "tankards", level: 0.8 }];
+    return copy;
+  })();
+  const marks = withSfx.stops[DEPTFORD]!.stories[0]!.audio!.marks;
+  const places = [marks[1]! - 1.2, marks[3]! - 1.2];
+  const fx = (r: Rig) => r.mixer.timeline.filter((e) => e.ch === "effect" && e.ev === "on");
+
+  it("each effect fires once, within 0.3 s of its place in the clip", async () => {
+    const r = rig({}, withSfx);
+    r.d.playStory(DEPTFORD, storyId);
+    await ms(100_000);
+    const voiceOn = r.mixer.timeline.find((e) => e.ch === "voice" && e.ev === "on")!.at;
+    const list = fx(r);
+    expect(list.map((e) => e.src)).toEqual(["hammer", "tankards"]);
+    list.forEach((e, i) => {
+      const clipTime = (e.at - voiceOn) / 1000;
+      expect(clipTime).toBeGreaterThanOrEqual(places[i]! - 0.01);
+      expect(clipTime).toBeLessThanOrEqual(places[i]! + 0.3);
+    });
+    expect(r.log.filter((e) => e.what === "effect").map((e) => e.reason)).toEqual(["1:hammer", "3:tankards"]);
+  });
+
+  it("not with the Soundscape switch off", async () => {
+    const r = rig({ ambience: false }, withSfx);
+    r.d.playStory(DEPTFORD, storyId);
+    await ms(130_000);
+    expect(fx(r)).toEqual([]);
+    expect(whats(r).some((w) => w.startsWith("effect"))).toBe(false);
+  });
+
+  it("a rewind past an effect arms it again", async () => {
+    const r = rig({}, withSfx);
+    r.d.playStory(DEPTFORD, storyId);
+    await ms(15_000);
+    expect(fx(r).map((e) => e.src)).toEqual(["hammer"]);
+    r.d.rewind!(1000);
+    await ms(15_000);
+    expect(fx(r).map((e) => e.src)).toEqual(["hammer", "hammer"]);
+  });
+
+  it("a pause holds the effect: it does not fire while the playhead stands still", async () => {
+    const r = rig({}, withSfx);
+    r.d.playStory(DEPTFORD, storyId);
+    await ms(8000);
+    r.d.togglePause();
+    await ms(60_000);
+    expect(fx(r)).toEqual([]);
+    r.d.togglePause();
+    await ms(6000);
+    expect(fx(r).map((e) => e.src)).toEqual(["hammer"]);
+  });
+
+  it("read by tapping: an effect fires when its paragraph appears", () => {
+    const r = rig({ storyVoice: false }, withSfx);
+    r.d.playStory(DEPTFORD, storyId);
+    expect(fx(r)).toEqual([]);
+    r.d.nextParagraph();
+    expect(fx(r).map((e) => e.src)).toEqual(["hammer"]);
+    r.d.nextParagraph();
+    expect(fx(r).map((e) => e.src)).toEqual(["hammer"]);
+    r.d.nextParagraph();
+    expect(fx(r).map((e) => e.src)).toEqual(["hammer", "tankards"]);
+  });
+});
+
+describe("prefetch", () => {
+  const cue = pack.cues.find((c) => c.turn === "left" && !c.quiet)!;
+  const other = pack.cues.find((c) => c.turn === "right" && !c.quiet && c.id !== cue.id)!;
+  const first = pack.stops[DEPTFORD]!.stories[0]!;
+
+  it("the first handle call preloads the system and distance clips, once", () => {
+    const r = rig();
+    r.d.handle([], nav());
+    const sys = pack.system;
+    for (const src of [sys.offRoute, sys.backOnRoute, ...Object.values(sys.distances ?? {})]) expect(r.mixer.preloaded).toContain(src);
+    const n = r.mixer.preloaded.length;
+    r.d.handle([], nav());
+    expect(r.mixer.preloaded.length).toBe(n);
+  });
+
+  it("within 150 m of a stop: the arrival clip, the first story, its soundscape and theme, once", () => {
+    const r = rig();
+    r.d.handle([], nav({ seg: DEPTFORD, toStop: 200 }));
+    expect(r.mixer.preloaded).not.toContain(first.audio!.src);
+    r.d.handle([], nav({ seg: DEPTFORD, toStop: 150 }));
+    for (const src of [pack.system.arrive[DEPTFORD]!, first.audio!.src, "ambience:yard", "music:bright"]) {
+      expect(r.mixer.preloaded.filter((s) => s === src)).toHaveLength(1);
+    }
+    const n = r.mixer.preloaded.length;
+    r.d.handle([], nav({ seg: DEPTFORD, toStop: 100 }));
+    expect(r.mixer.preloaded.length).toBe(n);
+  });
+
+  it("the settings leave out the soundscape and theme", () => {
+    const r = rig({ ambience: false, music: false });
+    r.d.handle([], nav({ seg: DEPTFORD, toStop: 100 }));
+    expect(r.mixer.preloaded).toContain(first.audio!.src);
+    expect(r.mixer.preloaded.some((s) => s.startsWith("ambience:") || s.startsWith("music:"))).toBe(false);
+  });
+
+  it("the next cue's clip is preloaded when it becomes nextCue, not a quiet one", () => {
+    const r = rig();
+    r.d.handle([], nav({ nextCue: cue, toCue: 300 }));
+    expect(r.mixer.preloaded).toContain(cue.audio);
+    expect(r.mixer.preloaded).not.toContain(other.audio);
+    r.d.handle([], nav({ nextCue: other, toCue: 300 }));
+    expect(r.mixer.preloaded).toContain(other.audio);
+    const quiet = pack.cues.find((c) => c.quiet)!;
+    r.d.handle([], nav({ nextCue: quiet, toCue: 300 }));
+    expect(r.mixer.preloaded).not.toContain(quiet.audio);
   });
 });
