@@ -5,7 +5,7 @@ export interface Synth {
   ctx: AudioContext;
   /** Input of the bed bus: layers, loops and music connect here and are carved by the pocket. */
   bed: GainNode;
-  /** Input of the master bus: sounds that bypass the pocket (the chime). */
+  /** Input of the master bus: sounds that bypass the pocket. */
   master: GainNode;
   noise: AudioBuffer;
 }
@@ -39,25 +39,36 @@ export function filter(x: Synth, type: BiquadFilterType, f: number, q?: number):
   return n;
 }
 
-/** `instant` skips the slow fade-in, for one-off sounds such as the chime. */
-export function session(x: Synth, level: number, instant = false): Session {
-  const s: Session = { bus: gain(x, instant ? level : 0), srcs: [], timers: [], dead: false, level };
-  s.bus.connect(instant ? x.master : x.bed);
-  if (!instant) s.bus.gain.setTargetAtTime(level, x.ctx.currentTime, 0.6);
+/**
+ * A session starts silent and fades in linearly over `fadeIn` seconds (0 starts at full level). `toMaster` bypasses
+ * the bed bus (and its pocket).
+ */
+export function session(x: Synth, level: number, fadeIn = 0, toMaster = false): Session {
+  const s: Session = { bus: gain(x, fadeIn > 0 ? 0 : level), srcs: [], timers: [], dead: false, level };
+  s.bus.connect(toMaster ? x.master : x.bed);
+  if (fadeIn > 0) {
+    const t = x.ctx.currentTime;
+    s.bus.gain.setValueAtTime(0, t);
+    s.bus.gain.linearRampToValueAtTime(level, t + fadeIn);
+  }
   return s;
 }
 
+/** Fade the session to silence so that it is silent exactly `fade` seconds from now, then stop its sources. */
 export function endSession(x: Synth, s: Session | null, fade = 0.5): void {
   if (!s || s.dead) return;
   s.dead = true;
   s.timers.forEach(clearTimeout);
-  const t = x.ctx.currentTime;
-  s.bus.gain.cancelScheduledValues(t);
-  s.bus.gain.setTargetAtTime(0, t, fade);
+  const t = x.ctx.currentTime, f = Math.max(0.02, fade);
+  const g = s.bus.gain;
+  const now = g.value;
+  g.cancelScheduledValues(t);
+  g.setValueAtTime(now, t);
+  g.linearRampToValueAtTime(0, t + f);
   setTimeout(() => {
     s.srcs.forEach((n) => { try { n.stop(); } catch {} });
     try { s.bus.disconnect(); } catch {}
-  }, (fade * 5 + 0.3) * 1000);
+  }, (f + 0.1) * 1000);
 }
 
 export function noise(x: Synth, s: Session): AudioBufferSourceNode {

@@ -7,11 +7,15 @@ export interface ClipCallbacks {
 }
 
 export interface Clip {
-  /** Start, or resume after `pause`. */
+  /** Start, or resume after `pause`, from the current playhead. */
   play(): void;
   pause(): void;
-  /** Move the playhead by this many seconds, clamped to the clip, whether playing or paused. */
-  seek?(deltaSeconds: number): void;
+  /** Move the playhead to this many seconds from the start (clamped), whether playing, paused or not yet started. */
+  seekTo(seconds: number): void;
+  /** The playhead in seconds. */
+  position(): number;
+  /** Length in seconds; Infinity while unknown. */
+  duration(): number;
   /** Silence and detach. No callback fires after this. */
   dispose(): void;
 }
@@ -21,7 +25,10 @@ export type ClipFactory = (src: string, estimatedSeconds: number | undefined, cb
 const TICK_MS = 250;
 const DEFAULT_SECONDS = 3;
 
-/** A clip that "plays" for estimatedSeconds / timeScale real seconds. Runs under Node. */
+/**
+ * A clip that "plays" for estimatedSeconds / timeScale real seconds. Runs under Node. The playhead is modelled
+ * exactly: it reports its position, seeks to an absolute second and ends when it reaches the end.
+ */
 export function virtualClipFactory(timeScale: number): ClipFactory {
   const scale = timeScale > 0 ? timeScale : 1;
   return (_src, estimatedSeconds, cb) => {
@@ -54,15 +61,15 @@ export function virtualClipFactory(timeScale: number): ClipFactory {
         playing = true;
         arm();
       },
-      seek(delta) {
+      seekTo(seconds) {
         if (dead) return;
-        const now = elapsedMs + (playing ? Date.now() - startedAt : 0);
-        const to = Math.min(totalMs, Math.max(0, now + (delta * 1000) / scale));
+        const to = Math.min(totalMs, Math.max(0, (seconds * 1000) / scale));
         if (playing) clear();
         elapsedMs = to;
         if (playing) arm();
-        cb.onTime?.(head());
       },
+      position: head,
+      duration: () => total,
       pause() {
         if (dead || !playing) return;
         elapsedMs += Date.now() - startedAt;
@@ -74,12 +81,27 @@ export function virtualClipFactory(timeScale: number): ClipFactory {
   };
 }
 
+/** Where an element's source was last set, so a clip can tell that its sound is already loaded. */
+const loadedSrc = new WeakMap<HTMLAudioElement, string>();
+
+/** Load a sound on an idle element ahead of its turn (the second nav element does this for the next cue). */
+export function prepareElement(el: HTMLAudioElement, url: string): void {
+  if (loadedSrc.get(el) === url) return;
+  loadedSrc.set(el, url);
+  try {
+    el.preload = "auto";
+    el.src = url;
+    el.load();
+  } catch {}
+}
+
 /** A clip on a shared, already unlocked audio element. */
 export function elementClipFactory(el: HTMLAudioElement, resolve: (src: string) => string): ClipFactory {
   return (src, _est, cb) => {
     let started = false;
     let dead = false;
     let paused = false;
+    let startAt = 0;
     let tick: ReturnType<typeof setInterval> | undefined;
     const fail = (): void => { if (dead) return; dispose(); cb.onError(); };
     const onEnded = (): void => { if (dead) return; cb.onTime?.(el.currentTime); dispose(); cb.onEnd(); };
@@ -91,6 +113,13 @@ export function elementClipFactory(el: HTMLAudioElement, resolve: (src: string) 
       el.removeEventListener("error", fail);
       try { el.pause(); } catch {}
     };
+    const go = (): void => {
+      if (dead || paused) return;
+      let p: Promise<void> | undefined;
+      try { p = el.play(); } catch { fail(); return; }
+      p?.catch(() => { if (!paused && !dead) fail(); });
+      if (cb.onTime && !tick) tick = setInterval(() => { if (!dead && !el.paused) cb.onTime?.(el.currentTime); }, TICK_MS);
+    };
     return {
       play() {
         if (dead) return;
@@ -99,12 +128,22 @@ export function elementClipFactory(el: HTMLAudioElement, resolve: (src: string) 
           started = true;
           el.addEventListener("ended", onEnded);
           el.addEventListener("error", fail);
-          el.src = resolve(src);
+          const url = resolve(src);
+          if (loadedSrc.get(el) !== url) { loadedSrc.set(el, url); el.src = url; }
+          if (el.readyState >= 1) {
+            // already loaded (prepared, or the same sound as last time): start from the right place, not where it stopped
+            try { el.currentTime = startAt; } catch {}
+          } else if (startAt > 0) {
+            // a playhead set before the metadata is there is ignored by some browsers: wait for it
+            el.addEventListener("loadedmetadata", () => {
+              if (dead) return;
+              try { el.currentTime = startAt; } catch {}
+              go();
+            }, { once: true });
+            return;
+          }
         }
-        let p: Promise<void> | undefined;
-        try { p = el.play(); } catch { fail(); return; }
-        p?.catch(() => { if (!paused && !dead) fail(); });
-        if (cb.onTime && !tick) tick = setInterval(() => { if (!dead && !el.paused) cb.onTime?.(el.currentTime); }, TICK_MS);
+        go();
       },
       pause() {
         if (dead) return;
@@ -113,12 +152,15 @@ export function elementClipFactory(el: HTMLAudioElement, resolve: (src: string) 
         tick = undefined;
         try { el.pause(); } catch {}
       },
-      seek(delta) {
-        if (dead || !started) return;
+      seekTo(seconds) {
+        if (dead) return;
         const length = Number.isFinite(el.duration) ? el.duration : Infinity;
-        try { el.currentTime = Math.min(length, Math.max(0, el.currentTime + delta)); } catch { return; }
-        cb.onTime?.(el.currentTime);
+        const to = Math.min(length, Math.max(0, seconds));
+        if (!started || el.readyState < 1) { startAt = to; return; }
+        try { el.currentTime = to; } catch {}
       },
+      position: () => (started && el.readyState >= 1 ? el.currentTime : startAt),
+      duration: () => (Number.isFinite(el.duration) ? el.duration : Infinity),
       dispose,
     };
   };

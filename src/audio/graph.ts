@@ -1,7 +1,7 @@
 /**
  * The audio graph: one AudioContext, three buses (voice, nav, bed) and a master with a gentle limiter.
  *
- *   voice element -> voice chain -> voice bus --------------------------\
+ *   voice element -> voice chain -> fader -> voice bus -----------------\
  *   nav element   -> nav chain   -> nav bus ----------------------------+-> master -> limiter -> out
  *   bed layers -> pocket (wide cut near 1.5 kHz) -> bed level ----------/
  *
@@ -44,8 +44,18 @@ export interface Levels {
   pocketClosed: boolean;
 }
 
+/** A gain the mixer ramps to fade a bus: the one place a fade is a Web Audio ramp. */
+export interface Fader {
+  /** Jump to this gain (0 to 1) now. */
+  set(value: number): void;
+  /** Ramp linearly from the current gain to `value`, arriving `seconds` from now. */
+  ramp(value: number, seconds: number): void;
+}
+
 export interface Graph {
   synth: Synth;
+  /** The fader on the voice bus (stories and asides). Routed elements only: others fade with element.volume. */
+  voiceFader: Fader;
   /** Connect a media element to the voice or nav chain. Returns false when it cannot be routed. */
   route(el: HTMLMediaElement, bus: "voice" | "nav"): boolean;
   /** Fallback for elements that could not be routed: tell the pocket speech is present. */
@@ -136,7 +146,9 @@ export function createGraph(): Graph | null {
     navBus.connect(master);
     const voiceChain = speechChain(ctx);
     const navChain = speechChain(ctx);
-    voiceChain.output.connect(voiceBus);
+    const voiceFade = ctx.createGain();
+    voiceChain.output.connect(voiceFade);
+    voiceFade.connect(voiceBus);
     navChain.output.connect(navBus);
 
     const bedIn = ctx.createGain();
@@ -180,8 +192,24 @@ export function createGraph(): Graph | null {
       setPocket(now - lastSpeech < SPEECH_HOLD_MS);
     }, DRIVE_MS);
 
+    const voiceFader: Fader = {
+      set(value) {
+        const t = ctx.currentTime;
+        voiceFade.gain.cancelScheduledValues(t);
+        voiceFade.gain.setValueAtTime(value, t);
+      },
+      ramp(value, seconds) {
+        const t = ctx.currentTime;
+        const now = voiceFade.gain.value;
+        voiceFade.gain.cancelScheduledValues(t);
+        voiceFade.gain.setValueAtTime(now, t);
+        voiceFade.gain.linearRampToValueAtTime(value, t + Math.max(0.005, seconds));
+      },
+    };
+
     return {
       synth,
+      voiceFader,
       route(el, bus) {
         try {
           const src = ctx.createMediaElementSource(el);
