@@ -67,7 +67,9 @@ describe("sound library", () => {
       expect(c.licence, c.file).toMatch(/^(CC0|Public domain|CC BY \d)/i);
       expect(c.licence, c.file).not.toMatch(/SA|NC|ND|GFDL/i);
       expect(c.author.length, c.file).toBeGreaterThan(0);
-      expect(c.source, c.file).toMatch(/^https?:\/\//);
+      // recordings link to their page; what was composed for Versta names the script that makes it
+      if (c.author !== "Composed for Versta") expect(c.source, c.file).toMatch(/^https?:\/\//);
+      else expect(c.source, c.file).toMatch(/^tools\//);
     }
   });
 

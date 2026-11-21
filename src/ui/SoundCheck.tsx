@@ -185,7 +185,8 @@ export function SoundCheck() {
               <ul>
                 {list.map((c) => (
                   <li key={c.file}>
-                    {c.title}, {c.author}, {c.licence}. <a class="linkbtn" href={c.source} target="_blank" rel="noopener">Source</a>
+                    {c.title}, {c.author}, {c.licence}.{" "}
+                    {/^https?:\/\//.test(c.source) ? <a class="linkbtn" href={c.source} target="_blank" rel="noopener">Source</a> : <span class="sc-src">{c.source}</span>}
                   </li>
                 ))}
               </ul>

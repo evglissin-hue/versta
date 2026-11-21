@@ -65,6 +65,12 @@ mile-end `towpath`, sidney-street `oldstreet`, home `canal` (unchanged). Story o
 
 If task 16 reported an effect as not found, leave that one entry out and say so.
 
+Amendment after task 16 (master): no effect file could be downloaded yet (Wikimedia answered 429 throughout), so
+`public/sounds/fx/` is empty for now. Enter every `sfx` row above in the route files all the same. In `apply_sfx` a
+missing `public/sounds/fx/<name>.mp3` is not a problem but a warning: that entry stays in the route file and is left
+out of `pack.json`, and the run prints each one. Rerunning `pack_sound.py` once the files land fills them in with no
+other change. The other `sfx` rules are checked on every entry in the route file, file or not.
+
 ### `tools/pack_sound.py`
 
 - `apply_music`: copies `music` from the route file to each pack story; a name not in `catalogue.json` `music` is a
@@ -91,8 +97,9 @@ If task 16 reported an effect as not found, leave that one entry out and say so.
 
 ### Tests (`tests/unit/packs.test.ts`)
 
-- For every pack: every story has a `music` in the catalogue; every `sfx` passes the rules above; every ambience
-  name is in the catalogue and has a recipe.
+- For every pack: every story has a `music` in the catalogue; every `sfx` in `pack.json` passes the rules above and
+  has its file; every route file `sfx` entry whose file exists is in `pack.json` (so a rerun is never forgotten);
+  every ambience name is in the catalogue and has a recipe.
 
 ### Docs
 
