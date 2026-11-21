@@ -42,6 +42,10 @@ export interface Levels {
   bed: { all: number; low: number; mid: number; high: number };
   /** True while the pocket is closed (speech present). */
   pocketClosed: boolean;
+  /** RMS in dBFS of the bed after the pocket, left channel only, right channel only, and their mono sum. */
+  bedSides: { left: number; right: number; mono: number };
+  /** RMS in dBFS in a phone speaker's band (300 Hz to 8 kHz): the speech buses together, and the bed. */
+  phone: { voice: number; bed: number };
 }
 
 /** A gain the mixer ramps to fade a bus: the one place a fade is a Web Audio ramp. */
@@ -111,10 +115,11 @@ function speechChain(ctx: AudioContext): { input: AudioNode; output: AudioNode }
 }
 
 /** Two cascaded biquads: about 24 dB per octave, steep enough for band meters. */
-function band(ctx: AudioContext, kind: "low" | "mid" | "high"): { input: AudioNode; output: AudioNode } {
+function band(ctx: AudioContext, kind: "low" | "mid" | "high" | "phone"): { input: AudioNode; output: AudioNode } {
   const stages: BiquadFilterNode[] =
     kind === "low" ? [biquad(ctx, "lowpass", 250, 0.707), biquad(ctx, "lowpass", 250, 0.707)]
     : kind === "high" ? [biquad(ctx, "highpass", 4000, 0.707), biquad(ctx, "highpass", 4000, 0.707)]
+    : kind === "phone" ? [biquad(ctx, "highpass", 300, 0.707), biquad(ctx, "highpass", 300, 0.707), biquad(ctx, "lowpass", 8000, 0.707), biquad(ctx, "lowpass", 8000, 0.707)]
     : [biquad(ctx, "highpass", 250, 0.707), biquad(ctx, "highpass", 250, 0.707), biquad(ctx, "lowpass", 4000, 0.707), biquad(ctx, "lowpass", 4000, 0.707)];
   for (let i = 0; i + 1 < stages.length; i++) stages[i]!.connect(stages[i + 1]!);
   return { input: stages[0]!, output: stages[stages.length - 1]! };
@@ -165,6 +170,28 @@ export function createGraph(): Graph | null {
     voiceBus.connect(vA.node); navBus.connect(nA.node);
     const bAll = analyser(ctx, 8192), bLow = analyser(ctx, 8192), bMid = analyser(ctx, 8192), bHigh = analyser(ctx, 8192);
     bedLevel.connect(bAll.node);
+    // the mix as one earbud or a phone speaker gives it: each side of the bed, their mono sum, and a phone band
+    const split = ctx.createChannelSplitter(2);
+    const bL = analyser(ctx, 8192), bR = analyser(ctx, 8192), bMono = analyser(ctx, 8192);
+    const monoSum = ctx.createGain();
+    monoSum.channelCount = 1;
+    monoSum.channelCountMode = "explicit";
+    monoSum.channelInterpretation = "discrete";
+    // a mono bed must read the same on both sides: up-mix to stereo the way speakers do before splitting
+    const toStereo = ctx.createGain();
+    toStereo.channelCount = 2;
+    toStereo.channelCountMode = "explicit";
+    toStereo.channelInterpretation = "speakers";
+    bedLevel.connect(toStereo); toStereo.connect(split);
+    split.connect(bL.node, 0); split.connect(bR.node, 1);
+    split.connect(monoSum, 0); split.connect(monoSum, 1);
+    monoSum.connect(bMono.node);
+    const speechSum = ctx.createGain();
+    voiceBus.connect(speechSum); navBus.connect(speechSum);
+    const pV = analyser(ctx, 8192), pB = analyser(ctx, 8192);
+    const phoneV = band(ctx, "phone"), phoneB = band(ctx, "phone");
+    speechSum.connect(phoneV.input); phoneV.output.connect(pV.node);
+    bedLevel.connect(phoneB.input); phoneB.output.connect(pB.node);
     for (const [k, a] of [["low", bLow], ["mid", bMid], ["high", bHigh]] as const) {
       const f = band(ctx, k);
       bedLevel.connect(f.input);
@@ -246,7 +273,12 @@ export function createGraph(): Graph | null {
       },
       levels() {
         const mid = rms(bMid);
-        return { voice: db(10 ** (rms(vA) / 10) + 10 ** (rms(nA) / 10)), bed: { all: rms(bAll), low: rms(bLow), mid, high: rms(bHigh) }, pocketClosed: closed };
+        return {
+          voice: db(10 ** (rms(vA) / 10) + 10 ** (rms(nA) / 10)), bed: { all: rms(bAll), low: rms(bLow), mid, high: rms(bHigh) }, pocketClosed: closed,
+          // the mono sum is L + R; halve it (-6 dB) so a centred mono layer reads the same on all three
+          bedSides: { left: rms(bL), right: rms(bR), mono: rms(bMono) - 6.02 },
+          phone: { voice: rms(pV), bed: rms(pB) },
+        };
       },
       dispose() {
         clearInterval(drive);
