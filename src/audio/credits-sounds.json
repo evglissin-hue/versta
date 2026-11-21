@@ -1,0 +1,10 @@
+[
+ {"file": "sounds/water.mp3", "title": "Shallow small river with stony riverbed.ogg", "author": "stephan", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Shallow_small_river_with_stony_riverbed.ogg", "cut": "18 s from the start"},
+ {"file": "sounds/shore.mp3", "title": "On a pebble beach.ogg", "author": "earthcalling", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:On_a_pebble_beach.ogg", "cut": "40 s from the start, high-pass 100 Hz"},
+ {"file": "sounds/wharf.mp3", "title": "Boat by a wharf 2.ogg", "author": "ezwa", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Boat_by_a_wharf_2.ogg", "cut": "40 s from 59 s, high-pass 100 Hz"},
+ {"file": "sounds/wind.mp3", "title": "Howling wind.ogg", "author": "Tvabutzku1234", "licence": "CC0", "source": "https://commons.wikimedia.org/wiki/File:Howling_wind.ogg", "cut": "40 s from 34 s"},
+ {"file": "sounds/gulls.mp3", "title": "Gull 1.ogg", "author": "avphillips", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Gull_1.ogg", "cut": "18 s from the start"},
+ {"file": "sounds/murmur.mp3", "title": "360703 eguobyte large-crowd-medium-distance-stereo.wav", "author": "eguobyte", "licence": "CC0", "source": "https://commons.wikimedia.org/wiki/File:360703_eguobyte_large-crowd-medium-distance-stereo.wav", "cut": "40 s from 12 s"},
+ {"file": "sounds/tick.mp3", "title": "Clock (tic tac).ogg", "author": "Saaabaaato", "licence": "CC0", "source": "https://commons.wikimedia.org/wiki/File:Clock_(tic_tac).ogg", "cut": "18 s from the start"},
+ {"file": "sounds/bells.mp3", "title": "Church bells - Leverkusen, 2007.oga", "author": "natalie", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Church_bells_-_Leverkusen,_2007.oga", "cut": "40 s from the start"}
+]
