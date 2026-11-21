@@ -2,7 +2,7 @@
 // simulator, samples window.__verstaAudio.levels() for 30 s while the first story plays and checks the numbers.
 //
 //   npm run build && npx vite preview --port 4181 --strictPort &
-//   node tools/sound/check-mix.mjs [http://localhost:4181]
+//   node tools/sound/check-mix.mjs [http://localhost:4181]      (CHROME_PATH=... for another Chromium binary)
 //
 // The story is paused for a few seconds in the middle so the gap level is measured over a real, long gap, as well
 // as the natural pauses between sentences.
@@ -13,7 +13,7 @@ const DURATION_S = 30, PAUSE_FROM_S = 14, PAUSE_TO_S = 20, SETTLE_MS = 900;
 const mean = (a) => (a.length ? 10 * Math.log10(a.reduce((s, v) => s + 10 ** (v / 10), 0) / a.length) : NaN);
 const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : "n/a");
 
-const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome", args: ["--no-sandbox", "--autoplay-policy=no-user-gesture-required"] });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
