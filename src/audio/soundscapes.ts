@@ -126,60 +126,104 @@ export const L = {
 export type Preset = (x: Synth, s: Session) => void;
 
 /**
- * One part of a soundscape. With `loop`, the recording plays when it has loaded; `gen` is the generated layer that
- * plays in its place when the recording is missing. A part with only `gen` always plays.
+ * One layer of a soundscape. With `loop`, the recording plays on a loop when it has loaded; `gen` is the generated
+ * layer that plays in its place when the recording is missing. With `fx` and `every`, the layer is sparse: the named
+ * effect (public/sounds/fx/<fx>.mp3) plays once at a random gap of `every[0]` to `every[1]` seconds. `pan` places the
+ * layer between the ears, never further than 0.3 either way so one earbud never loses a layer.
  */
-export interface Part { loop?: string; level?: number; gen?: Preset }
+export interface Part { loop?: string; fx?: string; every?: [number, number]; level?: number; pan?: number; gen?: Preset }
+
+const MAX_PAN = 0.3;
 
 const P = (gen: Preset): Part => ({ gen });
-const R = (loop: string, level: number, gen?: Preset): Part => (gen ? { loop, level, gen } : { loop, level });
+const R = (loop: string, level: number, gen?: Preset, pan?: number): Part => {
+  const p: Part = { loop, level };
+  if (gen) p.gen = gen;
+  if (pan !== undefined) p.pan = pan;
+  return p;
+};
 
 /** Level of a recorded loop (they are normalised to about -26 LUFS) relative to the generated layers. */
 export const LOOP_LEVEL = 1.6;
 
 /**
- * Recorded loops: water (a shallow river), shore (a pebble beach), wharf (a boat at a wharf), wind, gulls, murmur
- * (a crowd), tick (a clock), bells (church bells). Creaking, hammering, dripping, the foghorn and the low rumble are
- * generated: no recording of them with a free enough licence was found.
+ * Recipes: a steady base and one or two texture layers. Recorded loops are the eight in docs/sound-credits.md; the
+ * layers with only `gen` have no recording yet (tools/sound/planned-recipes.txt has the target recipes once those
+ * are fetched). A sparse one-shot layer is `{ fx: "ship-horn", every: [50, 100], level: 0.4 }` and sits at least
+ * 6 dB under the base.
  */
 export const RECIPES: Record<string, Part[]> = {
-  river: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("gulls", 0.6, (x, s) => L.gulls(x, s, 0.8)), P((x, s) => L.foghorn(x, s, 1)), P((x, s) => L.creak(x, s, 0.4))],
-  wharf: [R("wharf", 1, (x, s) => L.water(x, s, 0.4)), P((x, s) => L.creak(x, s, 0.9)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.6))],
-  ship: [R("wharf", 0.9, (x, s) => L.water(x, s, 0.7)), R("wind", 0.5, (x, s) => L.wind(x, s, 0.4)), P((x, s) => L.creak(x, s, 1))],
-  arctic: [R("wind", 1, (x, s) => L.wind(x, s, 1)), R("shore", 0.5, (x, s) => L.water(x, s, 0.8)), P((x, s) => L.creak(x, s, 0.7))],
-  yard: [R("wharf", 0.7, (x, s) => L.water(x, s, 0.4)), P((x, s) => L.hammer(x, s, 1)), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5))],
-  sail: [R("wind", 0.9, (x, s) => L.wind(x, s, 0.9)), R("shore", 0.6, (x, s) => L.water(x, s, 0.6)), P((x, s) => L.creak(x, s, 0.8))],
-  solemn: [R("water", 0.5, (x, s) => L.water(x, s, 0.5)), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3)), R("bells", 0.7, (x, s) => L.toll(x, s, 1, 220, 6, 7))],
+  river: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("gulls", 0.45, (x, s) => L.gulls(x, s, 0.8), 0.25), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2), P((x, s) => L.foghorn(x, s, 1)), P((x, s) => L.creak(x, s, 0.4))],
+  wharf: [R("wharf", 1, (x, s) => L.water(x, s, 0.4)), R("shore", 0.3, (x, s) => L.water(x, s, 0.3), -0.2), P((x, s) => L.creak(x, s, 0.9)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.6), 0.25)],
+  ship: [R("wharf", 0.9, (x, s) => L.water(x, s, 0.7)), R("wind", 0.5, (x, s) => L.wind(x, s, 0.4), 0.25), P((x, s) => L.creak(x, s, 1))],
+  arctic: [R("wind", 1, (x, s) => L.wind(x, s, 1)), R("shore", 0.5, (x, s) => L.water(x, s, 0.8), 0.2), P((x, s) => L.creak(x, s, 0.7))],
+  yard: [R("wharf", 0.7, (x, s) => L.water(x, s, 0.4)), P((x, s) => L.hammer(x, s, 1)), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5), 0.25)],
+  sail: [R("wind", 0.9, (x, s) => L.wind(x, s, 0.9), 0.2), R("shore", 0.6, (x, s) => L.water(x, s, 0.6), -0.2), P((x, s) => L.creak(x, s, 0.8))],
+  solemn: [R("water", 0.5, (x, s) => L.water(x, s, 0.5)), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3), 0.2), R("bells", 0.7, (x, s) => L.toll(x, s, 1, 220, 6, 7), -0.15)],
   tunnel: [P((x, s) => L.rumble(x, s, 1)), P((x, s) => L.drips(x, s, 1))],
-  dock: [R("shore", 0.9, (x, s) => L.water(x, s, 0.6)), P((x, s) => L.creak(x, s, 0.6)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.5))],
+  dock: [R("shore", 0.9, (x, s) => L.water(x, s, 0.6)), P((x, s) => L.creak(x, s, 0.6)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.5), 0.25)],
   tavern: [R("murmur", 1, (x, s) => L.murmur(x, s, 1)), P((x, s) => L.clink(x, s, 1)), P((x, s) => L.water(x, s, 0.25)), P((x, s) => L.creak(x, s, 0.4))],
-  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.5, (x, s) => L.bells(x, s, 1))],
-  canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15))],
+  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.5, (x, s) => L.bells(x, s, 1), 0.2)],
+  canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15), 0.2)],
   clock: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.45)), R("tick", 1, (x, s) => L.tick(x, s, 1))],
+  burial: [R("wind", 0.5, (x, s) => L.wind(x, s, 0.4), 0.2), R("bells", 0.4, (x, s) => L.toll(x, s, 1, 220, 12, 14), -0.2), R("water", 0.15, (x, s) => L.water(x, s, 0.15), 0.15)],
+  office: [R("tick", 0.8, (x, s) => L.tick(x, s, 0.8), -0.15), R("murmur", 0.12, (x, s) => L.murmur(x, s, 0.12), 0.2), P((x, s) => L.rumble(x, s, 0.15))],
+  rally: [R("murmur", 1, (x, s) => L.murmur(x, s, 1)), R("wind", 0.25, (x, s) => L.wind(x, s, 0.2), -0.2)],
+  park: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.35), 0.2), R("murmur", 0.2, (x, s) => L.murmur(x, s, 0.2), -0.2), R("gulls", 0.2, (x, s) => L.gulls(x, s, 0.2), 0.25)],
+  basin: [R("shore", 0.8, (x, s) => L.water(x, s, 0.6), -0.2), R("gulls", 0.6, (x, s) => L.gulls(x, s, 0.6), 0.25), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2), R("water", 0.25, (x, s) => L.water(x, s, 0.25))],
+  "working-dock": [R("wharf", 0.8, (x, s) => L.water(x, s, 0.5)), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.4), 0.25), P((x, s) => L.hammer(x, s, 0.4)), P((x, s) => L.rumble(x, s, 0.3))],
+  mill: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), 0.2), P((x, s) => L.creak(x, s, 0.3))],
+  pumping: [P((x, s) => L.rumble(x, s, 1)), R("water", 0.35, (x, s) => L.water(x, s, 0.35), 0.2)],
+  towpath: [R("water", 0.5, (x, s) => L.water(x, s, 0.3)), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2), R("gulls", 0.15, (x, s) => L.gulls(x, s, 0.15), -0.2)],
+  oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls", 0.25, (x, s) => L.gulls(x, s, 0.25), 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
 };
 
 const recipeFor = (name: string): Part[] => RECIPES[name] ?? RECIPES["river"]!;
 
-/** Names of the recorded loops a soundscape would use, so they can be loaded before it starts. */
+/** The loop names a soundscape uses and the `fx/<name>` names of its sparse layers, so they can be loaded before it starts. */
 export function loopsFor(name: string): string[] {
-  return recipeFor(name).flatMap((p) => (p.loop ? [p.loop] : []));
+  return recipeFor(name).flatMap((p) => (p.loop ? [p.loop] : p.fx ? [`fx/${p.fx}`] : []));
 }
 
-/** Every loop name any recipe mentions. */
+/** Every loop and effect name any recipe mentions. */
 export function allLoops(): string[] {
   return [...new Set(Object.keys(RECIPES).flatMap(loopsFor))];
+}
+
+/** Connect a layer's gain to the session bus, through a stereo panner when it has a pan. */
+function wire(x: Synth, s: Session, g: GainNode, pan: number | undefined): void {
+  if (pan === undefined || pan === 0) { g.connect(s.bus); return; }
+  const p = x.ctx.createStereoPanner();
+  p.pan.value = Math.max(-MAX_PAN, Math.min(MAX_PAN, pan));
+  g.connect(p); p.connect(s.bus);
 }
 
 /** Start the named soundscape on a session. Unknown names fall back to the river. */
 export function buildAmbience(x: Synth, s: Session, name: string, loops: LoopLib | null): void {
   for (const part of recipeFor(name)) {
+    if (part.fx) {
+      const fx = part.fx;
+      const [a, b] = part.every ?? [30, 60];
+      every(s, a, b, () => {
+        const buf = loops?.get(`fx/${fx}`);
+        if (!buf) return;
+        const src = x.ctx.createBufferSource();
+        src.buffer = buf;
+        const g = gain(x, (part.level ?? 0.4) * LOOP_LEVEL);
+        src.connect(g); wire(x, s, g, part.pan);
+        src.onended = () => { const i = s.srcs.indexOf(src); if (i >= 0) s.srcs.splice(i, 1); };
+        s.srcs.push(src);
+        src.start();
+      }, rnd(a * 0.3, a));
+      continue;
+    }
     const buf = part.loop ? loops?.get(part.loop) : undefined;
     if (part.loop && buf) {
       const src = x.ctx.createBufferSource();
       src.buffer = buf;
       src.loop = true;
       const g = gain(x, (part.level ?? 1) * LOOP_LEVEL);
-      src.connect(g); g.connect(s.bus);
+      src.connect(g); wire(x, s, g, part.pan);
       src.start(0, Math.random() * buf.duration);
       s.srcs.push(src);
     } else if (part.gen) {
