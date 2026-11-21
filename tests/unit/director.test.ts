@@ -811,6 +811,19 @@ describe("the bed around stories", () => {
     expect(r.mixer.bed).toBeNull();
   });
 
+  it("finished at the last stop: arrival, its stories, then the finish flourish in place of the close", async () => {
+    const r = rig();
+    const last = pack.stops.length - 1;
+    r.d.handle([{ type: "arrive", stop: last }, { type: "finished" }], nav({ status: "finished", seg: last }));
+    await ms(600_000);
+    const sig = timeline(r, "signal", "on").map((e) => e.src);
+    expect(sig).toEqual(["arrive", "finish"]);
+    const tl = r.mixer.timeline;
+    const fin = tl.findIndex((e) => e.ch === "signal" && e.src === "finish" && e.ev === "on");
+    const lastVoice = tl.map((e, i) => (e.ch === "voice" && e.ev === "off" ? i : -1)).filter((i) => i >= 0).pop()!;
+    expect(fin).toBeGreaterThan(lastVoice);
+  });
+
   it("finished: the finish signal after the nav queue, none with the Soundscape switch off", async () => {
     const r = rig();
     r.d.handle([{ type: "off_route" }, { type: "finished" }], nav({ status: "finished" }));

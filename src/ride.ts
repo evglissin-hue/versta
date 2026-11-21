@@ -117,8 +117,9 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
           // the simulated rider stands through the short lead before a stop's first story, as a real one would
           if (sim && source.hold) {
             source.hold(true);
-            const at = e.stop;
-            setTimeout(() => { if (ride?.source === source && nowPlaying.value === null && engine.state.seg === at) source.hold?.(false); }, ARRIVAL_HOLD_MS / (sim.scale > 0 ? sim.scale : 1));
+            // after an arrival the engine is already on the next leg: release only while it still is, and nothing plays
+            const leg = engine.state.seg;
+            setTimeout(() => { if (ride?.source === source && nowPlaying.value === null && engine.state.seg === leg) source.hold?.(false); }, ARRIVAL_HOLD_MS / (sim.scale > 0 ? sim.scale : 1));
           }
         }
         else if (e.type === "cue" && e.phase === "now" && e.cue.turn !== "depart" && e.cue.turn !== "straight") buzz(40);

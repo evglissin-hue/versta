@@ -78,6 +78,8 @@ export function createDirector(deps: DirectorDeps): Director {
   let bedKey: string | null = null;
   /** Timers of the bed: the story that follows an arrival, the stop's soundscape alone, and the linger after the last story. */
   let arrivalTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The ride has finished while the last stop's stories are still to come: the finish signal waits for them. */
+  let finishAfterStories = false;
   let bedOnlyTimer: ReturnType<typeof setTimeout> | undefined;
   let lingerTimer: ReturnType<typeof setTimeout> | undefined;
   /** The rider has ridden away from the stop whose stories are still queued: they get no bed. */
@@ -292,7 +294,9 @@ export function createDirector(deps: DirectorDeps): Director {
     clearMediaSession();
     deps.onNowPlaying(null);
     if (!leftStop) {
-      if (deps.settings().ambience) signal("close");
+      // at the last stop the finish flourish closes the ride in place of the close signal
+      if (deps.settings().ambience) signal(finishAfterStories ? "finish" : "close");
+      finishAfterStories = false;
       startLinger();
     }
   }
@@ -527,7 +531,9 @@ export function createDirector(deps: DirectorDeps): Director {
           }
           case "finished":
             log("finished");
-            if (deps.settings().ambience) signal("finish");
+            // the last stop's stories come first; the flourish follows them (see advance)
+            if (current || arrivalTimer !== undefined) finishAfterStories = true;
+            else if (deps.settings().ambience) signal("finish");
             break;
         }
       }

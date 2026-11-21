@@ -35,10 +35,14 @@ async function ride(page: Page, entry: Entry, query: string): Promise<Snapshot> 
   // collect the log as the ride goes: the app keeps only the last few hundred entries
   const seen = new Map<string, LogEntry>();
   let last: Snapshot | null = null;
+  // finished and quiet for 2 s of real time: at the last stop the home story starts a few simulated seconds after
+  // the ride reports finished, and a single quiet snapshot can fall in that gap
+  let quiet = 0;
   for (let i = 0; i < 1500; i++) {
     last = await snapshot(page);
     for (const e of last.log) seen.set(`${e.at}|${e.what}|${e.id ?? ""}`, e);
-    if (last.status === "finished" && last.playing === null) break;
+    quiet = last.status === "finished" && last.playing === null ? quiet + 1 : 0;
+    if (quiet >= 10) break;
     await page.waitForTimeout(200);
   }
   expect(errors, "no uncaught errors during the ride").toEqual([]);
