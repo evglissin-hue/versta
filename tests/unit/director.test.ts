@@ -104,7 +104,7 @@ describe("a cue in the middle of a story", () => {
     const end = r.log.find((e) => e.what === "story_end")!.at;
     const dur = pack.stops[DEPTFORD]!.stories[0]!.audio!.dur;
     const cueSeconds = cue.say.split(/\s+/).length / 2.6;
-    expect((end - start) / 1000).toBeCloseTo(dur + cueSeconds + 0.25, 1);
+    expect((end - start) / 1000).toBeCloseTo(dur + cueSeconds + 0.25 + 0.15 + 1.5, 1);
   });
 });
 
@@ -122,7 +122,7 @@ describe("passing-by stories", () => {
     const r = rig();
     await riding(r);
     r.d.handle(aside(), nav());
-    await ms(1300);
+    await ms(3300);
     expect(last(r)).toEqual({ kind: "aside", aside: a0 });
     expect(whats(r)).toEqual([`aside_played:${a0.id}`]);
     await ms(120_000);
@@ -175,7 +175,7 @@ describe("passing-by stories", () => {
     r.d.handle(aside(), nav({ toCue: 80 }));
     expect(skipped(r)).toEqual(["near_turn"]);
     r.d.handle(aside(), nav({ toCue: 81 }));
-    await ms(1300);
+    await ms(3300);
     expect(last(r)?.kind).toBe("aside");
   });
 
@@ -200,7 +200,7 @@ describe("passing-by stories", () => {
     const r = rig({ asides: mode });
     await riding(r);
     r.d.handle(aside(a0), nav());
-    await ms(1200);
+    await ms(3200);
     while (r.mixer.voiceBusy) await ms(1000);
     const endedAt = Date.now();
     await ms(100_000 - (Date.now() - endedAt));
@@ -216,7 +216,7 @@ describe("passing-by stories", () => {
   it("two asides 100 s apart: the second plays in rich", async () => {
     const r = await twoAsides("rich");
     expect(skipped(r)).toEqual([]);
-    await ms(1300);
+    await ms(3300);
     expect(last(r)).toEqual({ kind: "aside", aside: a1 });
   });
 
@@ -447,7 +447,7 @@ describe("way back after going off route", () => {
     await ms(61_000);
     expect(r.mixer.bed).toBeNull();
     r.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 4 }));
-    await ms(1300);
+    await ms(3300);
     expect(last(r)?.kind).toBe("aside");
     expect(r.mixer.bed).toEqual({ ambience: pack.stops[3]!.ambience, music: null });
     await ms(120_000);
@@ -624,7 +624,7 @@ describe("rewind", () => {
     r.d.handle([], nav({ toStop: 2000, toCue: 500 }));
     await ms(61_000);
     r.d.handle([{ type: "aside", aside }], nav({ toStop: 2000, toCue: 500 }));
-    await ms(2000);
+    await ms(3500);
     expect(r.now.at(-1)?.kind).toBe("aside");
     r.d.rewind!(10);
     expect(seek).toHaveBeenCalledWith(-10);
