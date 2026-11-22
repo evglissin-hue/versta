@@ -110,8 +110,15 @@ export function recordingFile(r: RideRecording): { name: string; text: string } 
 }
 
 /** Android app: hand the file to the system share sheet. The master fills this in. */
-export function exportRecordingNative(_file: { name: string; text: string }): Promise<void> {
-  throw new Error("not yet");
+/**
+ * The Android app: write the file to the app's cache and hand it to the share sheet, so the rider can send it by
+ * mail or a chat app. @capacitor/share is the only way to give a file to another app on Android.
+ */
+export async function exportRecordingNative(file: { name: string; text: string }): Promise<void> {
+  const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+  const { Share } = await import("@capacitor/share");
+  const written = await Filesystem.writeFile({ path: `rides/${file.name}`, data: file.text, directory: Directory.Cache, encoding: Encoding.UTF8, recursive: true });
+  await Share.share({ title: "Versta ride recording", files: [written.uri], dialogTitle: "Send the ride recording" });
 }
 
 /** Save the recording as a file: a download on the web, the share sheet in the Android app. */

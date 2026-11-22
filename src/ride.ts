@@ -8,12 +8,14 @@ import { geoDistance } from "./geo";
 import { createMixer } from "./audio/mixer";
 import { effect } from "@preact/signals";
 import { createDirector } from "./story/director";
-import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, screen, settings, simulated, startChoice } from "./state";
+import { beginRecording, type RideRecorder } from "./record/recorder";
+import { isNative } from "./native/platform";
+import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated, startChoice } from "./state";
 import type { Director, Fix, FixSource, LngLat, Mixer, NavEngine, Pack, RouteGraph, SoundEvent, StartChoice } from "./types";
 
 export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean }
 
-interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number; stopEffects: () => void }
+interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number; stopEffects: () => void; rec: RideRecorder | null }
 const BED_LEVELS = { soft: 0.6, balanced: 1, rich: 1.6 } as const;
 /** How long the simulated rider stands after arriving before a story has started: the director's arrival lead plus a margin. */
 const ARRIVAL_HOLD_MS = 4000;
@@ -34,7 +36,15 @@ export function savedRide(): SavedRide | null {
     return s && Date.now() - s.savedAt < SAVE_MAX_AGE ? s : null;
   } catch { return null; }
 }
-export function forgetSavedRide(): void { try { localStorage.removeItem(SAVE_KEY); } catch {} }
+export function forgetSavedRide(): void {
+  try { localStorage.removeItem(SAVE_KEY); } catch {}
+  // an update held back for the saved ride may switch in now
+  routesRideEnded();
+}
+/** Tell the route store (Android app) that no ride holds its updates or transfers back now. */
+function routesRideEnded(): void {
+  if (isNative()) void import("./routes/store").then((m) => m.routeStore.rideEnded()).catch(() => {});
+}
 function saveRide(): void {
   if (!ride || simulated.value) return;
   const st = ride.engine.state;
@@ -86,21 +96,26 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       source.hold?.(atItsStop);
     },
     onLog: (entry) => {
+      ride?.rec?.log(entry);
       directorLog.value = [...directorLog.value.slice(-400), entry];
       if (entry.what === "arrive" || entry.what === "story_start" || entry.what === "aside_played" || entry.what === "finished") saveRide();
     },
   });
   // the rider's soundscape level follows the setting, live
   const stopEffects = effect(() => { mixer.setBedLevel?.(BED_LEVELS[settings.value.bedLevel] ?? 1); });
-  ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects };
+  // every real ride is recorded on the device, so a problem met on the road can be replayed as a test
+  const rec = sim ? null : beginRecording({ packId: p.id, version: packIndex.value.find((e) => e.id === p.id)?.version ?? null, startAt: 0, app: isNative() ? "android" : "web" });
+  ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects, rec };
   let lastFix: Fix | null = null;
   chooseHook = (stop: number) => {
     if (!choosing || ride?.engine !== engine) return;
     choosing = false;
     startChoice.value = null;
     engine.startAt?.(stop);
+    if (ride.rec) { ride.rec.recording.startAt = stop; ride.rec.tap("choose_stop", stop); }
     if (lastFix) {
       const events = engine.update(lastFix);
+      ride.rec?.events(lastFix.time, events);
       nav.value = { ...engine.state };
       director.handle(events, engine.state);
     }
@@ -123,6 +138,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
     (fix) => {
       if (!ride) return;
       if (gpsError.value) gpsError.value = null;
+      ride.rec?.fix(fix);
       if (choosing) {
         const offer = startOffer(p, fix);
         if (!offer) choosing = false;
@@ -134,9 +150,11 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
         }
       }
       const events = engine.update(fix);
+      ride.rec?.events(fix.time, events);
       nav.value = { ...engine.state };
       director.handle(events, engine.state);
       for (const e of events) {
+        if (e.type === "finished") ride.rec?.end();
         if (e.type === "arrive") {
           openStop.value = e.stop; buzz([60, 80, 60]);
           // the simulated rider stands through the short lead before a stop's first story, as a real one would
@@ -162,9 +180,11 @@ export function endRide(forget = true): void {
   if (!ride) return;
   if (forget) forgetSavedRide();
   document.removeEventListener("visibilitychange", onVisible);
+  ride.rec?.tap("end"); ride.rec?.end();
   ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose(); ride.mixer.dispose?.();
   void ride.wake?.release().catch(() => {});
   ride = null; chooseHook = null; startChoice.value = null;
+  routesRideEnded();
   nav.value = IDLE_NAV; nowPlaying.value = null; openStop.value = null; screen.value = "home";
 }
 
@@ -197,6 +217,7 @@ export function chooseStart(stop: number): void { chooseHook?.(stop); }
 /** Rider chose to head for another stop (skipped one, or joined the route part way). */
 export function jumpToStop(stop: number): void {
   if (!ride) return;
+  ride.rec?.tap("jump", stop);
   ride.engine.jumpToSegment(stop);
   nav.value = { ...ride.engine.state };
 }
