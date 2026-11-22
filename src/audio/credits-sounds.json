@@ -1,10 +1,290 @@
 [
- {"file": "sounds/water.mp3", "title": "Shallow small river with stony riverbed.ogg", "author": "stephan", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Shallow_small_river_with_stony_riverbed.ogg", "cut": "18 s from the start"},
- {"file": "sounds/shore.mp3", "title": "On a pebble beach.ogg", "author": "earthcalling", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:On_a_pebble_beach.ogg", "cut": "40 s from the start, high-pass 100 Hz"},
- {"file": "sounds/wharf.mp3", "title": "Boat by a wharf 2.ogg", "author": "ezwa", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Boat_by_a_wharf_2.ogg", "cut": "40 s from 59 s, high-pass 100 Hz"},
- {"file": "sounds/wind.mp3", "title": "Howling wind.ogg", "author": "Tvabutzku1234", "licence": "CC0", "source": "https://commons.wikimedia.org/wiki/File:Howling_wind.ogg", "cut": "40 s from 34 s"},
- {"file": "sounds/gulls.mp3", "title": "Gull 1.ogg", "author": "avphillips", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Gull_1.ogg", "cut": "18 s from the start"},
- {"file": "sounds/murmur.mp3", "title": "360703 eguobyte large-crowd-medium-distance-stereo.wav", "author": "eguobyte", "licence": "CC0", "source": "https://commons.wikimedia.org/wiki/File:360703_eguobyte_large-crowd-medium-distance-stereo.wav", "cut": "40 s from 12 s"},
- {"file": "sounds/tick.mp3", "title": "Clock (tic tac).ogg", "author": "Saaabaaato", "licence": "CC0", "source": "https://commons.wikimedia.org/wiki/File:Clock_(tic_tac).ogg", "cut": "18 s from the start"},
- {"file": "sounds/bells.mp3", "title": "Church bells - Leverkusen, 2007.oga", "author": "natalie", "licence": "Public domain", "source": "https://commons.wikimedia.org/wiki/File:Church_bells_-_Leverkusen,_2007.oga", "cut": "40 s from the start"}
+ {
+  "file": "sounds/bells.mp3",
+  "title": "Church bells - Leverkusen, 2007.oga",
+  "author": "natalie",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Church_bells_-_Leverkusen,_2007.oga",
+  "cut": "40 s from the start"
+ },
+ {
+  "file": "sounds/birds.mp3",
+  "title": "Birds singing in garden.ogg",
+  "author": "ezwa",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Birds_singing_in_garden.ogg",
+  "cut": "45 s from 4 s"
+ },
+ {
+  "file": "sounds/church.mp3",
+  "title": "Church people walking steps with reverb.ogg",
+  "author": "stephan",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Church_people_walking_steps_with_reverb.ogg",
+  "cut": "30 s from the start"
+ },
+ {
+  "file": "sounds/creak.mp3",
+  "title": "WWS Creakingfloors.ogg",
+  "author": "Work With Sounds / Torsten Nilsson",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Creakingfloors.ogg",
+  "cut": "45 s from 32 s"
+ },
+ {
+  "file": "sounds/crowd.mp3",
+  "title": "211146 unfa another-crowd.flac",
+  "author": "unfa",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:211146_unfa_another-crowd.flac",
+  "cut": "50 s from the start"
+ },
+ {
+  "file": "sounds/drips.mp3",
+  "title": "WWS Waterdrainingthroughtherock.ogg",
+  "author": "Work With Sounds / Technical Museum of Slovenia",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Waterdrainingthroughtherock.ogg",
+  "cut": "35 s from 6 s"
+ },
+ {
+  "file": "sounds/fx/adze.mp3",
+  "title": "WWS Wheelwrightcarvingaspoke.ogg",
+  "author": "Work With Sounds / Museum of Municipal Engineering",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Wheelwrightcarvingaspoke.ogg",
+  "cut": "3 s from 98 s"
+ },
+ {
+  "file": "sounds/fx/bubbling.mp3",
+  "title": "Oil boiling.ogg",
+  "author": "ezwa",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Oil_boiling.ogg",
+  "cut": "5 s from 1 s"
+ },
+ {
+  "file": "sounds/fx/chain.mp3",
+  "title": "WWS Wardrobechainloweringandraising.ogg",
+  "author": "Work With Sounds / Technical Museum of Slovenia",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Wardrobechainloweringandraising.ogg",
+  "cut": "4 s from 10 s"
+ },
+ {
+  "file": "sounds/fx/crowd.mp3",
+  "title": "211146 unfa another-crowd.flac",
+  "author": "unfa",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:211146_unfa_another-crowd.flac",
+  "cut": "6 s from 25 s"
+ },
+ {
+  "file": "sounds/fx/fire-crackle.mp3",
+  "title": "Campfire sound ambience.ogg",
+  "author": "Glaneur de sons",
+  "licence": "CC BY 3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg",
+  "cut": "5 s from 17 s"
+ },
+ {
+  "file": "sounds/fx/hammer.mp3",
+  "title": "WWS Watersmithyforgingwithtwohammers.ogg",
+  "author": "Work With Sounds / Museum of Municipal Engineering",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Watersmithyforgingwithtwohammers.ogg",
+  "cut": "3 s from 4 s"
+ },
+ {
+  "file": "sounds/fx/ice-creak.mp3",
+  "title": "Singing iceberg.oga",
+  "author": "Müller, Christian; Schlindwein, Vera; Eckstaller, Alfons; Miller, Heinz (2005)",
+  "licence": "CC BY 3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Singing_iceberg.oga",
+  "cut": "4 s from 159 s"
+ },
+ {
+  "file": "sounds/fx/ship-horn.mp3",
+  "title": "Fog signal Bremerhaven.ogg",
+  "author": "Tvabutzku1234",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:Fog_signal_Bremerhaven.ogg",
+  "cut": "5 s from 0 s"
+ },
+ {
+  "file": "sounds/fx/steam-engine.mp3",
+  "title": "Steam engine.ogg",
+  "author": "aradlaw",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Steam_engine.ogg",
+  "cut": "6 s from 12 s"
+ },
+ {
+  "file": "sounds/fx/telegraph.mp3",
+  "title": "WWS Teleprintertyping.ogg",
+  "author": "Work With Sounds / Konrad Gutkowski",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Teleprintertyping.ogg",
+  "cut": "4 s from 62 s"
+ },
+ {
+  "file": "sounds/fx/water-lap.mp3",
+  "title": "WWS Smallwaves.ogg",
+  "author": "Work With Sounds / Torsten Nilsson",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Smallwaves.ogg",
+  "cut": "4 s from 23 s"
+ },
+ {
+  "file": "sounds/fx/water-wheel.mp3",
+  "title": "WWS Horizontalwaterwheel.ogg",
+  "author": "Work With Sounds / Konrad Gutkowski",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Horizontalwaterwheel.ogg",
+  "cut": "6 s from 3 s"
+ },
+ {
+  "file": "sounds/gulls.mp3",
+  "title": "Gull 1.ogg",
+  "author": "avphillips",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Gull_1.ogg",
+  "cut": "18 s from the start"
+ },
+ {
+  "file": "sounds/gulls2.mp3",
+  "title": "Gulls above the street at dawn.ogg",
+  "author": "earthcalling",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Gulls_above_the_street_at_dawn.ogg",
+  "cut": "45 s from 12 s"
+ },
+ {
+  "file": "sounds/hum.mp3",
+  "title": "Pump.ogg",
+  "author": "ezwa",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Pump.ogg",
+  "cut": "30 s from the start, low-pass 2500 Hz"
+ },
+ {
+  "file": "sounds/ice.mp3",
+  "title": "Singing iceberg.oga",
+  "author": "Müller, Christian; Schlindwein, Vera; Eckstaller, Alfons; Miller, Heinz (2005)",
+  "licence": "CC BY 3.0",
+  "source": "https://commons.wikimedia.org/wiki/File:Singing_iceberg.oga",
+  "cut": "40 s from 161 s"
+ },
+ {
+  "file": "sounds/lap.mp3",
+  "title": "WWS Smallwaves.ogg",
+  "author": "Work With Sounds / Torsten Nilsson",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Smallwaves.ogg",
+  "cut": "45 s from 2 s, high-pass 90 Hz"
+ },
+ {
+  "file": "sounds/murmur.mp3",
+  "title": "360703 eguobyte large-crowd-medium-distance-stereo.wav",
+  "author": "eguobyte",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:360703_eguobyte_large-crowd-medium-distance-stereo.wav",
+  "cut": "40 s from 12 s"
+ },
+ {
+  "file": "sounds/office.mp3",
+  "title": "LA2 kitchen clock.ogg",
+  "author": "LA2",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:LA2_kitchen_clock.ogg",
+  "cut": "20 s from the start"
+ },
+ {
+  "file": "sounds/pub.mp3",
+  "title": "Restaurant ambience.ogg",
+  "author": "stephan",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Restaurant_ambience.ogg",
+  "cut": "45 s from 31 s"
+ },
+ {
+  "file": "sounds/river.mp3",
+  "title": "433589 jackthemurray stream-river-water-up-close.wav",
+  "author": "jackthemurray",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:433589_jackthemurray_stream-river-water-up-close.wav",
+  "cut": "60 s from 7 s"
+ },
+ {
+  "file": "sounds/shore.mp3",
+  "title": "On a pebble beach.ogg",
+  "author": "earthcalling",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:On_a_pebble_beach.ogg",
+  "cut": "40 s from the start, high-pass 100 Hz"
+ },
+ {
+  "file": "sounds/signals/aside.mp3",
+  "title": "WWS ShipSodekshipsbell.ogg",
+  "author": "Work With Sounds / Museum of Municipal Engineering",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_ShipSodekshipsbell.ogg",
+  "cut": "3 s from 1 s"
+ },
+ {
+  "file": "sounds/tick.mp3",
+  "title": "Clock (tic tac).ogg",
+  "author": "Saaabaaato",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:Clock_(tic_tac).ogg",
+  "cut": "18 s from the start"
+ },
+ {
+  "file": "sounds/tide.mp3",
+  "title": "Water over rocks as tide recedes.ogg",
+  "author": "earthcalling",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Water_over_rocks_as_tide_recedes.ogg",
+  "cut": "30 s from the start, high-pass 100 Hz"
+ },
+ {
+  "file": "sounds/timber.mp3",
+  "title": "WWS Wheelwrightcarvingaspoke.ogg",
+  "author": "Work With Sounds / Museum of Municipal Engineering",
+  "licence": "CC BY 4.0",
+  "source": "https://commons.wikimedia.org/wiki/File:WWS_Wheelwrightcarvingaspoke.ogg",
+  "cut": "40 s from 42 s"
+ },
+ {
+  "file": "sounds/water.mp3",
+  "title": "Shallow small river with stony riverbed.ogg",
+  "author": "stephan",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Shallow_small_river_with_stony_riverbed.ogg",
+  "cut": "18 s from the start"
+ },
+ {
+  "file": "sounds/weir.mp3",
+  "title": "Vojníkov, 3. jez, středa.ogg",
+  "author": "Juandev",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Vojníkov,_3._jez,_středa.ogg",
+  "cut": "40 s from the start"
+ },
+ {
+  "file": "sounds/wharf.mp3",
+  "title": "Boat by a wharf 2.ogg",
+  "author": "ezwa",
+  "licence": "Public domain",
+  "source": "https://commons.wikimedia.org/wiki/File:Boat_by_a_wharf_2.ogg",
+  "cut": "40 s from 59 s, high-pass 100 Hz"
+ },
+ {
+  "file": "sounds/wind.mp3",
+  "title": "Howling wind.ogg",
+  "author": "Tvabutzku1234",
+  "licence": "CC0",
+  "source": "https://commons.wikimedia.org/wiki/File:Howling_wind.ogg",
+  "cut": "40 s from 34 s"
+ }
 ]
