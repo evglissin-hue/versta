@@ -1,6 +1,7 @@
 # Iteration 6: content that grows, and a better ride (spec)
 
-Status: asked for by Evgeny on 22 November 2026, scope settled the same day. Briefs `it6-21` to `it6-30`.
+Status: asked for by Evgeny on 22 November 2026, scope settled the same day. Briefs `it6-21` to `it6-30`. Built the
+same day: all ten tasks merged, two review rounds (`iteration-6-rounds.md`). Waiting on the phone checks.
 
 ## What Evgeny asked for
 

@@ -31,6 +31,9 @@ Quality check (each diff against its brief):
 - Task 28: as briefed; the master wired it into `src/ride.ts` and added a status bar icon (a white V) so Android does
   not show a blank square.
 - Task 29: as briefed.
+- Task 30: as briefed, plus: a place held back by the 5 minute gap is told later if the rider is still near it.
+  `nearbyControls.play` now says whether it found the place, because a tap that opens the app arrives before the
+  places have loaded. The master starts the watch at launch and stops it when a route ride starts.
 - A unit test of the mixer timed out at 5 s while six worktrees loaded the machine (it takes 2 s alone): given 20 s.
 - Parallel worktrees could have tested each other's build (Playwright reused whatever server held port 4173):
   `E2E_PORT` now gives each its own.
@@ -63,6 +66,28 @@ Rider's seat (screenshots of every new state, light and dark, 390 by 844):
 - Nearby: a passing-by place is named after its story, so the title showed twice. The repeat is hidden.
 - The Recordings sheet looked see-through in one screenshot: the open animation caught mid-fade. Settled, it is
   opaque.
+
+## Round 2
+
+- `npm run check`: 371 unit tests pass, build clean. Full e2e: 48 of 48.
+- The Android build passes on CI from the branch (run 45060874019) with the three new plugins.
+- Nothing new found on the web. What is left can only be found on a phone.
+
+## Phone checks (Evgeny)
+
+1. Install the test APK over the current app. Home: both routes are there, nothing to download.
+2. Routes on Wi-Fi: once a third route or a changed story is on the site, opening the app on Wi-Fi brings it in by
+   itself; on mobile data the card offers Download with its size. Play a downloaded story and skip back in it
+   (seeking in a file the app downloaded).
+3. Start a ride away from stop 1: the sheet asks where to start; Back to the routes works.
+4. Turns: the map zooms in on each junction and back out after.
+5. Lock screen: allow notifications; with the screen off the next turn and distance show and update; ending the ride
+   removes it.
+6. Nearby places: the list and map around you; Play; "Play when I get there".
+7. Pocket alerts: switch on "Tell me when I pass a place", lock the phone, walk past a place: one notification; tap
+   it and the story plays. Battery after an hour.
+8. After a real ride: Sound and settings, then Ride recordings, then Save file: send it to Claude, and it becomes a
+   replay test.
 
 ## Open
 
