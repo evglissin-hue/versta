@@ -89,7 +89,7 @@ function FirstRide() {
         <li>Allow location when your phone asks.</li>
         <li>Turn the volume up. Earphones are best.</li>
         {isNative()
-          ? <li>Allow location all the time, so the ride carries on in your pocket.</li>
+          ? <><li>Allow location all the time, so the ride carries on in your pocket.</li><li>Allow notifications to see the next turn on the lock screen.</li></>
           : <li>Keep the screen on, or use the Android app for the pocket.</li>}
       </ul>
       <div class="acts"><button type="button" class="btn play" onClick={go}>Start the ride</button></div>
