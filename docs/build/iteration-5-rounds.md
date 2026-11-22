@@ -144,12 +144,27 @@ Mix:
   is the iteration 2 pocket (a 2 dB drop of the whole bed and the lower edge of the 500 Hz cut) meeting the new
   river recording. Not retuned before anyone has listened.
 
+## Round 4: the synthesised sounds (22 November)
+
+Made in their own session with sfx-skill (MIT), synthesis only, all CC0: nine effects and five 30 s loops
+(`tools/sound/sfx/`). Recipes: rigging under ship and sail, cobbles in sailortown and oldstreet, the foot tunnel
+replaces the generated rumble, waders in basin, the dockyard in working-dock; sparse sail-flap, tankards (in place of
+the generated clink), water-flow, waders and crates. Both packs rebuilt: nine stories gain their effects. Trims
+measured again.
+
+- `build_sounds.py check`: every file passes, 8.84 MB in all.
+- check-mix: Royal Docks passes every target. The Thames passes all but the low band, at 5.2 and 5.9 dB against 5 in
+  two runs. The base commit fails it too (5.0 and 5.1): it is the river borderline of round 3, not the new sounds.
+- Effects under the voice on the Thames: 14.2 and 11.7 dB in two runs (the same recorded effects as before).
+- The new effects are mastered like the recorded ones but are not in the stories check-mix measures.
+- Nobody has listened. sfx-skill's own check flags short clicks at the wood strikes of oars and crates (intended
+  contact) and quieter sub-layers in the loops; each loop's events stand 7 to 28 dB over its bed.
+
 ## Open
 
-- Nine effects have no recording under the licence bar: sail-flap, tankards, oars, distant-cannon, parrots,
-  big-bell, crates, waders, water-flow. To add one, put a source in `tools/sound/sources.json`, run
-  `build_sounds.py` fetch, process, check and credits, take the name off the list in `tests/unit/sounds.test.ts`,
-  then rerun `pack_sound.py` for both packs. A Freesound token would widen the choice.
+- The nine effects with no recording (sail-flap, tankards, oars, distant-cannon, parrots, big-bell, crates, waders,
+  water-flow) and five loops (rigging, cobbles, tunnel, waders, dockyard) are now synthesised with sfx-skill, see
+  round 4. A recording found later can replace any of them through `tools/sound/sources.json`.
 - Nobody has listened to any of it. Before the PR, Evgeny needs about an hour with the Sound check screen and the
   narrator switch: every soundscape, theme, signal and effect, the level of the music and of the effects, and
   whether the Thames bed pumps under speech.
