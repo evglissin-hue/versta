@@ -1,4 +1,4 @@
-{"id":"thames-loop","version":"b9660e4f13d8da3e","format":1,"files":[
+{"id":"thames-loop","version":"ebd85d84985a5a3b","format":1,"files":[
   {"path":"asides/blitz-docks.mp3","bytes":143805,"sha256":"1bcf6c052eb1efc40e5d5e42d1ee1460db6b5973ea0627dab686d01b6279bb37"},
   {"path":"asides/cable-street.mp3","bytes":147693,"sha256":"0327780954ed4712cb54bdbabdd9731f8e0a3469b48b9cc304040f97ff5cccd9"},
   {"path":"asides/defoe.mp3","bytes":163389,"sha256":"6588cca57f986c8e6ad0d62b1ff47602b5bb9c8e5c592d3e39366bd1df1df900"},
@@ -157,7 +157,7 @@
   {"path":"img/tower-bridge.jpg","bytes":62040,"sha256":"b749e3674c62c454528fab1693ca4f494ab9c7746e406efb288b877d252a1721"},
   {"path":"img/west-india-docks.jpg","bytes":53138,"sha256":"f4842a0d03331ea36e1b478c4a4bb37319bc58772f04c08c59f35b8fc04d1ee4"},
   {"path":"img/whistler-limehouse.jpg","bytes":96077,"sha256":"8b23e2238b53e27de75a6e2bee9860b61c44f3fa90ef7652065564973cde8b9e"},
-  {"path":"pack.json","bytes":75149,"sha256":"2377519a67c9649bc32824bbb7841c03187069e82b602a2cff4cf962220320cf"},
+  {"path":"pack.json","bytes":75415,"sha256":"402257f47d93fc997fa5b42bff0d03b749c16c2e861079cea7dac26f231a16a4"},
   {"path":"system/arrive-canary-wharf.mp3","bytes":14205,"sha256":"8af3ffdbf3316dca44c1b0dceb7795e73d2603738b8f70ed91f17f5a761af893"},
   {"path":"system/arrive-foot-tunnel.mp3","bytes":20973,"sha256":"1daab520c856c8f87e79b4afb68ab77bf532edd45f082e867ed7bcf2c17e7791"},
   {"path":"system/arrive-great-eastern.mp3","bytes":16509,"sha256":"b8edf1b29d176df8381f3b3b235219445271c9ecf9dcba5d475c2e779e80be0f"},

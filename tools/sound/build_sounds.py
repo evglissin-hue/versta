@@ -389,7 +389,13 @@ wherever no recording has been fetched yet (below).
                    "(retry-after 600) while this was prepared.\n\n")
         out.append("\n".join(f"- `{rel_path(s).removeprefix('sounds/')}`: {s['file']}" for s in todo) + "\n")
     cat = json.loads(CATALOGUE.read_text())
-    nofile = [n for n in cat["effects"] if not any(s["kind"] == "fx" and s["name"] == n for s in SOURCES)]
+    nofile = [n for n in cat["effects"] if not any(s["kind"] == "fx" and s["name"] == n for s in SOURCES)
+              and not (OUT / "fx" / f"{n}.mp3").exists()]
+    composed = [e for e in sounds if e["author"] == "Composed for Versta" and e["source"].startswith("tools/sound/sfx/")]
+    if composed:
+        out.append("\nWith no recording under the licence bar, these are synthesised with sfx-skill (MIT), from synthesis "
+                   "only, and are CC0 (`tools/sound/sfx/README.md` says how to remake them): "
+                   + ", ".join(f"`{e['file'].removeprefix('sounds/')}`" for e in composed) + ".\n")
     if nofile:
         out.append("\nNo candidate under CC0, public domain or CC BY was found for these effects, and they stay unrecorded: "
                    + ", ".join(f"`{n}`" for n in nofile) + ".\n")

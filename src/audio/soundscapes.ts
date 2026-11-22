@@ -135,7 +135,6 @@ export interface Part { loop?: string; fx?: string; every?: [number, number]; le
 
 const MAX_PAN = 0.3;
 
-const P = (gen: Preset): Part => ({ gen });
 const R = (loop: string, level: number, gen?: Preset, pan?: number): Part => {
   const p: Part = { loop, level };
   if (gen) p.gen = gen;
@@ -156,33 +155,34 @@ export const LOOP_LEVEL = 1.6;
 /**
  * Recipes: a steady base and one or two texture layers, recorded where a recording exists (docs/sound-credits.md),
  * generated (`gen`) where none does or while it loads. A sparse one-shot layer (S) plays an effect now and then and
- * sits at least 6 dB under the base. Layers with no recording under the licence bar yet: rigging, cobbles, the foot
- * tunnel, wading birds, a dockyard, and the sail, tankard and water-flow effects.
+ * sits at least 6 dB under the base. Rigging, cobbles, the foot tunnel, wading birds and the dockyard have no recording
+ * under the licence bar: their loops are synthesised with sfx-skill (tools/sound/sfx/), as are the nine effects that
+ * had no recording.
  */
 export const RECIPES: Record<string, Part[]> = {
   river: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("gulls2", 0.45, (x, s) => L.gulls(x, s, 0.8), 0.25), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2), S("ship-horn", [50, 100], 0.4)],
   wharf: [R("wharf", 1, (x, s) => L.water(x, s, 0.4)), R("lap", 0.5, (x, s) => L.water(x, s, 0.3), -0.2), R("creak", 0.45, (x, s) => L.creak(x, s, 0.9), 0.15), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.6), 0.25)],
-  ship: [R("lap", 0.8, (x, s) => L.water(x, s, 0.7)), R("creak", 0.8, (x, s) => L.creak(x, s, 1), -0.15), R("wind", 0.3, (x, s) => L.wind(x, s, 0.4), 0.25)],
+  ship: [R("lap", 0.8, (x, s) => L.water(x, s, 0.7)), R("creak", 0.8, (x, s) => L.creak(x, s, 1), -0.15), R("rigging", 0.4, (x, s) => L.wind(x, s, 0.4), 0.25)],
   arctic: [R("wind", 1, (x, s) => L.wind(x, s, 1)), R("ice", 0.7, (x, s) => L.creak(x, s, 0.7), -0.2), R("shore", 0.25, (x, s) => L.water(x, s, 0.8), 0.2), S("ice-creak", [35, 70], 0.4)],
   yard: [R("timber", 0.8, (x, s) => L.hammer(x, s, 1), -0.15), R("wharf", 0.5, (x, s) => L.water(x, s, 0.4)), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.5), 0.25), S("hammer", [14, 30], 0.35, 0.15)],
-  sail: [R("wind", 0.6, (x, s) => L.wind(x, s, 0.9), 0.2), R("lap", 0.5, (x, s) => L.water(x, s, 0.6), -0.2), P((x, s) => L.creak(x, s, 0.8))],
+  sail: [R("rigging", 0.9, (x, s) => L.creak(x, s, 0.8), -0.1), R("wind", 0.4, (x, s) => L.wind(x, s, 0.9), 0.2), R("lap", 0.5, (x, s) => L.water(x, s, 0.6), -0.2), S("sail-flap", [25, 55], 0.35, 0.15)],
   solemn: [R("water", 0.5, (x, s) => L.water(x, s, 0.5)), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3), 0.2), R("church", 0.4, undefined, -0.15), R("bells", 0.5, (x, s) => L.toll(x, s, 1, 220, 6, 7), 0.15)],
-  tunnel: [P((x, s) => L.rumble(x, s, 1)), R("drips", 0.8, (x, s) => L.drips(x, s, 1), 0.2)],
+  tunnel: [R("tunnel", 1, (x, s) => L.rumble(x, s, 1)), R("drips", 0.5, (x, s) => L.drips(x, s, 1), 0.2)],
   dock: [R("lap", 0.9, (x, s) => L.water(x, s, 0.6)), R("tide", 0.4, undefined, -0.2), R("gulls", 0.45, (x, s) => L.gulls(x, s, 0.5), 0.25), R("creak", 0.3, (x, s) => L.creak(x, s, 0.6), 0.15)],
-  tavern: [R("pub", 1, (x, s) => L.murmur(x, s, 1)), R("murmur", 0.3, undefined, 0.2), P((x, s) => L.clink(x, s, 1))],
-  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.4, (x, s) => L.bells(x, s, 1), 0.2), R("gulls2", 0.25, undefined, 0.25)],
+  tavern: [R("pub", 1, (x, s) => L.murmur(x, s, 1)), R("murmur", 0.3, undefined, 0.2), S("tankards", [20, 45], 0.4, -0.15)],
+  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("cobbles", 0.4, undefined, -0.2), R("bells", 0.4, (x, s) => L.bells(x, s, 1), 0.2), R("gulls2", 0.25, undefined, 0.25)],
   canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15), 0.2), R("birds", 0.3, undefined, -0.2)],
   clock: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.45)), R("tick", 1, (x, s) => L.tick(x, s, 1))],
   burial: [R("wind", 0.7, (x, s) => L.wind(x, s, 0.5), 0.2), R("church", 0.5, undefined, -0.15), R("bells", 0.35, (x, s) => L.toll(x, s, 1, 220, 12, 14), 0.2), R("birds", 0.3, undefined, -0.2)],
   office: [R("office", 1, (x, s) => L.tick(x, s, 0.8)), R("hum", 0.2, undefined, 0.15), R("murmur", 0.1, undefined, -0.2)],
   rally: [R("crowd", 1, (x, s) => L.murmur(x, s, 1)), R("murmur", 0.4, undefined, 0.2), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2)],
   park: [R("wind", 0.7, (x, s) => L.wind(x, s, 0.4), 0.2), R("murmur", 0.4, undefined, -0.2), R("birds", 0.35, undefined, 0.15)],
-  basin: [R("tide", 1, (x, s) => L.water(x, s, 0.5)), R("lap", 0.6, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5), 0.25), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2)],
-  "working-dock": [R("wharf", 1, (x, s) => L.water(x, s, 0.5)), R("lap", 0.5, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.4), 0.25), S("chain", [18, 40], 0.35, 0.15), S("hammer", [25, 50], 0.3, -0.15)],
+  basin: [R("tide", 1, (x, s) => L.water(x, s, 0.5)), R("waders", 0.5, (x, s) => L.gulls(x, s, 0.5), -0.25), R("lap", 0.5, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.3, undefined, 0.25), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2), S("waders", [30, 60], 0.3, 0.2)],
+  "working-dock": [R("wharf", 1, (x, s) => L.water(x, s, 0.5)), R("dockyard", 0.6, (x, s) => L.hammer(x, s, 0.5), -0.15), R("lap", 0.4, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.4), 0.25), S("chain", [18, 40], 0.35, 0.15), S("hammer", [25, 50], 0.3, -0.15), S("crates", [30, 60], 0.3, 0.2)],
   mill: [R("weir", 1, (x, s) => L.water(x, s, 0.8)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), 0.2), R("birds", 0.25, undefined, -0.2), S("water-wheel", [30, 60], 0.35, 0.15)],
-  pumping: [R("hum", 1, (x, s) => L.rumble(x, s, 1)), R("water", 0.3, (x, s) => L.water(x, s, 0.3), 0.2), R("drips", 0.25, undefined, -0.15)],
+  pumping: [R("hum", 1, (x, s) => L.rumble(x, s, 1)), R("water", 0.3, (x, s) => L.water(x, s, 0.3), 0.2), R("drips", 0.25, undefined, -0.15), S("water-flow", [30, 60], 0.4, -0.15)],
   towpath: [R("river", 0.7, (x, s) => L.water(x, s, 0.4)), R("wind", 0.4, (x, s) => L.wind(x, s, 0.3), 0.2), R("birds", 0.3, undefined, -0.2)],
-  oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls2", 0.25, undefined, 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
+  oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("cobbles", 0.5, undefined, 0.15), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls2", 0.25, undefined, 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
 };
 
 /**
@@ -191,13 +191,13 @@ export const RECIPES: Record<string, Part[]> = {
  * more than -21 dBFS overall (there the pocket leaves the bed 14 to 18 dB under the voice), -21.5 dBFS in the phone
  * band (300 Hz to 8 kHz, which the pocket does not reach), and for bursts (the loudest tenth of the seconds, such as
  * birdsong) -19.5 dBFS in the phone band and -26 dBFS above 4 kHz. The tunnel is mostly low rumble and is capped at
- * +5 dB. Measured with the recordings of 22 November by tools/sound/measure-scapes.mjs (check-mix confirms); measure again
+ * +5 dB. Measured with the recordings of 22 November and the synthesised layers (tools/sound/sfx/) by tools/sound/measure-scapes.mjs (check-mix confirms); measure again
  * whenever a recipe or a recording changes.
  */
 export const TRIM_DB: Record<string, number> = {
-  river: 1.1, wharf: 1.4, ship: 1.9, arctic: -0.3, yard: 6.2, sail: 6.7, solemn: 4.1, tunnel: 5.0, dock: 2.6,
-  tavern: 0.8, sailortown: 3.3, canal: 5.6, clock: 1.8, burial: 5.0, office: 2.7, rally: 0.7, park: 5.7, basin: -0.1,
-  "working-dock": 2.1, mill: 2.6, pumping: -0.5, towpath: 4.7, oldstreet: 2.2,
+  river: 1.1, wharf: 1.8, ship: 1.8, arctic: -0.2, yard: 6.0, sail: 4.5, solemn: 3.9, tunnel: 0.5, dock: 2.5,
+  tavern: -0.3, sailortown: 2.6, canal: 5.6, clock: 1.7, burial: 5.0, office: 2.8, rally: 0.6, park: 5.8, basin: 0.3,
+  "working-dock": 1.4, mill: 2.8, pumping: -0.4, towpath: 4.5, oldstreet: 1.6,
 };
 
 /** The gain the trim of a soundscape stands for (the river's for an unknown name, as with its recipe). */
