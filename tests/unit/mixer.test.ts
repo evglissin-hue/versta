@@ -571,7 +571,7 @@ describe("12. preload, effects and dispose", () => {
     expect(m.timeline.length).toBe(3000);
     await ms(10_000);
     expect(m.timeline.length).toBe(5000);
-  });
+  }, 20_000); // 2 s alone; a busy CI runner or parallel worktrees can take several times that
 });
 
 describe("joinMusicLoop", () => {
