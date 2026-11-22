@@ -587,6 +587,15 @@ test("nearby places: Tower Bridge first, Play starts a story, Close returns Home
   expect(errors).toEqual([]);
 });
 
+test("nearby places: the pocket alerts switch is disabled on the web", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nearby-open").click();
+  const sw = page.getByTestId("pocket-switch");
+  await expect(sw).toBeDisabled();
+  await expect(sw).toContainText("Tell me when I pass a place");
+  await expect(sw).toContainText("In the Android app");
+});
+
 test("nearby places: without location the list still shows, with a note", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("nearby-open").click();

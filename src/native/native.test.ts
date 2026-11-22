@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createNativeGpsSource, errorToGps, locationToFix, WATCHER_OPTIONS, type BackgroundGeolocationApi, type KeepAwakeApi, type PluginLocation } from "./gps";
+import { createNativeGpsSource, errorToGps, locationToFix, WATCHER_OPTIONS, PLACE_WATCHER_OPTIONS, type BackgroundGeolocationApi, type KeepAwakeApi, type PluginLocation } from "./gps";
 import { gpsKind } from "../nav/sources";
 import { isNative } from "./platform";
 
@@ -57,6 +57,13 @@ function fakePlugin() {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("createNativeGpsSource", () => {
+  it("takes the watcher options per source", async () => {
+    const { api, keepAwake } = fakePlugin();
+    createNativeGpsSource(async () => ({ geo: api, keepAwake }), PLACE_WATCHER_OPTIONS).start(vi.fn(), vi.fn());
+    await flush();
+    expect(api.addWatcher.mock.calls[0]![0]).toMatchObject({ backgroundTitle: "Versta", backgroundMessage: "Watching for places nearby.", distanceFilter: 10 });
+  });
+
   it("adds a watcher with the agreed options and forwards fixes and errors", async () => {
     const { api, keepAwake, emit } = fakePlugin();
     const src = createNativeGpsSource(async () => ({ geo: api, keepAwake }));
