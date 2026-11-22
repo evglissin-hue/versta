@@ -1,7 +1,7 @@
-import { gpsError, nav, pack, simulated } from "../state";
+import { gpsError, nav, pack, simulated, startChoice } from "../state";
 import type { GpsError } from "../types";
 import { fmtDist, pad2, thenText, turnAngle, turnLabel } from "./format";
-import { joinChoice, joinTarget, peekAt } from "./uistate";
+import { peekAt } from "./uistate";
 
 const GPS_TEXT: Record<GpsError, { title: string; fix: string }> = {
   denied: { title: "Location is blocked", fix: "Allow location for this site in your browser settings, then end the ride and start again." },
@@ -26,13 +26,14 @@ export function Banner() {
   const tag = simulated.value ? <span class="sim-tag">Simulated</span> : null;
 
   let tone = "";
-  let cls = "";
   let body;
   let peekable = false;
   if (err && (n.status === "locating" || !n.fix)) {
     const t = GPS_TEXT[err];
     tone = "warn";
     body = <div class="b-text"><div class="b-label">{t.title}</div><div class="b-fix">{t.fix}</div></div>;
+  } else if (startChoice.value) {
+    body = <div class="b-text"><div class="b-big">Choose where to start</div><div class="b-sub">Your position is found.</div></div>;
   } else if (n.status === "locating" || n.status === "idle") {
     body = <div class="b-text"><div class="b-big">Finding you</div><div class="b-sub">Waiting for a GPS position.</div></div>;
   } else if (n.status === "finished") {
@@ -67,25 +68,10 @@ export function Banner() {
       </div>
     );
   } else if (n.status === "to_start") {
-    const j = p ? joinChoice(n, p) : null;
-    const toRoute = j?.chosen === "route" && j.routeDist !== null;
-    const dist = toRoute && j?.routeDist != null ? j.routeDist : n.toStop;
-    cls = "join";
+    const named = `${pad2(n.seg + 1)} ${stop?.name ?? ""}`;
     body = (
       <div class="b-text">
-        <div class="b-label">{toRoute ? "Joining part way" : "From the beginning"}</div>
-        <div class="b-big">{toRoute ? "Head for the route" : "Head for the start"}, {fmtDist(dist, 20)}</div>
-        <div class="b-sub">{toRoute ? "The ride picks up where you meet the line." : stop?.name ?? ""}</div>
-        {j && j.routeDist !== null ? (
-          <div class="b-choices" role="group" aria-label="Where to join">
-            <button type="button" class="choice" aria-pressed={!toRoute} onClick={() => { joinTarget.value = "start"; }}>
-              <b>To the start</b><span>{fmtDist(j.startDist, 20)}</span>
-            </button>
-            <button type="button" class="choice" aria-pressed={toRoute} onClick={() => { joinTarget.value = "route"; }}>
-              <b>Join nearby</b><span>{fmtDist(j.routeDist, 20)}</span>
-            </button>
-          </div>
-        ) : null}
+        <div class="b-big">{n.seg === 0 ? `Head for the start, ${named}` : `Head for ${named}`}, {fmtDist(n.toStop, 20)}</div>
       </div>
     );
   } else if (n.wrongWay && n.status === "riding") {
@@ -125,7 +111,7 @@ export function Banner() {
 
   return (
     <div
-      class={`banner ${tone} ${cls} ${peekable ? "peekable" : ""}`} role="status" aria-live="polite" data-testid="banner"
+      class={`banner ${tone} ${peekable ? "peekable" : ""}`} role="status" aria-live="polite" data-testid="banner"
       tabIndex={peekable ? 0 : undefined}
       onClick={peekable && n.nextCue ? () => peekAt(n.nextCue!.at) : undefined}
       onKeyDown={peekable && n.nextCue ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); peekAt(n.nextCue!.at); } } : undefined}

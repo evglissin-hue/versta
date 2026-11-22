@@ -1,7 +1,7 @@
 import { useSignalEffect } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { MapView } from "../map/MapView";
-import { nav, nowPlaying, openStop, pack } from "../state";
+import { nav, nowPlaying, openStop, pack, startChoice } from "../state";
 import { AsideCard } from "./AsideCard";
 import { Banner } from "./Banner";
 import { Dock } from "./Dock";
@@ -9,9 +9,10 @@ import { Finish } from "./Finish";
 import { MapControls } from "./MapControls";
 import { Scene } from "./Scene";
 import { SoundSheet } from "./SoundSheet";
+import { StartChoice } from "./StartChoice";
 import { StopSheet } from "./StopSheet";
 import { StopsList } from "./StopsList";
-import { finishOpen, finishedAt, following, joinTarget, resumeFollow, sceneOpen, soundOpen, stopsOpen } from "./uistate";
+import { finishOpen, finishedAt, following, resumeFollow, sceneOpen, soundOpen, stopsOpen } from "./uistate";
 
 let lastStory = "";
 let lastStatus = "";
@@ -27,12 +28,11 @@ export function Ride() {
     lastStory = id;
   });
   // Riding away from a stop with a story still playing puts the map and the turn banner back; the mini bar keeps the story one tap away.
-  // The finish logbook comes back at each finish, and the join choice starts afresh whenever the rider is on the route.
+  // The finish logbook comes back at each finish.
   useSignalEffect(() => {
     const status = nav.value.status;
     if (lastStatus === "at_stop" && status === "riding" && nowPlaying.peek()?.kind === "story") sceneOpen.value = false;
     if (status === "finished" && lastStatus !== "finished") { finishOpen.value = true; finishedAt.value = Date.now(); }
-    if (status !== "to_start") joinTarget.value = null;
     lastStatus = status;
   });
   // A new ride starts by following the rider, whatever the last one ended on.
@@ -71,6 +71,7 @@ export function Ride() {
       {stop !== null && !logbook ? <StopSheet index={stop} /> : null}
       {soundOpen.value ? <SoundSheet /> : null}
       {logbook ? <Finish /> : null}
+      {startChoice.value ? <StartChoice /> : null}
       {np?.kind === "story" && sceneOpen.value ? <Scene np={np} /> : null}
     </div>
   );
