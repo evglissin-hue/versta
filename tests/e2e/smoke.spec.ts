@@ -84,11 +84,12 @@ test("continue card on Home offers Continue ride and Start again", async ({ page
   expect(errors).toEqual([]);
 });
 
-test("the start-choice step shows the sheet with both stops and no way to close it", async ({ page }) => {
+test("the start-choice step shows the sheet with both stops and a way back to the routes", async ({ page }) => {
   await page.goto("/?demo=ride&step=start-choice");
   const sheet = page.getByTestId("start-choice");
   await expect(sheet).toContainText("Where do you start?");
-  await expect(sheet.getByRole("button")).toHaveCount(2);
+  await expect(sheet.getByRole("button")).toHaveCount(3);
+  await expect(sheet.getByRole("button", { name: "Back to the routes" })).toBeVisible();
   await expect(sheet.getByRole("button", { name: /^Start at 07 .*600 m away, the nearest stop$/ })).toBeVisible();
   await expect(sheet.getByRole("button", { name: /^Start at 01 Tower Bridge.*4\.2 km away, the start of the route$/ })).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Close" })).toHaveCount(0);
