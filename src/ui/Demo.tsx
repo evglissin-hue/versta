@@ -1,17 +1,45 @@
 import { useEffect } from "preact/hooks";
-import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated, startChoice } from "../state";
-import type { Detour, LngLat, NavState, Pack, PackIndexEntry } from "../types";
+import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, routeStatus, screen, settings, simulated, startChoice } from "../state";
+import type { Detour, LngLat, NavState, Pack, PackIndexEntry, RouteStatus } from "../types";
+import { nativeDemo } from "./Home";
 import { recordingsDemo, recordingsOpen, soundCheckOpen, demoRide, finishOpen, finishedAt, following, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
 
 /** Preview route /?demo=ride&step=N[&pack=<id>]: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings"] as const;
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings", "routes", "routes-held"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
 function shift(p: LngLat, dx: number, dy: number): LngLat {
   return [p[0] + dx / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + dy / 111320];
 }
 
-const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline"];
+const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline", "routes", "routes-held"];
+
+/** The real index, kept so stepping away from the route-state demos puts it back. */
+let realIndex: PackIndexEntry[] = [];
+
+const MB = 1048576;
+/** Made-up route cards and statuses for the Android route states. No network, no store. */
+function routeCards(step: string): { cards: PackIndexEntry[]; status: Record<string, RouteStatus> } {
+  const src = realIndex[0]!;
+  const card = (id: string, name: string): PackIndexEntry => ({ ...src, id, name });
+  const mk = (rows: [string, string, RouteStatus][]) => ({ cards: rows.map(([id, name]) => card(id, name)), status: Object.fromEntries(rows.map(([id, , st]) => [id, st])) });
+  const phone = (update: Extract<RouteStatus, { kind: "on-phone" }>["update"], source: "built-in" | "downloaded" = "downloaded"): RouteStatus => ({ kind: "on-phone", source, version: "v1", bytes: 15 * MB, update });
+  const upd = (u: Partial<NonNullable<Extract<RouteStatus, { kind: "on-phone" }>["update"]>>) => ({ bytes: 2 * MB, transfer: null, held: null, ready: false, ...u });
+  if (step === "routes-held") {
+    return mk([
+      ["demo-riding", "Held riding", phone(upd({ held: "riding", ready: true }))],
+      ["demo-saved", "Held saved ride", phone(upd({ held: "saved-ride", ready: true }))],
+      ["demo-needs", "Held needs app", phone(upd({ held: "needs-app" }))],
+      ["demo-updating", "Updating", phone(upd({ transfer: { state: "downloading", done: 40, total: 100 } }), "built-in")],
+    ]);
+  }
+  return mk([
+    ["demo-site", "On the site", { kind: "on-site", bytes: 15 * MB, transfer: null, removed: false }],
+    ["demo-down", "Downloading", { kind: "on-site", bytes: 15 * MB, transfer: { state: "downloading", done: 40, total: 100 }, removed: false }],
+    ["demo-new", "Needs the app", { kind: "needs-app" }],
+    ["demo-phone", "On the phone", phone(upd({ held: "not-wifi" }))],
+  ]);
+}
 
 function demoState(p: Pack, step: string): void {
   const seg = p.segments[2]!;
@@ -24,6 +52,10 @@ function demoState(p: Pack, step: string): void {
   settings.value = { ...settings.value, courseUp: true };
   nowPlaying.value = null; simulated.value = new URLSearchParams(location.search).get("simtag") === "1";
   firstRideSheet.value = null; startPhase.value = null; startFailure.value = null; netDown.value = false;
+  const routesStep = step === "routes" || step === "routes-held";
+  nativeDemo.value = routesStep;
+  if (routesStep) { const r = routeCards(step); packIndex.value = r.cards; routeStatus.value = r.status; }
+  else { packIndex.value = realIndex; routeStatus.value = {}; }
   screen.value = HOME_STEPS.includes(step) ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
   const tagged = p.asides.find((a) => a.tags.length > 0) ?? p.asides[0]!;
@@ -116,6 +148,7 @@ export async function enterDemo(step: string): Promise<void> {
   const p = (await res.json()) as Pack;
   // set the state in one go, before Home renders: the continue step writes the saved ride Home reads
   pack.value = p;
+  realIndex = entries;
   packIndex.value = entries;
   demoState(p, step);
 }

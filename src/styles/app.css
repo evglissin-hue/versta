@@ -45,6 +45,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .blurb { margin: 0; font-size: 18px; }
 .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .card .acts .btn { flex: 1 1 140px; }
+.acts-col { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 .saved-note { margin: 0; font-size: 16px; color: var(--muted); }
 .foot { margin-top: auto; font-size: 15px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
 .foot p { margin: 0 0 4px; }
