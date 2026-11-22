@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import catalogue from "../audio/catalogue.json";
+import { recorded } from "../audio/library";
 import { createMixer } from "../audio/mixer";
 import { currentDirector, currentMixer } from "../ride";
 import { nowPlaying, packBase, packIndex } from "../state";
@@ -22,8 +23,6 @@ const creditGroups = (["sounds", "music"] as const)
   .map((g) => ({ group: g, list: creditFiles[`../audio/credits-${g}.json`] ?? [] }))
   .filter((g) => Array.isArray(g.list) && g.list.length > 0);
 /** Every file is credited (tests/unit/sounds.test.ts), so a sound with no credit has no file yet. */
-const credited = new Set(creditGroups.flatMap((g) => g.list.map((c) => c.file)));
-const recorded = (path: string): boolean => credited.has(`sounds/${path}.mp3`);
 /** "Gull 1.ogg" reads as "Gull 1". */
 const plainTitle = (t: string): string => t.replace(/\.(ogg|oga|wav|flac|mp3)$/i, "");
 

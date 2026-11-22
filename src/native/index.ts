@@ -38,6 +38,7 @@ export function initNative(): void {
   }
   void removeServiceWorkers();
   void import("@capacitor/app").then(({ App }) => {
+    void App.addListener("resume", () => { void import("../routes/store").then((m) => m.routeStore.check()); });
     void App.addListener("backButton", () => { handleBack(() => { void App.minimizeApp(); }); });
   }).catch(() => {});
 }
