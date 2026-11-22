@@ -191,13 +191,13 @@ export const RECIPES: Record<string, Part[]> = {
  * more than -21 dBFS overall (there the pocket leaves the bed 14 to 18 dB under the voice), -21.5 dBFS in the phone
  * band (300 Hz to 8 kHz, which the pocket does not reach), and for bursts (the loudest tenth of the seconds, such as
  * birdsong) -19.5 dBFS in the phone band and -26 dBFS above 4 kHz. The tunnel is mostly low rumble and is capped at
- * +5 dB. Measured with the recordings of 22 November by tools/sound/measure-scapes.mjs (check-mix confirms); measure again
+ * +5 dB. Measured with the recordings of 22 November and the synthesised layers (tools/sound/sfx/) by tools/sound/measure-scapes.mjs (check-mix confirms); measure again
  * whenever a recipe or a recording changes.
  */
 export const TRIM_DB: Record<string, number> = {
-  river: 1.1, wharf: 1.4, ship: 1.9, arctic: -0.3, yard: 6.2, sail: 6.7, solemn: 4.1, tunnel: 5.0, dock: 2.6,
-  tavern: 0.8, sailortown: 3.3, canal: 5.6, clock: 1.8, burial: 5.0, office: 2.7, rally: 0.7, park: 5.7, basin: -0.1,
-  "working-dock": 2.1, mill: 2.6, pumping: -0.5, towpath: 4.7, oldstreet: 2.2,
+  river: 1.1, wharf: 1.8, ship: 1.8, arctic: -0.2, yard: 6.0, sail: 4.5, solemn: 3.9, tunnel: 0.5, dock: 2.5,
+  tavern: -0.3, sailortown: 2.6, canal: 5.6, clock: 1.7, burial: 5.0, office: 2.8, rally: 0.6, park: 5.8, basin: 0.3,
+  "working-dock": 1.4, mill: 2.8, pumping: -0.4, towpath: 4.5, oldstreet: 1.6,
 };
 
 /** The gain the trim of a soundscape stands for (the river's for an unknown name, as with its recipe). */
