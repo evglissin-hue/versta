@@ -24,6 +24,15 @@
   "cut": "30 s from the start"
  },
  {
+  "file": "sounds/cobbles.mp3",
+  "title": "Hooves and wheels on cobbles",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "A 30 s seamless loop, rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
   "file": "sounds/creak.mp3",
   "title": "WWS Creakingfloors.ogg",
   "author": "Work With Sounds / Torsten Nilsson",
@@ -38,6 +47,15 @@
   "licence": "CC0",
   "source": "https://commons.wikimedia.org/wiki/File:211146_unfa_another-crowd.flac",
   "cut": "50 s from the start"
+ },
+ {
+  "file": "sounds/dockyard.mp3",
+  "title": "A working dock in the distance",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "A 30 s seamless loop, rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
  },
  {
   "file": "sounds/drips.mp3",
@@ -56,6 +74,15 @@
   "cut": "3 s from 98 s"
  },
  {
+  "file": "sounds/fx/big-bell.mp3",
+  "title": "One stroke of a great bell",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
   "file": "sounds/fx/bubbling.mp3",
   "title": "Oil boiling.ogg",
   "author": "ezwa",
@@ -72,12 +99,30 @@
   "cut": "4 s from 10 s"
  },
  {
+  "file": "sounds/fx/crates.mp3",
+  "title": "Crates being loaded",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
   "file": "sounds/fx/crowd.mp3",
   "title": "211146 unfa another-crowd.flac",
   "author": "unfa",
   "licence": "CC0",
   "source": "https://commons.wikimedia.org/wiki/File:211146_unfa_another-crowd.flac",
   "cut": "6 s from 25 s"
+ },
+ {
+  "file": "sounds/fx/distant-cannon.mp3",
+  "title": "A cannon far off",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
  },
  {
   "file": "sounds/fx/fire-crackle.mp3",
@@ -104,6 +149,33 @@
   "cut": "4 s from 159 s"
  },
  {
+  "file": "sounds/fx/oars.mp3",
+  "title": "Oars in the water",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
+  "file": "sounds/fx/parrots.mp3",
+  "title": "Parrots in a shop",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
+  "file": "sounds/fx/sail-flap.mp3",
+  "title": "Sails filling, rigging",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
   "file": "sounds/fx/ship-horn.mp3",
   "title": "Fog signal Bremerhaven.ogg",
   "author": "Tvabutzku1234",
@@ -120,12 +192,39 @@
   "cut": "6 s from 12 s"
  },
  {
+  "file": "sounds/fx/tankards.mp3",
+  "title": "Tankards and glasses",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
   "file": "sounds/fx/telegraph.mp3",
   "title": "WWS Teleprintertyping.ogg",
   "author": "Work With Sounds / Konrad Gutkowski",
   "licence": "CC BY 4.0",
   "source": "https://commons.wikimedia.org/wiki/File:WWS_Teleprintertyping.ogg",
   "cut": "4 s from 62 s"
+ },
+ {
+  "file": "sounds/fx/waders.mp3",
+  "title": "Wading birds on the mud",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
+  "file": "sounds/fx/water-flow.mp3",
+  "title": "Water rushing underground",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "Rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
  },
  {
   "file": "sounds/fx/water-lap.mp3",
@@ -208,6 +307,15 @@
   "cut": "45 s from 31 s"
  },
  {
+  "file": "sounds/rigging.mp3",
+  "title": "Rigging in the wind",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "A 30 s seamless loop, rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
   "file": "sounds/river.mp3",
   "title": "433589 jackthemurray stream-river-water-up-close.wav",
   "author": "jackthemurray",
@@ -254,6 +362,24 @@
   "licence": "CC BY 4.0",
   "source": "https://commons.wikimedia.org/wiki/File:WWS_Wheelwrightcarvingaspoke.ogg",
   "cut": "40 s from 42 s"
+ },
+ {
+  "file": "sounds/tunnel.mp3",
+  "title": "The foot tunnel under the Thames",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "A 30 s seamless loop, rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
+ },
+ {
+  "file": "sounds/waders.mp3",
+  "title": "Wading birds on a tidal shore",
+  "author": "Composed for Versta",
+  "licence": "CC0",
+  "source": "tools/sound/sfx/design.py",
+  "cut": "A 30 s seamless loop, rendered offline by tools/sound/sfx/make.py",
+  "note": "Made with sfx-skill (MIT) from synthesis."
  },
  {
   "file": "sounds/water.mp3",

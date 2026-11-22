@@ -38,7 +38,7 @@ def build(kit) -> list[dict]:
 
     def knock(t: float, hz: float, gain: float, length: float = 0.3, t_d: float = 4.0) -> dict:
         """Wood struck: a wooden block, a thole pin, a crate side."""
-        return k.modal(t, length, hz, t_d, modes=6, hardness=0.65, gain=gain, detune=8)
+        return k.modal(t, length, hz, t_d, modes=6, hardness=0.5, gain=gain, detune=8)
 
     def ring(t: float, hz: float, t_d: float, length: float, gain: float, ratios=None, hardness=0.8, cut=None) -> dict:
         layer = k.modal(t, length, hz, t_d, hardness=hardness, gain=gain, detune=6, ratios=ratios)
@@ -66,7 +66,7 @@ def build(kit) -> list[dict]:
         knock(2.0, 330, -13),
         creak(2.3, 95, 0.8, -11),
         creak(3.2, 120, 0.7, -13, centre=1100),
-    ], chain={"eq": {"low_cut_hz": 60}, "room": {"size": 1.0, "decay": 0.5, "mix": 0.08}}, peak_at=1.6))
+    ], chain={"eq": {"low_cut_hz": 60}, "room": {"size": 1.0, "decay": 0.5, "mix": 0.08}},))
 
     pewter = [1, 1.59, 2.91, 4.33]
     glass = [1, 2.32, 4.25, 6.63]
@@ -77,7 +77,7 @@ def build(kit) -> list[dict]:
         ring(1.3, 690, 40, 0.8, -4, pewter, 0.85), k.crack(1.3, gain=-14, cutoff=2000),
         ring(1.95, 3120, 120, 0.9, -11, glass, 0.9),
         knock(2.35, 150, -3, t_d=5), k.thump(2.35, 115, 65, 0.12, gain=-10), ring(2.35, 820, 50, 0.5, -13, pewter, 0.6),
-    ], chain={"eq": {"low_cut_hz": 70}, "room": {"size": 0.6, "decay": 0.5, "mix": 0.15}}, peak_at=1.3))
+    ], chain={"eq": {"low_cut_hz": 70}, "room": {"size": 0.6, "decay": 0.5, "mix": 0.15}},))
 
     def stroke(t: float) -> list[dict]:
         drops = lambda start, length, rate, slope, gain, env: k._layer(  # noqa: E731
@@ -122,9 +122,9 @@ def build(kit) -> list[dict]:
     sounds.append(k.sound("big_bell", "impact", "One stroke of a great bell: hum near 82 Hz with the strike note an octave "
                           "up, a minor tierce, a long ring in a large space.", [
         {**k.modal(0.0, 6.0, 82, 420, hardness=0.4, gain=0, detune=4, ratios=bell),
-         "env": [[0, 1, "hold"], [4.6, 1, "cos"], [6.0, 0]]},
+         "env": [[0, 1, "hold"], [3.8, 1, "cos"], [5.0, 0]]},
         k.thump(0.0, 120, 70, 0.15, gain=-16),
-    ], chain={"eq": {"low_cut_hz": 50}, "room": {"size": 2.5, "decay": 3.0, "mix": 0.25}}, peak_at=0.0))
+    ], chain={"eq": {"low_cut_hz": 50}, "room": {"size": 2.5, "decay": 2.0, "mix": 0.22}}))
 
     def crate(t: float, hz: float, gain: float) -> list[dict]:
         return [knock(t, hz, gain, length=0.35, t_d=3.2), {**k.modal(t, 0.4, hz * 0.45, 5, modes=2, hardness=0.3, gain=gain - 4)},
@@ -166,21 +166,21 @@ def build(kit) -> list[dict]:
         k._layer({"type": "drops", "rate": 30000, "r_min_mm": 0.3, "r_max_mm": 5, "size_slope": 2}, 0, 6.0, flow_env, 0),
         k.noise(0, 6.0, "brown", env=flow_env, filt=k.lp(500), gain=-3),
         k.noise(0, 6.0, "pink", env=flow_env, filt=k.bp(1400, 0.8), gain=-15),
-    ], chain={"eq": {"low_cut_hz": 70}, "room": {"size": 2.5, "decay": 2.4, "mix": 0.3}}))
+    ], chain={"eq": {"low_cut_hz": 70}, "room": {"size": 2.5, "decay": 1.6, "mix": 0.3}}))
 
     # ---- soundscape loops ----------------------------------------------------------------------------------------
     L = LOOP_S
     loop = {"use": "loop", "loop": {"seconds": L}}
 
-    rig = [k.wind(0, L, band_hz=300, turbulence=0.3, gust_hz=0.15, gain=-4),
+    rig = [k.wind(0, L, band_hz=300, turbulence=0.3, gust_hz=0.15, gain=-9),
            {**k.wind(0, L, band_hz=500, turbulence=0.2, gust_hz=0.1, gain=-16), "source": {
                "type": "wind", "band_hz": 500, "turbulence": 0.2, "gust_hz": 0.1, "whistle_hz": 760, "whistle_db": -10}}]
     t = 0.8
     while t < L - 1:
-        rig.append(creak(t, r(80, 140), r(0.6, 1.1), r(-13, -8), centre=r(700, 1200)))
+        rig.append(creak(t, r(80, 140), r(0.6, 1.1), r(-4, 0), centre=r(700, 1200)))
         t += r(2.6, 4.8)
     for t in (3.7, 11.2, 18.9, 25.4):
-        rig += [knock(t, r(300, 420), -14), knock(t + r(0.18, 0.3), r(300, 420), -17)]
+        rig += [knock(t, r(300, 420), -6), knock(t + r(0.18, 0.3), r(300, 420), -9)]
     for t in (7.5, 21.3):
         rig.append(filt({**k.noise(t, 3.0, "pink", env=[[0, 0, "cos"], [1.2, 1, "cos"], [3.0, 0]], gain=-13),
                          "tremolo": {"rate_hz": 9, "depth": 0.6}}, k.bp(450, 0.9)))
@@ -190,8 +190,9 @@ def build(kit) -> list[dict]:
 
     def hoof(t: float, gain: float) -> list[dict]:
         hz = r(850, 1350)
-        return [ring(t, hz, 9, 0.12, gain, hardness=0.9), k.crack(t, gain=gain - 10, cutoff=2200),
-                k.thump(t, 220, 120, 0.07, gain=gain - 11)]
+        return [knock(t, hz * 0.5, gain + 6, length=0.14, t_d=6), ring(t, hz, 9, 0.12, gain, hardness=0.9),
+                k.noise(t, 0.04, "pink", env=k.decay(0.04, 0.001), filt=k.bp(hz * 0.6, 1.5), gain=gain - 2),
+                k.crack(t, gain=gain - 8, cutoff=2200), k.thump(t, 220, 120, 0.07, gain=gain - 9)]
     pass_db = lambda x: -9 + 9 * (1 - abs(x - L / 2) / (L / 2)) ** 1.5  # noqa: E731  a cart nearing and going by
     cob: list[dict] = []
     t, i = 0.05, 0
@@ -205,17 +206,17 @@ def build(kit) -> list[dict]:
         t += (0.25 if i % 2 == 0 else 0.4) + r(-0.03, 0.03)
         i += 1
     wheel_env = [[x, 10 ** (pass_db(x) / 20)] for x in (0, 7.5, 15, 22.5, L)]
-    cob += [filt({**k.noise(0, L, "brown", env=wheel_env, gain=-6), "tremolo": {"rate_hz": 13, "depth": 0.5}}, k.lp(420)),
-            filt({**k.noise(0, L, "pink", env=wheel_env, gain=-22), "tremolo": {"rate_hz": 31, "depth": 0.6}}, k.bp(2400, 1.5)),
-            k.noise(0, L, "pink", filt=k.lp(700), gain=-26)]
+    cob += [filt({**k.noise(0, L, "brown", env=wheel_env, gain=-16), "tremolo": {"rate_hz": 13, "depth": 0.5}}, k.lp(420)),
+            filt({**k.noise(0, L, "pink", env=wheel_env, gain=-28), "tremolo": {"rate_hz": 31, "depth": 0.6}}, k.bp(2400, 1.5)),
+            k.noise(0, L, "pink", filt=k.lp(700), gain=-30)]
     sounds.append(k.sound("cobbles", "ambience", "Hooves and iron-rimmed wheels on cobbles: a horse and cart walking up and going "
                           "by, a second horse further off.", cob,
                           chain={"eq": {"low_cut_hz": 60}, "room": {"size": 1.4, "decay": 0.7, "mix": 0.15}}, **loop))
 
     def step(t: float, gain: float) -> list[dict]:
-        return [k.noise(t, 0.07, "pink", env=k.decay(0.07, 0.002), filt=k.bp(r(1500, 2100), 1.0), gain=gain),
-                k.thump(t, 150, 90, 0.08, gain=gain - 8), k.crack(t, gain=gain - 18, cutoff=3000)]
-    tun = [k.noise(0, L, "brown", filt=k.lp(180), gain=0), k.noise(0, L, "pink", filt=k.bp(380, 0.5), gain=-16)]
+        return [k.noise(t, 0.07, "pink", env=k.decay(0.07, 0.002), filt=k.bp(r(1500, 2100), 1.0), gain=gain + 8),
+                k.thump(t, 150, 90, 0.08, gain=gain), k.crack(t, gain=gain - 8, cutoff=3000)]
+    tun = [k.noise(0, L, "brown", filt=k.lp(160), gain=-6), k.noise(0, L, "pink", filt=k.bp(380, 0.5), gain=-24)]
     t = 3.0
     while t < 20.0:   # someone walks up the tunnel and on past
         tun += step(t, -4 - 14 * abs(t - 11.5) / 8.5)
@@ -226,13 +227,13 @@ def build(kit) -> list[dict]:
         t += 0.6 + r(-0.02, 0.02)
     sounds.append(k.sound("tunnel", "ambience", "The foot tunnel under the Thames: low air in a long tiled tube and footsteps "
                           "ringing as someone walks up and past, then another further off.", tun,
-                          chain={"eq": {"low_cut_hz": 40}, "room": {"size": 2.6, "decay": 2.8, "mix": 0.4}}, **loop))
+                          chain={"eq": {"low_cut_hz": 40}, "room": {"size": 2.6, "decay": 2.4, "mix": 0.3}}, **loop))
 
     wad = [k._layer({"type": "drops", "rate": 500, "r_min_mm": 0.4, "r_max_mm": 3, "size_slope": 2}, 0, L, None, -9),
            k.noise(0, L, "pink", filt=k.lp(1100), gain=-17)]
     for w in wad:
         w.pop("env", None)
-    wad += curlew(1.5, -6) + curlew(17.0, -9)
+    wad += curlew(1.5, -2) + curlew(17.0, -5)
     wad += [trill(5.2, 1.4, -8), trill(23.5, 1.2, -11)]
     wad += redshank(9.0, -9) + redshank(13.6, -12, 2) + redshank(20.4, -10, 4) + redshank(27.8, -13)
     for t in (11.8, 26.0):   # oystercatcher piping, a quick run of "kleep"
@@ -242,18 +243,18 @@ def build(kit) -> list[dict]:
                           chain={"eq": {"low_cut_hz": 110, "high_cut_hz": 6500}, "room": {"size": 2.2, "decay": 1.4, "mix": 0.28}},
                           **loop))
 
-    dock = [k.noise(0, L, "brown", filt=k.lp(240), gain=-2), k.noise(0, L, "pink", filt=k.bp(500, 0.6), gain=-18)]
+    dock = [k.noise(0, L, "brown", filt=k.lp(240), gain=-8), k.noise(0, L, "pink", filt=k.bp(500, 0.6), gain=-24)]
     t = 1.2
     while t < L - 1.5:   # iron struck somewhere across the dock
-        dock.append(ring(t, r(280, 620), 200, 1.6, r(-12, -7), cut=2500))
+        dock.append(ring(t, r(280, 620), 200, 1.6, r(-4, 0), cut=2500))
         t += r(2.5, 5.5)
     for t0 in (4.0, 19.0):   # a hammer at work, a run of blows
         for i in range(rnd.randint(4, 6)):
-            dock += [ring(t0 + i * 0.52, 760, 60, 0.4, -14, cut=3000), k.crack(t0 + i * 0.52, gain=-26, cutoff=1800)]
+            dock += [ring(t0 + i * 0.52, 760, 60, 0.4, 0, cut=3000), k.crack(t0 + i * 0.52, gain=-12, cutoff=1800)]
     for t0 in (9.0, 24.0):   # a steam winch chuffing
         for i in range(16):
-            dock.append(k.noise(t0 + i * 0.26, 0.14, "pink", env=k.decay(0.14, 0.01), filt=k.bp(650, 1.2), gain=-14 - abs(i - 8) * 0.6))
-    dock.append(filt({**k.noise(14.0, 1.8, "white", env=[[0, 0, "cos"], [0.2, 1], [1.8, 0]], gain=-24),
+            dock.append(k.noise(t0 + i * 0.26, 0.14, "pink", env=k.decay(0.14, 0.01), filt=k.bp(650, 1.2), gain=-4 - abs(i - 8) * 0.6))
+    dock.append(filt({**k.noise(14.0, 1.8, "white", env=[[0, 0, "cos"], [0.2, 1], [1.8, 0]], gain=-12),
                       "tremolo": {"rate_hz": 24, "depth": 0.7}}, k.bp(2800, 2)))
     sounds.append(k.sound("dockyard", "ambience", "A working dock in the distance: a low working hum, iron ringing across the "
                           "water, a hammer at work, a steam winch, a chain running out.", dock,

@@ -63,8 +63,13 @@ def master(src: Path, kind: str, dst: Path) -> tuple[float, float, float]:
             a = b
         gain = lim["lufs"] - measure_lufs(a)
         ceiling = 10 ** ((lim["peak"] - 0.7) / 20)
-        ff("-i", str(a), "-af", f"volume={gain:.2f}dB,alimiter=limit={ceiling:.3f}:attack=1:release=80:level=disabled",
-           "-ac", "1", "-ar", str(SR), "-b:a", f"{lim['kbps']}k", str(dst))
+        for _ in range(3):   # the limiter takes some loudness off a peaky sound: correct the gain and go again
+            ff("-i", str(a), "-af", f"volume={gain:.2f}dB,alimiter=limit={ceiling:.3f}:attack=1:release=80:level=disabled",
+               "-ac", "1", "-ar", str(SR), "-b:a", f"{lim['kbps']}k", str(dst))
+            off = lim["lufs"] - measure_lufs(dst)
+            if abs(off) < 0.4:
+                break
+            gain += off
     x = decode(dst)
     return len(x) / SR, measure_lufs(dst), 20 * np.log10(np.max(np.abs(x)) + 1e-12)
 

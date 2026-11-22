@@ -25,7 +25,7 @@ const credits: Credit[] = Object.values(found).flat();
  * and take the name off this list. Their stories keep them in the route files; `tools/pack_sound.py` adds them to
  * the packs once the file exists.
  */
-const AWAITING_FETCH: string[] = ["sail-flap", "tankards", "oars", "distant-cannon", "parrots", "big-bell", "crates", "waders", "water-flow"].map((n) => `fx/${n}`);
+const AWAITING_FETCH: string[] = [];
 
 describe("sound library", () => {
   it("has every loop and fx file a recipe uses", () => {
