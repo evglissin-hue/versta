@@ -6,22 +6,17 @@ check screen. Seven tasks, 14 to 20, each merged after review against its brief.
 
 ## What changed from the spec
 
-- Task 16 (library) is half done. Wikimedia's download host answered every request with 429 and retry-after 600 for
-  the whole build (about 18:15 to 20:00 UTC, retried once more by the master): no new recording was downloaded. The
-  library is still the eight loops of iteration 2. What is in:
-  - `build_sounds.py` with fetch, process, check and credits.
-  - 35 sources chosen and licence-checked in `tools/sound/sources.json`.
-  - Recipes for all 23 soundscapes, with gentle panning.
-  - Credits for every file.
-  - `tools/sound/planned-recipes.txt` for when the recordings land.
-- The 21 effects have no files. They are written into the route files (19 stories). `pack_sound.py` leaves an effect
-  out of `pack.json` until its file exists, so rerunning it fills them in, and `packs.test.ts` fails if a rerun is
-  forgotten. The Sound check screen marks them "Not recorded yet".
-- The ship's bell before a passing-by story was also to be a recording. Without a file it was silent, so a two-stroke
-  bell is rendered with the other signals (`tools/music/signals.py`) as a stand-in. When the recording is fetched,
-  drop the stand-in and its credit line: `sounds.test.ts` fails on two credits for one file.
-- "Save for offline" saves every sound a pack can play, but a sound that fails to save does not fail the save
-  (the effect files are missing for now).
+- Wikimedia's download host refused every request from the build container (429, retry-after 600) for the whole
+  build. Task 16 delivered the tooling, 35 licence-checked sources, recipes and credits, but no new recording. The
+  recordings were then fetched on Evgeny's own connection (branch `sounds-recordings`, 22 November) and wired in by
+  the master in round 3.
+- 12 of the 21 effects have a recording. Nine have no source under the licence bar (CC0, public domain, CC BY):
+  sail-flap, tankards, oars, distant-cannon, parrots, big-bell, crates, waders, water-flow. They stay in the route
+  files; `pack_sound.py` leaves an effect out of `pack.json` until its file exists, `packs.test.ts` fails if a rerun
+  is forgotten, and the Sound check screen marks them "Not recorded yet".
+- Soundscape layers with no recording (rigging, cobbles, the foot tunnel, wading birds, a dockyard) keep a generated
+  stand-in or were dropped.
+- "Save for offline" saves every sound a pack can play, but a sound that fails to save does not fail the save.
 
 ## Round 1
 
@@ -102,13 +97,61 @@ Rider's seat (`?demo=ride&step=soundcheck`, `sound`, `story` and Home, 390 by 84
   `dist/` and so the Android build.
 - Nothing new found.
 
+## Round 3: the recordings (22 November)
+
+Evgeny fetched the recordings on his own connection (branch `sounds-recordings`, 15 new loops, 12 effects, the
+ship's bell). Wired in by the master:
+
+- Recipes rebuilt from `tools/sound/planned-recipes.txt` (now deleted), with sparse one-shot layers where an effect
+  fits the place: a ship's horn on the river, ice in the Arctic, a hammer in the yard, a chain at the working dock,
+  the water wheel at the mill.
+- The rendered bell stand-in is gone. The effect lengths are in the catalogue. Both packs rebuilt with
+  `pack_sound.py`: 14 stories carry 19 effects. The diff shows only `sfx`.
+- `build_sounds.py check` failed on seven files:
+  - Fire crackle and water lap were 6 and 2 dB under the effect loudness target. They were compressed and raised
+    10 dB, and their credits say so.
+  - Two effect lengths differed from the catalogue.
+  - The three signals from the music tool were held to this tool's targets. The check now leaves them to the music
+    tool.
+- Credits: CC BY 4.0 asks that changes be indicated, so every recording's line on the Sound check screen now says
+  "Cut and levelled for Versta".
+
+Mix:
+
+- Found: with the recordings in, both routes failed. The story effects fire in the pauses, right where the check
+  measures the gaps, so the check counted them as bed. Now samples are kept out of the bed figures while a story
+  effect or a soundscape's own one-shot is sounding. Those one-shots are on the sound timeline as `bed:<name>`.
+  The check also measures the effects themselves.
+- Found: birdsong. "Birds singing in garden" was the base of the burial and park soundscapes, so Bunhill Fields
+  had song bursts reaching -20 dBFS in the band the pocket does not reach (it only cuts the speech band). The phone
+  band there was 5.6 dB under the voice, against a target of 12. Burial, park and towpath now rest on wind or water,
+  with the birds underneath.
+- Trims measured again. Each soundscape is measured alone over 24 one-second readings, and the trim respects five
+  limits: speech band, overall, phone band, and two caps on bursts (`TRIM_DB` explains them).
+- The low and high band checks are judged only when the bed is steady by itself. Birdsong in a gap moved the high
+  band by up to 15 dB with no help from the pocket.
+- Effects were 14 to 16 dB under the voice, at or past the quiet edge. `EFFECT_LEVEL` went from 0.7 to 1.1, and
+  they now sit 11.7 to 12.7 dB under.
+- Result, two runs each, every target passes:
+
+  | Check | Thames Loop | Royal Docks |
+  | --- | --- | --- |
+  | Bed mid band under the voice in speech | 16.5 to 16.9 dB | 16.3 to 16.7 dB |
+  | Bed mid band under the voice in gaps | 6.3 to 7.0 dB | 6.9 to 7.1 dB |
+  | Voice over the bed in the phone band | 13.7 to 13.9 dB | 13.3 to 13.9 dB |
+
+- Borderline: on the Thames the low band moves 4.7 to 5.4 dB between speech and gaps, against a 5 dB limit. That
+  is the iteration 2 pocket (a 2 dB drop of the whole bed and the lower edge of the 500 Hz cut) meeting the new
+  river recording. Not retuned before anyone has listened.
+
 ## Open
 
-- The recordings: rerun `python3 tools/sound/build_sounds.py fetch`, then `process`, `check` and `credits` when
-  Wikimedia lets requests through, then the steps listed at the top of `tests/unit/sounds.test.ts`, then
-  `python3 tools/pack_sound.py thames-loop` and `royal-docks`. A Freesound token would widen the choice: eight
-  effects and five loops had no candidate on Commons at the licence bar.
+- Nine effects have no recording under the licence bar: sail-flap, tankards, oars, distant-cannon, parrots,
+  big-bell, crates, waders, water-flow. To add one, put a source in `tools/sound/sources.json`, run
+  `build_sounds.py` fetch, process, check and credits, take the name off the list in `tests/unit/sounds.test.ts`,
+  then rerun `pack_sound.py` for both packs. A Freesound token would widen the choice.
 - Nobody has listened to any of it. Before the PR, Evgeny needs about an hour with the Sound check screen and the
-  narrator switch: every soundscape, theme and signal, and the level of the music.
+  narrator switch: every soundscape, theme, signal and effect, the level of the music and of the effects, and
+  whether the Thames bed pumps under speech.
 - A turn spoken the moment the rider leaves a stop can come about 3 s after the depart cue at 9 m/s. This was the
   case before this iteration.

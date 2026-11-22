@@ -2,8 +2,8 @@
 
 Status: spec agreed with Evgeny on 21 November 2026. Briefs cut the same day (`it5-14-breaks.md` to
 `it5-20-soundcheck.md`), contracts settled in `src/types.ts` and `src/audio/catalogue.json`. Built on 21 November:
-all seven tasks merged, two review rounds (`iteration-5-rounds.md`). The recordings are still to be fetched (Wikimedia
-refused downloads throughout), so the 21 effects are written into the route files but have no sound yet.
+all seven tasks merged, three review rounds (`iteration-5-rounds.md`). The recordings were fetched on Evgeny's
+connection on 22 November; 12 of the 21 effects have one, the other nine have no source under the licence bar yet.
 
 ## Decisions made when tracing (master, 21 November)
 

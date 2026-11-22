@@ -173,29 +173,31 @@ export const RECIPES: Record<string, Part[]> = {
   sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.4, (x, s) => L.bells(x, s, 1), 0.2), R("gulls2", 0.25, undefined, 0.25)],
   canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15), 0.2), R("birds", 0.3, undefined, -0.2)],
   clock: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.45)), R("tick", 1, (x, s) => L.tick(x, s, 1))],
-  burial: [R("birds", 1), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3), 0.2), R("church", 0.3, undefined, -0.15), R("bells", 0.3, (x, s) => L.toll(x, s, 1, 220, 12, 14), 0.2)],
+  burial: [R("wind", 0.7, (x, s) => L.wind(x, s, 0.5), 0.2), R("church", 0.5, undefined, -0.15), R("bells", 0.35, (x, s) => L.toll(x, s, 1, 220, 12, 14), 0.2), R("birds", 0.3, undefined, -0.2)],
   office: [R("office", 1, (x, s) => L.tick(x, s, 0.8)), R("hum", 0.2, undefined, 0.15), R("murmur", 0.1, undefined, -0.2)],
   rally: [R("crowd", 1, (x, s) => L.murmur(x, s, 1)), R("murmur", 0.4, undefined, 0.2), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2)],
-  park: [R("birds", 1), R("wind", 0.4, (x, s) => L.wind(x, s, 0.3), 0.2), R("murmur", 0.2, undefined, -0.2)],
+  park: [R("wind", 0.7, (x, s) => L.wind(x, s, 0.4), 0.2), R("murmur", 0.4, undefined, -0.2), R("birds", 0.35, undefined, 0.15)],
   basin: [R("tide", 1, (x, s) => L.water(x, s, 0.5)), R("lap", 0.6, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5), 0.25), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2)],
   "working-dock": [R("wharf", 1, (x, s) => L.water(x, s, 0.5)), R("lap", 0.5, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.4), 0.25), S("chain", [18, 40], 0.35, 0.15), S("hammer", [25, 50], 0.3, -0.15)],
   mill: [R("weir", 1, (x, s) => L.water(x, s, 0.8)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), 0.2), R("birds", 0.25, undefined, -0.2), S("water-wheel", [30, 60], 0.35, 0.15)],
   pumping: [R("hum", 1, (x, s) => L.rumble(x, s, 1)), R("water", 0.3, (x, s) => L.water(x, s, 0.3), 0.2), R("drips", 0.25, undefined, -0.15)],
-  towpath: [R("river", 0.4, (x, s) => L.water(x, s, 0.3)), R("birds", 0.8, undefined, -0.2), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2)],
+  towpath: [R("river", 0.7, (x, s) => L.water(x, s, 0.4)), R("wind", 0.4, (x, s) => L.wind(x, s, 0.3), 0.2), R("birds", 0.3, undefined, -0.2)],
   oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls2", 0.25, undefined, 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
 };
 
 /**
- * Level trim per soundscape, in dB, measured through the real mixer (each alone, from the Sound check screen) so that
- * every one sits near -21.5 dBFS in the speech band and no louder than -21 dBFS overall: there the pocket leaves the
- * bed 14 to 18 dB under the voice while it speaks (tools/sound/check-mix.mjs). The tunnel and the pumping station are
- * mostly low rumble and are capped at +5 dB rather than lifted to the speech band. Measure again after a recipe or a
- * recording changes.
+ * Level trim per soundscape, in dB, measured through the real mixer: each alone from the Sound check screen, 24
+ * one-second readings. Each gets the most it can take within five limits: about -21.5 dBFS in the speech band and no
+ * more than -21 dBFS overall (there the pocket leaves the bed 14 to 18 dB under the voice), -21.5 dBFS in the phone
+ * band (300 Hz to 8 kHz, which the pocket does not reach), and for bursts (the loudest tenth of the seconds, such as
+ * birdsong) -19.5 dBFS in the phone band and -26 dBFS above 4 kHz. The tunnel is mostly low rumble and is capped at
+ * +5 dB. Measured with the recordings of 22 November (tools/sound/check-mix.mjs confirms the result); measure again
+ * whenever a recipe or a recording changes.
  */
 export const TRIM_DB: Record<string, number> = {
-  river: 1.2, wharf: 2.6, ship: 2.7, arctic: 2.1, yard: 5.5, sail: 4.4, solemn: 3.8, tunnel: 5, dock: 4.9, tavern: 0.7,
-  sailortown: 3.1, canal: 5.6, clock: 1.6, burial: 7.2, office: 7.7, rally: 1.6, park: 9.6, basin: 4, "working-dock": 4.4,
-  mill: 0.6, pumping: 5, towpath: 6.6, oldstreet: 2.5,
+  river: 1.1, wharf: 1.4, ship: 1.9, arctic: -0.3, yard: 6.2, sail: 6.7, solemn: 4.1, tunnel: 5.0, dock: 2.6,
+  tavern: 0.8, sailortown: 3.3, canal: 5.6, clock: 1.8, burial: 5.0, office: 2.7, rally: 0.7, park: 5.7, basin: -0.1,
+  "working-dock": 2.1, mill: 2.6, pumping: -0.5, towpath: 4.7, oldstreet: 2.2,
 };
 
 /** The gain the trim of a soundscape stands for (the river's for an unknown name, as with its recipe). */
@@ -221,8 +223,11 @@ function wire(x: Synth, s: Session, g: GainNode, pan: number | undefined): void 
   g.connect(p); p.connect(s.bus);
 }
 
-/** Start the named soundscape on a session. Unknown names fall back to the river. */
-export function buildAmbience(x: Synth, s: Session, name: string, loops: LoopLib | null): void {
+/**
+ * Start the named soundscape on a session. Unknown names fall back to the river. `onFx` hears each sparse one-shot
+ * start and end, so the sound timeline can show it.
+ */
+export function buildAmbience(x: Synth, s: Session, name: string, loops: LoopLib | null, onFx?: (fx: string, ev: "on" | "off") => void): void {
   for (const part of recipeFor(name)) {
     if (part.fx) {
       const fx = part.fx;
@@ -234,9 +239,10 @@ export function buildAmbience(x: Synth, s: Session, name: string, loops: LoopLib
         src.buffer = buf;
         const g = gain(x, (part.level ?? 0.4) * LOOP_LEVEL);
         src.connect(g); wire(x, s, g, part.pan);
-        src.onended = () => { const i = s.srcs.indexOf(src); if (i >= 0) s.srcs.splice(i, 1); };
+        src.onended = () => { const i = s.srcs.indexOf(src); if (i >= 0) s.srcs.splice(i, 1); onFx?.(fx, "off"); };
         s.srcs.push(src);
         src.start();
+        onFx?.(fx, "on");
       }, rnd(a * 0.3, a));
       continue;
     }

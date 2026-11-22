@@ -193,7 +193,9 @@ export function SoundCheck() {
                 {list.map((c) => (
                   <li key={c.file}>
                     {plainTitle(c.title)}, {c.author}, {c.licence}.{" "}
-                    {/^https?:\/\//.test(c.source) ? <a class="linkbtn" href={c.source} target="_blank" rel="noopener">Source</a> : c.note ?? null}
+                    {/^https?:\/\//.test(c.source)
+                      ? <>Cut and levelled for Versta. <a class="linkbtn" href={c.source} target="_blank" rel="noopener">Source</a></>
+                      : c.note ?? null}
                   </li>
                 ))}
               </ul>

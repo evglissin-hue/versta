@@ -13,7 +13,8 @@ import { type Session, endSession, session } from "./synth";
 export const AMB_LEVEL = 0.9;
 /** About 8 dB under the soundscapes overall (measured: themes -29 to -33 dBFS alone, soundscapes -21 to -24). */
 export const MUS_LEVEL = 1.1;
-export const EFFECT_LEVEL = 0.7;
+/** Story effects, 10 to 14 dB under the voice: at 0.9 check-mix measured 14 dB, so 2 dB more (22 November). */
+export const EFFECT_LEVEL = 1.1;
 /** How long a starting soundscape waits for its recordings before it starts without them. */
 const LOAD_WAIT_MS = 1500;
 /** How long an effect waits for its recording to decode before it is dropped. */
@@ -132,7 +133,8 @@ export function createBed(hooks: BedHooks): Bed {
         retire(kind, fadeOut);
         if (kind === "music" && !music) return; // a theme that failed to load means no music
         const s = session(x, kind === "ambience" ? AMB_LEVEL * trimOf(name) : MUS_LEVEL, fadeIn);
-        if (kind === "ambience") buildAmbience(x, s, name, lib);
+        // a soundscape's own sparse one-shots go on the timeline as "bed:<effect>", apart from story effects
+        if (kind === "ambience") buildAmbience(x, s, name, lib, (fx, ev) => hooks.emit("effect", ev, `bed:${fx}`));
         else if (music) {
           const src = x.ctx.createBufferSource();
           src.buffer = music;

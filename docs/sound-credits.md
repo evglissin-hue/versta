@@ -46,13 +46,13 @@ with a 1.5 s crossfade when it decodes the file.
 | fx/bubbling.mp3 | [Oil boiling.ogg](https://commons.wikimedia.org/wiki/File:Oil_boiling.ogg) | ezwa | Public domain | 5 s from 1 s |
 | fx/chain.mp3 | [WWS Wardrobechainloweringandraising.ogg](https://commons.wikimedia.org/wiki/File:WWS_Wardrobechainloweringandraising.ogg) | Work With Sounds / Technical Museum of Slovenia | CC BY 4.0 | 4 s from 10 s |
 | fx/crowd.mp3 | [211146 unfa another-crowd.flac](https://commons.wikimedia.org/wiki/File:211146_unfa_another-crowd.flac) | unfa | CC0 | 6 s from 25 s |
-| fx/fire-crackle.mp3 | [Campfire sound ambience.ogg](https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg) | Glaneur de sons | CC BY 3.0 | 5 s from 17 s |
+| fx/fire-crackle.mp3 | [Campfire sound ambience.ogg](https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg) | Glaneur de sons | CC BY 3.0 | 5 s from 17 s, compressed and raised 10 dB |
 | fx/hammer.mp3 | [WWS Watersmithyforgingwithtwohammers.ogg](https://commons.wikimedia.org/wiki/File:WWS_Watersmithyforgingwithtwohammers.ogg) | Work With Sounds / Museum of Municipal Engineering | CC BY 4.0 | 3 s from 4 s |
 | fx/ice-creak.mp3 | [Singing iceberg.oga](https://commons.wikimedia.org/wiki/File:Singing_iceberg.oga) | Müller, Christian; Schlindwein, Vera; Eckstaller, Alfons; Miller, Heinz (2005) | CC BY 3.0 | 4 s from 159 s |
 | fx/ship-horn.mp3 | [Fog signal Bremerhaven.ogg](https://commons.wikimedia.org/wiki/File:Fog_signal_Bremerhaven.ogg) | Tvabutzku1234 | CC0 | 5 s from 0 s |
 | fx/steam-engine.mp3 | [Steam engine.ogg](https://commons.wikimedia.org/wiki/File:Steam_engine.ogg) | aradlaw | Public domain | 6 s from 12 s |
 | fx/telegraph.mp3 | [WWS Teleprintertyping.ogg](https://commons.wikimedia.org/wiki/File:WWS_Teleprintertyping.ogg) | Work With Sounds / Konrad Gutkowski | CC BY 4.0 | 4 s from 62 s |
-| fx/water-lap.mp3 | [WWS Smallwaves.ogg](https://commons.wikimedia.org/wiki/File:WWS_Smallwaves.ogg) | Work With Sounds / Torsten Nilsson | CC BY 4.0 | 4 s from 23 s |
+| fx/water-lap.mp3 | [WWS Smallwaves.ogg](https://commons.wikimedia.org/wiki/File:WWS_Smallwaves.ogg) | Work With Sounds / Torsten Nilsson | CC BY 4.0 | 4 s from 23 s, compressed and raised 10 dB |
 | fx/water-wheel.mp3 | [WWS Horizontalwaterwheel.ogg](https://commons.wikimedia.org/wiki/File:WWS_Horizontalwaterwheel.ogg) | Work With Sounds / Konrad Gutkowski | CC BY 4.0 | 6 s from 3 s |
 
 ## Signals
@@ -63,7 +63,6 @@ with a 1.5 s crossfade when it decodes the file.
 | signals/arrive.mp3 | [Arrival signal](tools/music/signals.py. Rendered with FluidR3_GM by Frank Wen (MIT licence)) | Composed for Versta | CC0 | A 2 s motif, rendered offline by tools/music/render.py |
 | signals/close.mp3 | [End of a stop's stories signal](tools/music/signals.py. Rendered with FluidR3_GM by Frank Wen (MIT licence)) | Composed for Versta | CC0 | A 2.5 s motif, rendered offline by tools/music/render.py |
 | signals/finish.mp3 | [End of the ride signal](tools/music/signals.py. Rendered with FluidR3_GM by Frank Wen (MIT licence)) | Composed for Versta | CC0 | A 4 s motif, rendered offline by tools/music/render.py |
-| signals/aside.mp3 | [Ship's bell signal](tools/music/signals.py. Rendered with FluidR3_GM by Frank Wen (MIT licence)) | Composed for Versta | CC0 | Two strokes, 3 s, rendered offline by tools/music/render.py. A stand-in until the recording is fetched |
 
 ## Music
 
