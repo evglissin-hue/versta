@@ -58,7 +58,7 @@ describe("arrival", () => {
     expect(whats(r)).toEqual([
       "arrive:4", "signal:arrive", "story_start:peter-the-great-0",
       "effect:peter-the-great-0:3:hammer", "effect:peter-the-great-0:7:adze", "story_end:peter-the-great-0",
-      "story_start:peter-the-great-1", "story_end:peter-the-great-1", "signal:close",
+      "story_start:peter-the-great-1", "effect:peter-the-great-1:4:tankards", "story_end:peter-the-great-1", "signal:close",
     ]);
     expect(r.mixer.bed).toBeNull();
     expect(r.mixer.voiceBusy).toBe(false);
