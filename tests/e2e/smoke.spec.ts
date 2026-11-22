@@ -458,3 +458,48 @@ test("ride recordings open from Sound and settings, show the empty state and clo
   await expect(page.getByTestId("sound-sheet")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("route states demo: each Android state shows its text and its one action", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?demo=ride&step=routes");
+  const cards = page.getByTestId("route-card");
+  await expect(cards).toHaveCount(4);
+  const site = cards.nth(0), down = cards.nth(1), needs = cards.nth(2), phone = cards.nth(3);
+  await expect(site.getByRole("button", { name: "Download", exact: true })).toBeVisible();
+  await expect(site.getByTestId("route-note")).toHaveText("15 MB. Downloads by itself on Wi-Fi.");
+  await expect(site.getByRole("button", { name: "Ride", exact: true })).toHaveCount(0);
+  await expect(site.getByRole("button", { name: "Save for offline" })).toHaveCount(0);
+  await expect(down.getByRole("button", { name: "Downloading 40%" })).toBeDisabled();
+  await expect(down.locator(".progress")).toBeVisible();
+  await expect(needs.getByTestId("route-note")).toContainText("This route needs the newest version of the app.");
+  await expect(needs.getByRole("link", { name: "Get the app" })).toBeVisible();
+  await expect(needs.getByRole("button")).toHaveCount(0);
+  await expect(phone.getByRole("button", { name: "Ride", exact: true })).toBeVisible();
+  await expect(phone.getByTestId("update-line")).toContainText("An update is ready to download, 2 MB.");
+  await expect(phone.getByRole("button", { name: "Download update" })).toBeVisible();
+  await expect(phone.getByTestId("on-phone-note")).toContainText("On this phone, 15 MB.");
+  await expect(phone.getByRole("button", { name: "Remove" })).toBeVisible();
+  const small = await page.$$eval("button, a.linkbtn", (els) => els.filter((e) => e.getBoundingClientRect().height > 0 && e.getBoundingClientRect().height < 47.5).map((e) => e.textContent));
+  expect(small).toEqual([]);
+  expect(errors.filter((e) => !/Failed to load resource|ERR_/.test(e))).toEqual([]);
+});
+
+test("route states demo: updates held for a ride say why", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?demo=ride&step=routes-held");
+  const lines = page.getByTestId("update-line");
+  await expect(lines.nth(0)).toHaveText("Update downloaded. It comes in when this ride ends.");
+  await expect(lines.nth(1)).toHaveText("Update downloaded. It comes in when you finish or start your saved ride again.");
+  await expect(lines.nth(2)).toContainText("An update needs the newest version of the app.");
+  await expect(lines.nth(3)).toContainText("Updating, 40%");
+});
+
+test("web Home has none of the Android route states", async ({ page }) => {
+  await page.goto("/");
+  await expect(thamesCard(page)).toBeVisible();
+  await expect(page.getByTestId("update-line")).toHaveCount(0);
+  await expect(page.getByTestId("on-phone-note")).toHaveCount(0);
+  await expect(thamesCard(page).getByRole("button", { name: "Ride", exact: true })).toBeVisible();
+  await expect(thamesCard(page).getByRole("button", { name: "Save for offline" })).toBeVisible();
+});

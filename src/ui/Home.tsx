@@ -1,10 +1,11 @@
 import { signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { offlineStatus, removePackOffline, savePackOffline } from "../offline";
+import { offlineStatus, removePackOffline, savePackOffline, updatedSinceSaved } from "../offline";
+import { routeStore } from "../routes/store";
 import { isNative } from "../native/platform";
 import { forgetSavedRide, loadPack, savedRide, simFromUrl, startRide, type SavedRide } from "../ride";
-import { packIndex } from "../state";
-import type { PackIndexEntry } from "../types";
+import { heroSrc, packIndex, routeStatus } from "../state";
+import type { PackIndexEntry, RouteUpdate, Transfer } from "../types";
 import { fmtDate, fmtListening, fmtMB, pad2 } from "./format";
 import { Sheet } from "./Sheet";
 import { firstRideSheet, netDown, recordingsOpen, soundCheckOpen, startFailure, startPhase } from "./uistate";
@@ -15,6 +16,36 @@ type IndexEntry = PackIndexEntry & { stories?: number; asides?: number; minutes?
 const RELEASES = "https://github.com/evglissin-hue/versta/releases/tag/android-latest";
 const FIRST_KEY = "versta:firstride";
 const seenFirstRide = (): boolean => { try { return localStorage.getItem(FIRST_KEY) === "1"; } catch { return true; } };
+
+/** The demo screens set this to show the Android app's route states in a browser. */
+export const nativeDemo = signal(false);
+const onPhoneApp = (): boolean => isNative() || nativeDemo.value;
+const pct = (t: Transfer): number => Math.round((t.done / Math.max(1, t.total)) * 100);
+
+function Bar({ t }: { t: Transfer }) {
+  return <div class="progress"><i style={{ width: `${pct(t)}%` }} /></div>;
+}
+
+function GetApp() {
+  return <a class="linkbtn" href={RELEASES} target="_blank" rel="noopener" data-testid="get-app">Get the app</a>;
+}
+
+/** The one line under a route that is on the phone and has a newer copy on the site. */
+function UpdateLine({ id, u }: { id: string; u: RouteUpdate }) {
+  const t = u.transfer;
+  if (t?.state === "downloading") return <div class="acts-col" data-testid="update-line"><p class="saved-note">Updating, {pct(t)}%</p><Bar t={t} /></div>;
+  if (t?.state === "failed") return <p class="saved-note" data-testid="update-line">The update stopped. <button type="button" class="linkbtn" onClick={() => void routeStore.fetch(id)}>Try again</button></p>;
+  if (u.held === "not-wifi") return (
+    <div class="acts-col" data-testid="update-line">
+      <p class="saved-note">An update is ready to download, {fmtMB(u.bytes)}.</p>
+      <button type="button" class="btn ghost" onClick={() => void routeStore.fetch(id)}>Download update</button>
+    </div>
+  );
+  if (u.held === "riding") return <p class="saved-note" data-testid="update-line">Update downloaded. It comes in when this ride ends.</p>;
+  if (u.held === "saved-ride") return <p class="saved-note" data-testid="update-line">Update downloaded. It comes in when you finish or start your saved ride again.</p>;
+  if (u.held === "needs-app") return <p class="saved-note" data-testid="update-line">An update needs the newest version of the app. <GetApp /></p>;
+  return null;
+}
 
 type Saving =
   | { s: "idle" }
@@ -100,7 +131,6 @@ function Card({ entry }: { entry: IndexEntry }) {
   useEffect(() => {
     void offlineStatus(entry.id).then((o) => { if (o.saved) set(entry.id, { s: "saved", bytes: o.bytes, savedAt: o.savedAt }); });
   }, [entry.id]);
-  const base = import.meta.env.BASE_URL;
   const phase = startPhase.value?.id === entry.id ? startPhase.value.phase : null;
   const busy = startPhase.value !== null;
   const label = phase === "loading" ? "Loading the route" : "Starting the ride";
@@ -114,10 +144,16 @@ function Card({ entry }: { entry: IndexEntry }) {
   ].filter((x): x is string => x !== null);
   const saved = savedRide();
   const resume = saved && saved.packId === entry.id ? saved : null;
+  const app = onPhoneApp();
+  const rs = app ? routeStatus.value[entry.id] : undefined;
+  const away = rs && rs.kind !== "on-phone" ? rs : null; // on the site only, or too new for this app
+  const onSite = away && away.kind === "on-site" ? away : null;
+  const phone = rs && rs.kind === "on-phone" ? rs : null;
+  const changed = !app && !!updatedSinceSaved.value[entry.id] && (st.s === "idle" || st.s === "error");
   return (
     <article class="card" data-testid="route-card">
       <div class="card-pic">
-        <img src={`${base}${entry.hero}`} alt="" loading="eager" />
+        <img src={heroSrc(entry)} alt="" loading="eager" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
         <div class="card-words">
           <span class="label">{entry.mode === "bicycling" ? "Bike ride" : "Walk"}</span>
           <h2>{entry.name}</h2>
@@ -129,13 +165,27 @@ function Card({ entry }: { entry: IndexEntry }) {
       </div>
       <p class="blurb">{entry.blurb}</p>
       {inside.length > 1 ? <p class="inside" data-testid="inside">{inside.map((x, i) => <span key={x}><span class="nb">{x}{i < inside.length - 1 ? "," : ""}</span>{" "}</span>)}</p> : null}
-      {resume ? <Continue entry={entry} saved={resume} busy={busy} label={label} /> : null}
-      <div class="acts">
-        {resume ? null : <button type="button" class={`btn play ${phase ? "busy" : ""}`} disabled={busy} onClick={() => requestRide(entry.id)}>{phase ? label : "Ride"}</button>}
-        <button type="button" class="btn ghost" disabled={st.s === "saving" || st.s === "saved"} onClick={() => void save(entry)}>
-          {st.s === "saving" ? `Saving ${Math.round((st.done / st.total) * 100)}%` : st.s === "saved" ? "Saved for offline" : st.s === "error" ? "Try saving again" : "Save for offline"}
-        </button>
-      </div>
+      {away ? null : resume ? <Continue entry={entry} saved={resume} busy={busy} label={label} /> : null}
+      {away ? (
+        <div class="acts-col">
+          {onSite ? (
+            onSite.transfer?.state === "downloading" ? <button type="button" class="btn play" disabled>Downloading {pct(onSite.transfer)}%</button>
+              : onSite.transfer?.state === "failed" ? <button type="button" class="btn play" onClick={() => void routeStore.fetch(entry.id)}>Try again</button>
+              : <button type="button" class="btn play" onClick={() => void routeStore.fetch(entry.id)}>Download</button>
+          ) : null}
+          {onSite?.transfer?.state === "downloading" ? <Bar t={onSite.transfer} /> : null}
+          {onSite?.transfer?.state === "failed" ? <p class="warn-note" data-testid="route-note">Download stopped.</p> : null}
+          {onSite && !onSite.transfer ? <p class="saved-note" data-testid="route-note">{onSite.removed ? "Removed from this phone." : `${fmtMB(onSite.bytes)}. Downloads by itself on Wi-Fi.`}</p> : null}
+          {away.kind === "needs-app" ? <p class="saved-note" data-testid="route-note">This route needs the newest version of the app. <GetApp /></p> : null}
+        </div>
+      ) : (
+        <div class="acts">
+          {resume ? null : <button type="button" class={`btn play ${phase ? "busy" : ""}`} disabled={busy} onClick={() => requestRide(entry.id)}>{phase ? label : "Ride"}</button>}
+          <button type="button" class="btn ghost" disabled={st.s === "saving" || st.s === "saved"} onClick={() => void save(entry)}>
+            {st.s === "saving" ? `Saving ${Math.round((st.done / st.total) * 100)}%` : st.s === "saved" ? "Saved for offline" : st.s === "error" ? "Try saving again" : "Save for offline"}
+          </button>
+        </div>
+      )}
       {failure ? (
         <div class="failure" role="alert" data-testid="load-failure">
           <p class="warn-note">{failure.kind === "load" ? "Could not load the route. Check your connection and try again." : "Could not start the ride. Try again."}</p>
@@ -145,6 +195,14 @@ function Card({ entry }: { entry: IndexEntry }) {
       {offlineUnsaved && !failure ? <p class="warn-note" data-testid="offline-note">You are offline and this route is not saved on this device. Connect to ride it.</p> : null}
       {st.s === "saving" ? <div class="progress"><i style={{ width: `${(st.done / st.total) * 100}%` }} /></div> : null}
       {st.s === "error" ? <p class="warn-note">Some files did not save. Check your connection and try again.</p> : null}
+      {phone?.update ? <UpdateLine id={entry.id} u={phone.update} /> : null}
+      {phone && phone.source === "downloaded" && !resume ? (
+        <p class="saved-note" data-testid="on-phone-note">
+          On this phone, {fmtMB(phone.bytes)}.{" "}
+          <button type="button" class="linkbtn" onClick={() => void routeStore.remove(entry.id)}>Remove</button>
+        </p>
+      ) : null}
+      {changed ? <p class="saved-note" data-testid="changed-note">This route changed. Save it again for offline use.</p> : null}
       {st.s === "saved" ? (
         <p class="saved-note">
           {st.savedAt ? `Saved ${fmtDate(st.savedAt)}, ` : "Saved, "}{fmtMB(st.bytes)}. Works without signal.{" "}
