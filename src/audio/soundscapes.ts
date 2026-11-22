@@ -143,39 +143,46 @@ const R = (loop: string, level: number, gen?: Preset, pan?: number): Part => {
   return p;
 };
 
+/** A sparse one-shot layer: effect `fx` (public/sounds/fx/<fx>.mp3) every `every[0]` to `every[1]` seconds. */
+const S = (fx: string, every: [number, number], level: number, pan?: number): Part => {
+  const p: Part = { fx, every, level };
+  if (pan !== undefined) p.pan = pan;
+  return p;
+};
+
 /** Level of a recorded loop (they are normalised to about -26 LUFS) relative to the generated layers. */
 export const LOOP_LEVEL = 1.6;
 
 /**
- * Recipes: a steady base and one or two texture layers. Recorded loops are the eight in docs/sound-credits.md; the
- * layers with only `gen` have no recording yet (tools/sound/planned-recipes.txt has the target recipes once those
- * are fetched). A sparse one-shot layer is `{ fx: "ship-horn", every: [50, 100], level: 0.4 }` and sits at least
- * 6 dB under the base.
+ * Recipes: a steady base and one or two texture layers, recorded where a recording exists (docs/sound-credits.md),
+ * generated (`gen`) where none does or while it loads. A sparse one-shot layer (S) plays an effect now and then and
+ * sits at least 6 dB under the base. Layers with no recording under the licence bar yet: rigging, cobbles, the foot
+ * tunnel, wading birds, a dockyard, and the sail, tankard and water-flow effects.
  */
 export const RECIPES: Record<string, Part[]> = {
-  river: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("gulls", 0.45, (x, s) => L.gulls(x, s, 0.8), 0.25), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2), P((x, s) => L.foghorn(x, s, 1)), P((x, s) => L.creak(x, s, 0.4))],
-  wharf: [R("wharf", 1, (x, s) => L.water(x, s, 0.4)), R("shore", 0.3, (x, s) => L.water(x, s, 0.3), -0.2), P((x, s) => L.creak(x, s, 0.9)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.6), 0.25)],
-  ship: [R("wharf", 0.9, (x, s) => L.water(x, s, 0.7)), R("wind", 0.5, (x, s) => L.wind(x, s, 0.4), 0.25), P((x, s) => L.creak(x, s, 1))],
-  arctic: [R("wind", 1, (x, s) => L.wind(x, s, 1)), R("shore", 0.5, (x, s) => L.water(x, s, 0.8), 0.2), P((x, s) => L.creak(x, s, 0.7))],
-  yard: [R("wharf", 0.7, (x, s) => L.water(x, s, 0.4)), P((x, s) => L.hammer(x, s, 1)), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5), 0.25)],
-  sail: [R("wind", 0.9, (x, s) => L.wind(x, s, 0.9), 0.2), R("shore", 0.6, (x, s) => L.water(x, s, 0.6), -0.2), P((x, s) => L.creak(x, s, 0.8))],
-  solemn: [R("water", 0.5, (x, s) => L.water(x, s, 0.5)), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3), 0.2), R("bells", 0.7, (x, s) => L.toll(x, s, 1, 220, 6, 7), -0.15)],
-  tunnel: [P((x, s) => L.rumble(x, s, 1)), P((x, s) => L.drips(x, s, 1))],
-  dock: [R("shore", 0.9, (x, s) => L.water(x, s, 0.6)), P((x, s) => L.creak(x, s, 0.6)), R("gulls", 0.5, (x, s) => L.gulls(x, s, 0.5), 0.25)],
-  tavern: [R("murmur", 1, (x, s) => L.murmur(x, s, 1)), P((x, s) => L.clink(x, s, 1)), P((x, s) => L.water(x, s, 0.25)), P((x, s) => L.creak(x, s, 0.4))],
-  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.5, (x, s) => L.bells(x, s, 1), 0.2)],
-  canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15), 0.2)],
+  river: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("gulls2", 0.45, (x, s) => L.gulls(x, s, 0.8), 0.25), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2), S("ship-horn", [50, 100], 0.4)],
+  wharf: [R("wharf", 1, (x, s) => L.water(x, s, 0.4)), R("lap", 0.5, (x, s) => L.water(x, s, 0.3), -0.2), R("creak", 0.45, (x, s) => L.creak(x, s, 0.9), 0.15), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.6), 0.25)],
+  ship: [R("lap", 0.8, (x, s) => L.water(x, s, 0.7)), R("creak", 0.8, (x, s) => L.creak(x, s, 1), -0.15), R("wind", 0.3, (x, s) => L.wind(x, s, 0.4), 0.25)],
+  arctic: [R("wind", 1, (x, s) => L.wind(x, s, 1)), R("ice", 0.7, (x, s) => L.creak(x, s, 0.7), -0.2), R("shore", 0.25, (x, s) => L.water(x, s, 0.8), 0.2), S("ice-creak", [35, 70], 0.4)],
+  yard: [R("timber", 0.8, (x, s) => L.hammer(x, s, 1), -0.15), R("wharf", 0.5, (x, s) => L.water(x, s, 0.4)), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.5), 0.25), S("hammer", [14, 30], 0.35, 0.15)],
+  sail: [R("wind", 0.6, (x, s) => L.wind(x, s, 0.9), 0.2), R("lap", 0.5, (x, s) => L.water(x, s, 0.6), -0.2), P((x, s) => L.creak(x, s, 0.8))],
+  solemn: [R("water", 0.5, (x, s) => L.water(x, s, 0.5)), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3), 0.2), R("church", 0.4, undefined, -0.15), R("bells", 0.5, (x, s) => L.toll(x, s, 1, 220, 6, 7), 0.15)],
+  tunnel: [P((x, s) => L.rumble(x, s, 1)), R("drips", 0.8, (x, s) => L.drips(x, s, 1), 0.2)],
+  dock: [R("lap", 0.9, (x, s) => L.water(x, s, 0.6)), R("tide", 0.4, undefined, -0.2), R("gulls", 0.45, (x, s) => L.gulls(x, s, 0.5), 0.25), R("creak", 0.3, (x, s) => L.creak(x, s, 0.6), 0.15)],
+  tavern: [R("pub", 1, (x, s) => L.murmur(x, s, 1)), R("murmur", 0.3, undefined, 0.2), P((x, s) => L.clink(x, s, 1))],
+  sailortown: [R("murmur", 0.7, (x, s) => L.murmur(x, s, 0.7)), R("bells", 0.4, (x, s) => L.bells(x, s, 1), 0.2), R("gulls2", 0.25, undefined, 0.25)],
+  canal: [R("water", 0.6, (x, s) => L.water(x, s, 0.35)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.15), 0.2), R("birds", 0.3, undefined, -0.2)],
   clock: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.45)), R("tick", 1, (x, s) => L.tick(x, s, 1))],
-  burial: [R("wind", 0.5, (x, s) => L.wind(x, s, 0.4), 0.2), R("bells", 0.4, (x, s) => L.toll(x, s, 1, 220, 12, 14), -0.2), R("water", 0.15, (x, s) => L.water(x, s, 0.15), 0.15)],
-  office: [R("tick", 0.8, (x, s) => L.tick(x, s, 0.8), -0.15), R("murmur", 0.12, (x, s) => L.murmur(x, s, 0.12), 0.2), P((x, s) => L.rumble(x, s, 0.15))],
-  rally: [R("murmur", 1, (x, s) => L.murmur(x, s, 1)), R("wind", 0.25, (x, s) => L.wind(x, s, 0.2), -0.2)],
-  park: [R("wind", 0.45, (x, s) => L.wind(x, s, 0.35), 0.2), R("murmur", 0.2, (x, s) => L.murmur(x, s, 0.2), -0.2), R("gulls", 0.2, (x, s) => L.gulls(x, s, 0.2), 0.25)],
-  basin: [R("shore", 0.8, (x, s) => L.water(x, s, 0.6), -0.2), R("gulls", 0.6, (x, s) => L.gulls(x, s, 0.6), 0.25), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2), R("water", 0.25, (x, s) => L.water(x, s, 0.25))],
-  "working-dock": [R("wharf", 0.8, (x, s) => L.water(x, s, 0.5)), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.4), 0.25), P((x, s) => L.hammer(x, s, 0.4)), P((x, s) => L.rumble(x, s, 0.3))],
-  mill: [R("water", 1, (x, s) => L.water(x, s, 0.8)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), 0.2), P((x, s) => L.creak(x, s, 0.3))],
-  pumping: [P((x, s) => L.rumble(x, s, 1)), R("water", 0.35, (x, s) => L.water(x, s, 0.35), 0.2)],
-  towpath: [R("water", 0.5, (x, s) => L.water(x, s, 0.3)), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2), R("gulls", 0.15, (x, s) => L.gulls(x, s, 0.15), -0.2)],
-  oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls", 0.25, (x, s) => L.gulls(x, s, 0.25), 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
+  burial: [R("birds", 1), R("wind", 0.35, (x, s) => L.wind(x, s, 0.3), 0.2), R("church", 0.3, undefined, -0.15), R("bells", 0.3, (x, s) => L.toll(x, s, 1, 220, 12, 14), 0.2)],
+  office: [R("office", 1, (x, s) => L.tick(x, s, 0.8)), R("hum", 0.2, undefined, 0.15), R("murmur", 0.1, undefined, -0.2)],
+  rally: [R("crowd", 1, (x, s) => L.murmur(x, s, 1)), R("murmur", 0.4, undefined, 0.2), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), -0.2)],
+  park: [R("birds", 1), R("wind", 0.4, (x, s) => L.wind(x, s, 0.3), 0.2), R("murmur", 0.2, undefined, -0.2)],
+  basin: [R("tide", 1, (x, s) => L.water(x, s, 0.5)), R("lap", 0.6, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.4, (x, s) => L.gulls(x, s, 0.5), 0.25), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2)],
+  "working-dock": [R("wharf", 1, (x, s) => L.water(x, s, 0.5)), R("lap", 0.5, (x, s) => L.water(x, s, 0.4), -0.2), R("gulls", 0.3, (x, s) => L.gulls(x, s, 0.4), 0.25), S("chain", [18, 40], 0.35, 0.15), S("hammer", [25, 50], 0.3, -0.15)],
+  mill: [R("weir", 1, (x, s) => L.water(x, s, 0.8)), R("wind", 0.2, (x, s) => L.wind(x, s, 0.2), 0.2), R("birds", 0.25, undefined, -0.2), S("water-wheel", [30, 60], 0.35, 0.15)],
+  pumping: [R("hum", 1, (x, s) => L.rumble(x, s, 1)), R("water", 0.3, (x, s) => L.water(x, s, 0.3), 0.2), R("drips", 0.25, undefined, -0.15)],
+  towpath: [R("river", 0.4, (x, s) => L.water(x, s, 0.3)), R("birds", 0.8, undefined, -0.2), R("wind", 0.3, (x, s) => L.wind(x, s, 0.3), 0.2)],
+  oldstreet: [R("murmur", 0.8, (x, s) => L.murmur(x, s, 0.6)), R("bells", 0.3, (x, s) => L.bells(x, s, 1), -0.2), R("gulls2", 0.25, undefined, 0.25), R("wind", 0.15, (x, s) => L.wind(x, s, 0.15), 0.2)],
 };
 
 /**

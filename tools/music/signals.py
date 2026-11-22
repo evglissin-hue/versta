@@ -6,10 +6,6 @@ arrive  a rising figure of three notes on the celesta (E, G, C) over a soft stri
 close   a falling two-note figure on the vibraphone (D, then C, home) over a low soft chord. About 2.5 s, quieter.
 finish  a harp arpeggio rising in five notes into a held C major chord with a glockenspiel on top. About 4 s.
 Not a bell: all three are soft attacks on pitched instruments, and each has its own register.
-
-aside   the ship's bell before a passing-by story: two strokes close together, as a ship's bell is rung, on the
-        tubular bells. About 3 s. A stand-in until the recording in tools/sound/sources.json can be fetched; when
-        it is, drop this one and its line in src/audio/credits-music.json (the sounds test fails on two credits).
 """
 SIGNALS = {
     "arrive": {"length": 2.0, "reverb": (0.6, 0.5, 0.45), "parts": [
@@ -24,9 +20,6 @@ SIGNALS = {
         {"ch": 1, "prog": 49, "pan": 0.0, "vol": 90, "rev": 45,
          "notes": [(0.35, "C3+G3", 2.1, 34)]},
     ]},
-    "aside": {"length": 3.0, "reverb": (0.5, 0.5, 0.35), "parts": [
-        {"ch": 0, "prog": 14, "pan": 0.0, "vol": 100, "rev": 35,
-         "notes": [(0.0, "A5", 2.6, 92), (0.32, "A5", 2.6, 84)]},
     ]},
     "finish": {"length": 4.0, "reverb": (0.75, 0.5, 0.5), "parts": [
         {"ch": 0, "prog": 46, "pan": 0.0, "vol": 100, "rev": 55,

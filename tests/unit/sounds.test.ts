@@ -20,12 +20,12 @@ const found = import.meta.glob<Credit[]>("../../src/audio/credits-*.json", { eag
 const credits: Credit[] = Object.values(found).flat();
 
 /**
- * Effects whose recordings are listed in tools/sound/sources.json but could not be downloaded yet:
- * Wikimedia answered every download with 429 and retry-after 600 for the whole of the task 16 session. Run
- * `python3 tools/sound/build_sounds.py fetch && ... process && ... check && ... credits` once the host lets requests
- * through, then empty this list. The ship's bell (signals/aside) is a rendered stand-in from tools/music/signals.py meanwhile.
+ * Effects with no recording under the licence bar yet (CC0, public domain or CC BY): tools/sound/sources.json has no
+ * source for them. Add one, run `python3 tools/sound/build_sounds.py fetch`, then `process`, `check` and `credits`,
+ * and take the name off this list. Their stories keep them in the route files; `tools/pack_sound.py` adds them to
+ * the packs once the file exists.
  */
-const AWAITING_FETCH: string[] = Object.keys(catalogue.effects).map((n) => `fx/${n}`);
+const AWAITING_FETCH: string[] = ["sail-flap", "tankards", "oars", "distant-cannon", "parrots", "big-bell", "crates", "waders", "water-flow"].map((n) => `fx/${n}`);
 
 describe("sound library", () => {
   it("has every loop and fx file a recipe uses", () => {

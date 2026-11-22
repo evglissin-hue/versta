@@ -85,7 +85,7 @@
   "author": "Glaneur de sons",
   "licence": "CC BY 3.0",
   "source": "https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg",
-  "cut": "5 s from 17 s"
+  "cut": "5 s from 17 s, compressed and raised 10 dB"
  },
  {
   "file": "sounds/fx/hammer.mp3",
@@ -133,7 +133,7 @@
   "author": "Work With Sounds / Torsten Nilsson",
   "licence": "CC BY 4.0",
   "source": "https://commons.wikimedia.org/wiki/File:WWS_Smallwaves.ogg",
-  "cut": "4 s from 23 s"
+  "cut": "4 s from 23 s, compressed and raised 10 dB"
  },
  {
   "file": "sounds/fx/water-wheel.mp3",

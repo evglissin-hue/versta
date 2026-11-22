@@ -281,10 +281,13 @@ def check() -> int:
     bad = 0
     total = 0
     print(f"{'file':26} {'kind':6} {'dur':>5} {'LUFS':>6} {'target':>6} {'peak':>6} {'ch':>2} {'kbps':>4}  result")
+    ours = {s["name"] for s in SOURCES if s.get("kind") == "signal"}
     for f in sound_files():
         kind = kind_of(f)
         lim = KIND[kind]
         name = f.stem
+        if kind == "signal" and name not in ours:
+            continue  # rendered by tools/music/render.py, which checks them against its own targets
         x = decode(f)
         dur = len(x) / SR
         lufs = measure_lufs(f)
