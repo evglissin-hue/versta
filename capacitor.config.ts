@@ -10,6 +10,10 @@ const config: CapacitorConfig = {
     // The app only loads packs from its own assets and map tiles over https.
     allowMixedContent: false,
   },
+  plugins: {
+    // the status bar icon of the ride and places notifications (white on transparent), tinted chart magenta (--mark)
+    LocalNotifications: { smallIcon: "ic_stat_versta", iconColor: "#A61C6E" },
+  },
 };
 
 export default config;

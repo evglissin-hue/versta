@@ -23,7 +23,10 @@ With the phone in a pocket, Versta can tell you when you pass a place that has a
   - On entering a place's radius (`arrivals` from task 29): `placeNotice` with title the place name, body
     "<first story title>. Tap to hear it.", extra `{ place: id }`. At most one per place per day (kept in
     `localStorage`), at most one every 5 minutes, none between 22:00 and 07:00 local time.
-  - Tapping it (`onNoticeTap`): open Nearby and play that place's story.
+  - Tapping it (`onNoticeTap`): open Nearby (`nearbyOpen`) and play that place's story with
+    `nearbyControls.play(placeId)` from `src/ui/Nearby.tsx` (set while the screen is mounted: wait for it after
+    opening). Use `createArrivalWatcher` from `src/places/nearby.ts` for the arrivals.
+  - Notification ids for places: 2000 plus the place's index in places.json (the ride notice is 1001).
   - Off by itself 8 hours after it was switched on. Stopped when a route ride starts (the master calls
     `stopPlaceWatch` from `startRide`; it is not restarted by itself: the rider switches it on again).
   - Asks for notification permission when switched on; if refused, the switch goes back off and a note says

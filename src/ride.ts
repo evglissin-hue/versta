@@ -10,6 +10,7 @@ import { effect } from "@preact/signals";
 import { createDirector } from "./story/director";
 import { beginRecording, type RideRecorder } from "./record/recorder";
 import { isNative } from "./native/platform";
+import { ensurePermission, rideNotice } from "./native/notify";
 import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated, startChoice } from "./state";
 import type { Director, Fix, FixSource, LngLat, Mixer, NavEngine, Pack, RouteGraph, SoundEvent, StartChoice } from "./types";
 
@@ -85,6 +86,8 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   const clock = (): number => (source.now ? source.now() : Date.now());
   const mixer = createMixer({ baseUrl: packBase(p.id), virtual: sim?.virtualAudio ?? false, timeScale: sim?.scale ?? 1, clock });
   await mixer.unlock();
+  // the next turn on the lock screen (Android): asked once, the ride works without it
+  if (!sim) void ensurePermission();
   const engine = createNavEngine(p);
   const director = createDirector({
     pack: p, mixer, settings: () => settings.value, clock, timeScale: sim?.scale ?? 1,
@@ -152,6 +155,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       const events = engine.update(fix);
       ride.rec?.events(fix.time, events);
       nav.value = { ...engine.state };
+      if (!sim) rideNotice.update(engine.state, p);
       director.handle(events, engine.state);
       for (const e of events) {
         if (e.type === "finished") ride.rec?.end();
@@ -181,6 +185,7 @@ export function endRide(forget = true): void {
   if (forget) forgetSavedRide();
   document.removeEventListener("visibilitychange", onVisible);
   ride.rec?.tap("end"); ride.rec?.end();
+  void rideNotice.clear();
   ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose(); ride.mixer.dispose?.();
   void ride.wake?.release().catch(() => {});
   ride = null; chooseHook = null; startChoice.value = null;
