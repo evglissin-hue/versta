@@ -23,6 +23,10 @@ export default defineConfig({
         globIgnores: ["packs/**"],
         navigateFallback: "index.html",
         runtimeCaching: [
+          // Small files that say what is current: network first, the cache when offline or slower than 3 s.
+          { urlPattern: ({ url }) => /\/packs\/(index\.json|[^/]+\/(pack|manifest)\.json)$/.test(url.pathname) || url.pathname.endsWith("/places.json"), handler: "NetworkFirst",
+            options: { cacheName: "versta-packs", networkTimeoutSeconds: 3, cacheableResponse: { statuses: [200] } } },
+          // Everything else in a pack (audio, pictures, graph) is big and keyed by the version check: cache first.
           { urlPattern: ({ url }) => url.pathname.includes("/packs/"), handler: "CacheFirst",
             options: { cacheName: "versta-packs", rangeRequests: true, cacheableResponse: { statuses: [200] }, expiration: { maxEntries: 2000 } } },
           { urlPattern: ({ url }) => url.hostname === "tiles.openfreemap.org", handler: "CacheFirst",

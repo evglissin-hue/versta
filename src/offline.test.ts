@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import catalogue from "./audio/catalogue.json";
-import { packFiles, packSounds, routeTiles } from "./offline";
+import { packFiles, packSounds, routeTiles, syncVersions, updatedSinceSaved } from "./offline";
 import type { Pack } from "./types";
 import { PACKS } from "../tests/unit/packs";
 
@@ -47,5 +47,51 @@ describe("offline", () => {
       const missing = sounds.filter((s) => !SOUND_FILES.has(s) && !s.startsWith("fx/") && s !== "signals/aside");
       expect(missing).toEqual([]);
     });
+  });
+});
+
+describe("syncVersions", () => {
+  let store: Map<string, string>, files: Set<string>;
+  const entry = (id: string, version: string) => ({ id, version }) as never;
+  beforeEach(() => {
+    store = new Map(); files = new Set();
+    vi.stubGlobal("location", { href: "https://x.test/" });
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k), key: (i: number) => [...store.keys()][i] ?? null, get length() { return store.size; },
+    });
+    const cache = {
+      keys: async () => [...files].map((url) => ({ url })),
+      delete: async (r: { url: string }) => files.delete(r.url),
+    };
+    vi.stubGlobal("caches", { open: async () => cache });
+    updatedSinceSaved.value = {};
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const seed = () => ["a/pack.json", "a/manifest.json", "a/audio/1.mp3", "b/audio/1.mp3"].forEach((f) => files.add(`https://x.test/packs/${f}`));
+
+  it("stores a first-seen version and touches nothing", async () => {
+    seed();
+    expect(await syncVersions([entry("a", "v1")])).toEqual([]);
+    expect(JSON.parse(store.get("versta:seen-versions")!)).toEqual({ a: "v1" });
+    expect(files.size).toBe(4);
+  });
+  it("does nothing when the version is unchanged", async () => {
+    seed(); store.set("versta:seen-versions", JSON.stringify({ a: "v1" })); store.set("versta:offline:a", "{}");
+    expect(await syncVersions([entry("a", "v1")])).toEqual([]);
+    expect(files.size).toBe(4); expect(store.has("versta:offline:a")).toBe(true);
+  });
+  it("drops that pack's files but not pack.json, manifest.json or other packs, clears the marker and returns the id", async () => {
+    seed(); store.set("versta:seen-versions", JSON.stringify({ a: "v1" })); store.set("versta:offline:a", "{}");
+    expect(await syncVersions([entry("a", "v2")])).toEqual(["a"]);
+    expect([...files].sort()).toEqual(["https://x.test/packs/a/manifest.json", "https://x.test/packs/a/pack.json", "https://x.test/packs/b/audio/1.mp3"]);
+    expect(store.has("versta:offline:a")).toBe(false);
+    expect(JSON.parse(store.get("versta:seen-versions")!)).toEqual({ a: "v2" });
+    expect(updatedSinceSaved.value).toEqual({ a: true });
+  });
+  it("returns no id for a changed route that was never saved", async () => {
+    seed(); store.set("versta:seen-versions", JSON.stringify({ a: "v1" }));
+    expect(await syncVersions([entry("a", "v2")])).toEqual([]);
+    expect(files.has("https://x.test/packs/a/audio/1.mp3")).toBe(false);
   });
 });
