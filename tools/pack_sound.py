@@ -169,6 +169,9 @@ def main():
         sys.exit(1)
     json.dump(pack, open(fn, "w", encoding="utf-8"), separators=(",", ":"), ensure_ascii=False)
     print("updated", os.path.relpath(fn, ROOT))
+    import pack_manifest, places
+    pack_manifest.write(pack_id, os.path.dirname(os.path.dirname(fn)))
+    places.write(os.path.dirname(os.path.dirname(fn)), None if os.path.abspath(os.path.dirname(os.path.dirname(fn))) == os.path.join(ROOT, "public", "packs") else os.path.join(os.path.dirname(os.path.dirname(fn)), "places.json"))
 
 
 if __name__ == "__main__":

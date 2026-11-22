@@ -330,11 +330,22 @@ def check() -> int:
     return 1 if bad else 0
 
 
+def write_public_credits() -> None:
+    """public/sounds/credits.json: the two credit files merged, so an app that downloads a sound can credit it."""
+    entries: list[dict] = []
+    for p in (CREDITS_SOUNDS, CREDITS_MUSIC):
+        if p.exists():
+            entries += json.loads(p.read_text())
+    (OUT / "credits.json").write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n")
+    print("wrote public/sounds/credits.json")
+
+
 def credits() -> None:
     entries: list[dict] = []
     for p in (CREDITS_SOUNDS, CREDITS_MUSIC):
         if p.exists():
             entries += json.loads(p.read_text())
+    write_public_credits()
     sounds = [e for e in entries if not e["file"].startswith("sounds/music/")]
     music = [e for e in entries if e["file"].startswith("sounds/music/")]
     header = """# Sound credits

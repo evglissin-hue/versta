@@ -20,7 +20,7 @@ def P(lat, lon): return ((lon - LON0) * KX, (LAT0 - lat) * KY)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-import pack_index, pack_sound
+import pack_index, pack_sound, pack_manifest, places
 CONTENT = os.path.join(ROOT, "tools", "content")
 OSM_DIR = os.environ.get("OSM_DIR", "/home/claude/osm")
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -430,6 +430,8 @@ ip = os.path.join(OUT_BASE, "index.json")
 if not os.path.exists(ip) and os.path.exists(os.path.join(ROOT, "public", "packs", "index.json")):
     json.dump(json.load(open(os.path.join(ROOT, "public", "packs", "index.json"))), open(ip, "w"), separators=(",", ":"), ensure_ascii=False)
 entry = pack_index.entry_for(pack, pack_index.listening_minutes(pack, ASSETS), route.get("card_blurb"))
+for old in json.load(open(ip))["packs"]:
+    if old["id"] == entry["id"]: entry.update({k: old[k] for k in ("version", "bytes", "updated", "format") if k in old})
 pack_index.upsert(ip, entry)
 print("index entry", json.dumps(entry, ensure_ascii=False))
 # corridor graph
@@ -437,3 +439,6 @@ import router
 net = router.load()
 gr = router.write_graph(net, [TRACK["segments"][str(i)] for i in range(1, N)], [[st["lng"], st["lat"]] for st in stops], os.path.join(OUT_DIR, "graph.json"))
 print("graph", gr)
+# last: the manifest and version of this pack, then the places library
+pack_manifest.write(PACK_ID, OUT_BASE)
+places.write(OUT_BASE, None if OUT_BASE == os.path.join(ROOT, "public", "packs") else os.path.join(OUT_BASE, "places.json"))
