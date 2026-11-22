@@ -2,17 +2,18 @@ import { useEffect } from "preact/hooks";
 import { geoDistance } from "../geo";
 import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated } from "../state";
 import type { Detour, LngLat, NavState, Pack, PackIndexEntry } from "../types";
-import { recordingsDemo, recordingsOpen, soundCheckOpen, demoRide, finishOpen, finishedAt, following, joinTarget, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
+import { nearbyDemo } from "./Nearby";
+import { nearbyOpen, recordingsDemo, recordingsOpen, soundCheckOpen, demoRide, finishOpen, finishedAt, following, joinTarget, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
 
 /** Preview route /?demo=ride&step=N[&pack=<id>]: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings"] as const;
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings", "nearby", "nearby-playing"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
 function shift(p: LngLat, dx: number, dy: number): LngLat {
   return [p[0] + dx / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + dy / 111320];
 }
 
-const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline"];
+const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline", "nearby", "nearby-playing"];
 
 function demoState(p: Pack, step: string): void {
   const seg = p.segments[2]!;
@@ -24,6 +25,7 @@ function demoState(p: Pack, step: string): void {
   wholeRoute.value = false; peek.value = null; ringDemo.value = null; lastTouch.value = 0;
   settings.value = { ...settings.value, courseUp: true };
   nowPlaying.value = null; simulated.value = new URLSearchParams(location.search).get("simtag") === "1";
+  nearbyOpen.value = false; nearbyDemo.value = null;
   firstRideSheet.value = null; startPhase.value = null; startFailure.value = null; netDown.value = false;
   screen.value = HOME_STEPS.includes(step) ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
@@ -82,6 +84,7 @@ function demoState(p: Pack, step: string): void {
       ];
       break;
     }
+    case "nearby": case "nearby-playing": nav.value = IDLE_NAV; nearbyDemo.value = { at: [-0.0868, 51.5104], playing: step === "nearby-playing" }; nearbyOpen.value = true; break;
     case "soundcheck": nav.value = base; soundCheckOpen.value = true; break;
     case "sound": nav.value = base; soundOpen.value = true; break;
     case "recentre":

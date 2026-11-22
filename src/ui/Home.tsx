@@ -7,7 +7,7 @@ import { packIndex } from "../state";
 import type { PackIndexEntry } from "../types";
 import { fmtDate, fmtListening, fmtMB, pad2 } from "./format";
 import { Sheet } from "./Sheet";
-import { firstRideSheet, netDown, recordingsOpen, soundCheckOpen, startFailure, startPhase } from "./uistate";
+import { firstRideSheet, nearbyOpen, netDown, recordingsOpen, soundCheckOpen, startFailure, startPhase } from "./uistate";
 
 /** What the route index may carry beyond the contract: counts and listening time for the line under the blurb. */
 type IndexEntry = PackIndexEntry & { stories?: number; asides?: number; minutes?: number };
@@ -169,6 +169,10 @@ export function Home() {
         <h1>Versta</h1>
         <p>Rides and walks that tell you their stories as you pass.</p>
       </header>
+      <div class="nb-entry">
+        <button type="button" class="btn" data-testid="nearby-open" onClick={() => { nearbyOpen.value = true; }}>Nearby places</button>
+        <p>Stories of the places around you, off any route.</p>
+      </div>
       {packIndex.value.map((e) => <Card key={e.id} entry={e} />)}
       <footer class="foot">
         <p>Pictures are public domain works from Wikimedia Commons. Map data &copy; OpenStreetMap contributors. Map tiles by OpenFreeMap. Your progress stays on this device.</p>

@@ -11,6 +11,8 @@ export const soundOpen = signal(false);
 export const soundCheckOpen = signal(false);
 /** The Ride recordings sheet. Reachable from Home and from the sound sheet. */
 export const recordingsOpen = signal(false);
+/** The Nearby places screen: places around the rider, off any route. Reachable from Home. */
+export const nearbyOpen = signal(false);
 /** Preview only: recordings the sheet lists instead of the ones on the device. */
 export const recordingsDemo = signal<import("../record/store").RecordingSummary[] | null>(null);
 /** Map camera follows the rider. */
