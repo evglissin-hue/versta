@@ -191,7 +191,7 @@ export const RECIPES: Record<string, Part[]> = {
  * more than -21 dBFS overall (there the pocket leaves the bed 14 to 18 dB under the voice), -21.5 dBFS in the phone
  * band (300 Hz to 8 kHz, which the pocket does not reach), and for bursts (the loudest tenth of the seconds, such as
  * birdsong) -19.5 dBFS in the phone band and -26 dBFS above 4 kHz. The tunnel is mostly low rumble and is capped at
- * +5 dB. Measured with the recordings of 22 November (tools/sound/check-mix.mjs confirms the result); measure again
+ * +5 dB. Measured with the recordings of 22 November by tools/sound/measure-scapes.mjs (check-mix confirms); measure again
  * whenever a recipe or a recording changes.
  */
 export const TRIM_DB: Record<string, number> = {
