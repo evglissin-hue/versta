@@ -288,3 +288,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .sc-credits li { margin-bottom: 2px; }
 .sc-credits b { font-family: var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
 .sc-credits .linkbtn { font-size: 14px; }
+
+/* ride recordings: one row per ride, the two buttons under the text */
+.recrow { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.recacts { display: flex; gap: 10px; }
+.recacts .btn { flex: 1 1 0; }

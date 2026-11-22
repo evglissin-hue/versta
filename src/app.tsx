@@ -4,8 +4,9 @@ import type { PackIndexEntry } from "./types";
 import { enterDemo, useDemoKeys } from "./ui/Demo";
 import { Home } from "./ui/Home";
 import { Ride } from "./ui/Ride";
+import { Recordings } from "./ui/Recordings";
 import { SoundCheck } from "./ui/SoundCheck";
-import { soundCheckOpen } from "./ui/uistate";
+import { recordingsOpen, soundCheckOpen } from "./ui/uistate";
 
 const query = new URLSearchParams(location.search);
 const demo = query.get("demo") === "ride";
@@ -23,6 +24,7 @@ export function App() {
     <>
       {screen.value === "ride" ? <Ride /> : <Home />}
       {soundCheckOpen.value ? <SoundCheck /> : null}
+      {recordingsOpen.value ? <Recordings /> : null}
     </>
   );
 }

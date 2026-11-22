@@ -9,6 +9,10 @@ export const stopsOpen = signal(false);
 export const soundOpen = signal(false);
 /** The Sound check screen: every sound, to hear before a ride. Reachable from Home and from the sound sheet. */
 export const soundCheckOpen = signal(false);
+/** The Ride recordings sheet. Reachable from Home and from the sound sheet. */
+export const recordingsOpen = signal(false);
+/** Preview only: recordings the sheet lists instead of the ones on the device. */
+export const recordingsDemo = signal<import("../record/store").RecordingSummary[] | null>(null);
 /** Map camera follows the rider. */
 export const following = signal(true);
 /** The map shows the whole route with the rider. Following is off while it does. */

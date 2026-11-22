@@ -399,3 +399,17 @@ test("sound check opens from the ride's sound sheet and closing it returns to th
   await expect(page.getByTestId("sound-sheet")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("ride recordings open from Sound and settings, show the empty state and close with Back", async ({ page }) => {
+  const errors = watchConsole(page);
+  await startSim(page);
+  await page.getByRole("button", { name: "Sound", exact: true }).click();
+  await page.getByTestId("sound-sheet").getByRole("button", { name: "Ride recordings" }).click();
+  const rec = page.getByTestId("recordings");
+  await expect(rec).toBeVisible();
+  await expect(page.getByTestId("recordings-empty")).toHaveText("No rides recorded yet. Your next ride will be.");
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("versta:back", { cancelable: true })));
+  await expect(rec).toHaveCount(0);
+  await expect(page.getByTestId("sound-sheet")).toBeVisible();
+  expect(errors).toEqual([]);
+});
