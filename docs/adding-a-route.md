@@ -80,3 +80,11 @@ need the Kokoro model files (`kokoro-v1.0.onnx`, `voices-v1.0.bin`, from the `mo
 kokoro-onnx on GitHub) in `KOKORO_DIR` (default `/home/claude/kokoro`), the `kokoro-onnx` and `soundfile` Python
 packages (`pip install --break-system-packages kokoro-onnx soundfile`), and `ffmpeg`. Every pack tool takes the pack
 id as its first argument and defaults to `thames-loop`.
+
+## Versions and the places library
+
+`build_pack.py` and `pack_sound.py` finish by running `tools/pack_manifest.py` and `tools/places.py`, so a pack is never
+written without its `manifest.json`, its `version` in `public/packs/index.json` and its entries in `public/places.json`.
+Never edit those files by hand; run `python3 tools/pack_manifest.py` and `python3 tools/places.py` after any change
+made another way. `version` is a hash of every file in the pack, so it changes when any file does. `updated` is the
+time `version` last changed (UTC); of two copies of a route, the one with the later `updated` is the newer.

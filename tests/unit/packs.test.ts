@@ -3,12 +3,14 @@
  * stop, and every file the app would play or show is there. A missing file here is a silence or a broken picture on
  * the road.
  */
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import catalogue from "../../src/audio/catalogue.json";
 import { RECIPES } from "../../src/audio/soundscapes";
 import { packFiles } from "../../src/offline";
 import { cumulative, geoDistance, makeProjection, nearestOnPolyline, project } from "../../src/geo";
-import type { Pack } from "../../src/types";
+import type { Pack, PackManifest } from "../../src/types";
 import { ENTRIES, PACKS, hasFile, loaded } from "./packs";
 
 /** Every piece of text a rider reads or hears in a pack. */
@@ -229,5 +231,50 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("pack %s", (id, p) => 
       });
     }
     expect(problems).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ manifests and versions (tools/pack_manifest.py) */
+
+const PACKS_DIR = "public/packs";
+const sha = (b: Buffer | string) => createHash("sha256").update(b).digest("hex");
+
+/** Every file under a folder, as paths relative to it with "/", sorted. */
+function walk(dir: string, rel = ""): string[] {
+  return readdirSync(`${dir}/${rel}`, { withFileTypes: true })
+    .flatMap((d) => (d.isDirectory() ? walk(dir, `${rel}${d.name}/`) : [`${rel}${d.name}`]))
+    .sort();
+}
+
+describe.each(ENTRIES.map((e) => [e.id, e] as const))("manifest of %s", (id, entry) => {
+  const mf = JSON.parse(readFileSync(`${PACKS_DIR}/${id}/manifest.json`, "utf8")) as PackManifest;
+  it("lists exactly the files on disk with their sizes and hashes", () => {
+    const onDisk = walk(`${PACKS_DIR}/${id}`).filter((p) => p !== "manifest.json");
+    expect(mf.files.map((f) => f.path)).toEqual(onDisk);
+    for (const f of mf.files) {
+      const data = readFileSync(`${PACKS_DIR}/${id}/${f.path}`);
+      expect(f.bytes, f.path).toBe(data.length);
+      expect(f.sha256, f.path).toBe(sha(data));
+    }
+  });
+  it("has the version the files give", () => {
+    expect(mf.id).toBe(id);
+    expect(mf.format).toBe(1);
+    expect(mf.version).toBe(sha(mf.files.map((f) => `${f.path}:${f.sha256}\n`).join("")).slice(0, 16));
+  });
+  it("matches its index entry", () => {
+    expect(entry.version).toBe(mf.version);
+    expect(entry.bytes).toBe(mf.files.reduce((n, f) => n + f.bytes, 0));
+    expect(entry.format).toBe(mf.format);
+    expect(entry.updated).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
+  });
+});
+
+describe("public/sounds/credits.json", () => {
+  it("is the two credit files merged (run build_sounds.py credits)", () => {
+    const read = (p: string) => JSON.parse(readFileSync(p, "utf8")) as unknown[];
+    const merged = [...read("src/audio/credits-sounds.json"), ...read("src/audio/credits-music.json")];
+    expect(existsSync("public/sounds/credits.json")).toBe(true);
+    expect(read("public/sounds/credits.json")).toEqual(merged);
   });
 });

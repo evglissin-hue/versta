@@ -592,6 +592,17 @@ def check():
     return 0
 
 
+def write_public_credits():
+    """public/sounds/credits.json: credits-sounds.json and credits-music.json merged."""
+    entries = []
+    for p in (CREDITS.with_name("credits-sounds.json"), CREDITS):
+        if p.exists():
+            entries += json.loads(p.read_text())
+    out = ROOT / "public" / "sounds" / "credits.json"
+    out.write_text(json.dumps(entries, indent=1, ensure_ascii=False) + "\n")
+    print("wrote", out.relative_to(ROOT))
+
+
 def main(argv):
     if argv and argv[0] == "check":
         return check()
@@ -611,6 +622,7 @@ def main(argv):
     if secs:
         write_catalogue(secs)
         print("catalogue seconds:", secs)
+    write_public_credits()
     return 0
 
 
