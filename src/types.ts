@@ -148,6 +148,107 @@ export interface Detour {
 
 export interface PackIndexEntry {
   id: string; name: string; mode: Pack["mode"]; km: number; stops: number; hero: string; blurb: string;
+  /** Content version: a hash of every file in the pack folder (tools/pack_manifest.py). Changes when any file does. */
+  version?: string;
+  /** Total size of the pack's files, bytes. */
+  bytes?: number;
+  /** When `version` last changed, UTC ISO date-time. Of two copies of a route, the later one wins. */
+  updated?: string;
+  /** Pack format. An app reads formats up to PACK_FORMAT (src/state.ts) and leaves newer ones for a newer app. */
+  format?: number;
+}
+
+/** public/packs/<id>/manifest.json: every file of a pack, for downloading it and checking it. */
+export interface PackManifest {
+  id: string;
+  version: string;
+  format: number;
+  /** Paths relative to the pack folder, the manifest itself left out. */
+  files: { path: string; bytes: number; sha256: string }[];
+}
+
+/* ------------------------------------------------------------------ routes on the phone (Android app) */
+
+/** A download in hand: bytes done of bytes in all. `failed` keeps the counts of the attempt that stopped. */
+export interface Transfer { state: "downloading" | "failed"; done: number; total: number }
+
+/** A newer copy of a route the phone already has. */
+export interface RouteUpdate {
+  /** What the update costs to download (only the files that changed). */
+  bytes: number;
+  /** In progress or stopped; null while not started. */
+  transfer: Transfer | null;
+  /**
+   * Why a downloaded update is not switched in yet, or why it does not download: the route is being ridden, a saved
+   * ride of it would not fit the new stops, the phone is not on Wi-Fi (it waits for a tap), or it needs a newer app.
+   */
+  held: "riding" | "saved-ride" | "not-wifi" | "needs-app" | null;
+  /** Downloaded and waiting to be switched in. */
+  ready: boolean;
+}
+
+/** What the Android app has of a route. The web app does not use this (it reads the site as before). */
+export type RouteStatus =
+  | { kind: "on-phone"; source: "built-in" | "downloaded"; version: string; bytes: number; update: RouteUpdate | null }
+  /** On the site, not on this phone. `transfer` is null until a download starts. `removed`: the rider removed it. */
+  | { kind: "on-site"; bytes: number; transfer: Transfer | null; removed: boolean }
+  /** Only on the site, in a format this app cannot read. */
+  | { kind: "needs-app" };
+
+/* ------------------------------------------------------------------ places (public/places.json) */
+
+export interface PlaceStory {
+  /** The story id inside its pack. */
+  id: string;
+  title: string;
+  kind: Story["kind"] | "aside";
+  /** Audio path relative to the pack folder, and its length in seconds. */
+  audio: string;
+  dur: number;
+  pic?: string;
+}
+
+export interface Place {
+  /** `<pack>:<stop id>` or `<pack>:<aside id>`. */
+  id: string;
+  name: string;
+  at: LngLat;
+  /** Metres: inside this, the rider is at the place. */
+  radius: number;
+  pack: string;
+  kind: "stop" | "aside";
+  stories: PlaceStory[];
+}
+
+export interface PlacesFile {
+  /** A hash of the file's content, as for packs. */
+  version: string;
+  places: Place[];
+}
+
+/** Where to start, offered when a ride begins far from stop 1 (src/ride.ts `startOffer`). Metres are straight-line. */
+export interface StartChoice { nearest: number; toNearest: number; toFirst: number }
+
+/* ------------------------------------------------------------------ ride recordings */
+
+/** One real ride as the phone saw it: enough to replay it through the engine and the director. */
+export interface RideRecording {
+  /** The ride's start, ms since 1970, also its id. */
+  startedAt: number;
+  packId: string;
+  /** The pack version ridden, when known. */
+  version: string | null;
+  /** The stop the ride started at (0 unless the rider chose another). */
+  startAt: number;
+  /** App build, for telling recordings apart. */
+  app: string;
+  fixes: Fix[];
+  /** The nav events, each with the time of the fix that caused it. */
+  events: { at: number; event: NavEvent }[];
+  log: DirectorLogEntry[];
+  /** Rider taps that change the ride: skip, pause, end, choose a stop. */
+  taps: { at: number; what: string; arg?: string | number }[];
+  endedAt: number | null;
 }
 
 /* ------------------------------------------------------------------ positioning */
@@ -263,6 +364,11 @@ export interface NavEngine {
   readonly state: NavState;
   /** Start riding towards stop `seg` regardless of position (rider skipped ahead or back). */
   jumpToSegment(seg: number): void;
+  /**
+   * Begin the ride at stop `stop` instead of stop 0: guidance to it as to stop 0, the stops before it behind and
+   * skipped (not arrived), then on to the last stop. Called once, before the first fix. (Task 25.)
+   */
+  startAt?(stop: number): void;
   /** Give the engine the corridor graph so it can find a way back when off route. */
   setGraph?(graph: RouteGraph | null): void;
   reset(): void;

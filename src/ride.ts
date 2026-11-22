@@ -8,8 +8,8 @@ import { geoDistance } from "./geo";
 import { createMixer } from "./audio/mixer";
 import { effect } from "@preact/signals";
 import { createDirector } from "./story/director";
-import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, screen, settings, simulated } from "./state";
-import type { Director, FixSource, Mixer, NavEngine, Pack, RouteGraph, SoundEvent } from "./types";
+import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, screen, settings, simulated, startChoice } from "./state";
+import type { Director, Fix, FixSource, LngLat, Mixer, NavEngine, Pack, RouteGraph, SoundEvent, StartChoice } from "./types";
 
 export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean }
 
@@ -93,6 +93,18 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   // the rider's soundscape level follows the setting, live
   const stopEffects = effect(() => { mixer.setBedLevel?.(BED_LEVELS[settings.value.bedLevel] ?? 1); });
   ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects };
+  let lastFix: Fix | null = null;
+  chooseHook = (stop: number) => {
+    if (!choosing || ride?.engine !== engine) return;
+    choosing = false;
+    startChoice.value = null;
+    engine.startAt?.(stop);
+    if (lastFix) {
+      const events = engine.update(lastFix);
+      nav.value = { ...engine.state };
+      director.handle(events, engine.state);
+    }
+  };
   if (resume && resume.packId === p.id) {
     director.markHeard?.(resume.heard);
     engine.jumpToSegment(Math.min(resume.seg, p.stops.length - 1));
@@ -100,14 +112,27 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   if (p.graph && engine.setGraph) {
     void fetch(`${packBase(p.id)}${p.graph}`).then((r) => (r.ok ? r.json() : null)).then((g: RouteGraph | null) => { if (g && ride?.engine === engine) engine.setGraph?.(g); }).catch(() => {});
   }
-  simulated.value = !!sim; gpsError.value = null; directorLog.value = []; openStop.value = null;
+  simulated.value = !!sim; gpsError.value = null; directorLog.value = []; openStop.value = null; startChoice.value = null;
   nav.value = { ...IDLE_NAV, status: "locating" };
+  // A real ride from the beginning asks where to start when the rider is far from stop 1 and nearer another stop.
+  // Until the rider chooses, the engine sees no fix: no guidance, no speech. (Simulated rides choose by URL.)
+  let choosing = !sim && !(resume && resume.packId === p.id);
   screen.value = "ride";
   document.addEventListener("visibilitychange", onVisible);
   source.start(
     (fix) => {
       if (!ride) return;
       if (gpsError.value) gpsError.value = null;
+      if (choosing) {
+        const offer = startOffer(p, fix);
+        if (!offer) choosing = false;
+        else {
+          lastFix = fix;
+          if (!startChoice.value) startChoice.value = offer;
+          nav.value = { ...nav.value, fix };
+          return;
+        }
+      }
       const events = engine.update(fix);
       nav.value = { ...engine.state };
       director.handle(events, engine.state);
@@ -139,13 +164,36 @@ export function endRide(forget = true): void {
   document.removeEventListener("visibilitychange", onVisible);
   ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose(); ride.mixer.dispose?.();
   void ride.wake?.release().catch(() => {});
-  ride = null;
+  ride = null; chooseHook = null; startChoice.value = null;
   nav.value = IDLE_NAV; nowPlaying.value = null; openStop.value = null; screen.value = "home";
 }
 
 export function currentDirector(): Director | null { return ride?.director ?? null; }
 /** The ride's mixer, for the Sound check screen while a ride is running. */
 export function currentMixer(): Mixer | null { return ride?.mixer ?? null; }
+/** How far from stop 1 a rider must be, with another stop nearer, to be asked where to start. */
+export const START_CHOICE_METRES = 300;
+
+/** The start choice to offer for this fix, or null when stop 1 is the obvious start. Straight-line distances. */
+export function startOffer(p: Pack, fix: Fix): StartChoice | null {
+  const here: LngLat = [fix.lng, fix.lat];
+  const dists = p.stops.map((s) => geoDistance(here, s.at));
+  const first = dists[0] ?? 0;
+  let nearest = 0;
+  dists.forEach((d, i) => { if (d < dists[nearest]!) nearest = i; });
+  // the last stop is where the ride ends: starting there is no ride
+  if (nearest === p.stops.length - 1) {
+    nearest = 0;
+    dists.forEach((d, i) => { if (i < p.stops.length - 1 && d < dists[nearest]!) nearest = i; });
+  }
+  if (first <= START_CHOICE_METRES || nearest === 0) return null;
+  return { nearest, toNearest: dists[nearest]!, toFirst: first };
+}
+
+let chooseHook: ((stop: number) => void) | null = null;
+/** The rider chose where to start: stop 0 or the offered nearest stop. (The start choice sheet, task 25.) */
+export function chooseStart(stop: number): void { chooseHook?.(stop); }
+
 /** Rider chose to head for another stop (skipped one, or joined the route part way). */
 export function jumpToStop(stop: number): void {
   if (!ride) return;
