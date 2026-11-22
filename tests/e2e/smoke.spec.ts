@@ -39,7 +39,7 @@ test("demo ride shows the banner and dock", async ({ page }) => {
 
 test("demo ride: every button is at least 48px tall at 360px wide", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
-  for (const step of ["riding", "at-stop", "story", "aside", "stops-list", "sound", "join", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "story-manual"]) {
+  for (const step of ["riding", "at-stop", "story", "aside", "stops-list", "sound", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "story-manual"]) {
     await page.goto(`/?demo=ride&step=${step}`);
     await expect(page.getByTestId("banner").or(page.getByTestId("finish"))).toBeVisible();
     // Stop markers shrink to 30px at low zoom on purpose (the map is still easing in on the rider when this runs), so they are left out then.
@@ -65,15 +65,45 @@ test("continue card on Home offers Continue ride and Start again", async ({ page
   expect(errors).toEqual([]);
 });
 
-test("join choice offers the start and the nearby route, and the choice changes the banner", async ({ page }) => {
-  await page.goto("/?demo=ride&step=join");
-  const banner = page.getByTestId("banner");
-  await expect(banner).toContainText("Head for the route");
-  await expect(banner.getByRole("button", { name: /To the start/ })).toBeVisible();
-  await banner.getByRole("button", { name: /To the start/ }).click();
-  await expect(banner).toContainText("Head for the start");
-  await banner.getByRole("button", { name: /Join nearby/ }).click();
-  await expect(banner).toContainText("Head for the route");
+test("the start-choice step shows the sheet with both stops and no way to close it", async ({ page }) => {
+  await page.goto("/?demo=ride&step=start-choice");
+  const sheet = page.getByTestId("start-choice");
+  await expect(sheet).toContainText("Where do you start?");
+  await expect(sheet.getByRole("button")).toHaveCount(2);
+  await expect(sheet.getByRole("button", { name: /^Start at 07 .*600 m away, the nearest stop$/ })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: /^Start at 01 Tower Bridge.*4\.2 km away, the start of the route$/ })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Close" })).toHaveCount(0);
+});
+
+/** A real ride (the browser's position set near stop 7 of the Thames Loop), through the start-choice sheet. */
+async function rideFromStop7(page: Page, context: import("@playwright/test").BrowserContext): Promise<void> {
+  await context.grantPermissions(["geolocation"]);
+  // 120 m from Foot Tunnel & Island Gardens, 7th stop: far from stop 1, and the nearest stop is not the last
+  await context.setGeolocation({ latitude: 51.4881, longitude: -0.0081588 });
+  await page.addInitScript(() => { try { localStorage.setItem("versta:firstride", "1"); } catch {} });
+  await page.goto("/");
+  await thamesCard(page).getByRole("button", { name: /^Ride/ }).click();
+  await expect(page.getByTestId("start-choice")).toBeVisible({ timeout: 20_000 });
+}
+
+test("a real ride far from stop 1 asks where to start, and choosing the nearest stop heads for it", async ({ page, context }) => {
+  await rideFromStop7(page, context);
+  const sheet = page.getByTestId("start-choice");
+  await expect(sheet).toContainText("the nearest stop");
+  await expect(sheet.getByRole("button", { name: /^Start at 07 Foot Tunnel/ })).toBeVisible();
+  // nothing is guided or said until the rider chooses
+  expect(await page.evaluate(() => window.__versta!.nav.value.status)).not.toBe("to_start");
+  await sheet.getByRole("button", { name: /^Start at 07 Foot Tunnel/ }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByTestId("banner")).toContainText("Head for 07 Foot Tunnel");
+  await expect.poll(() => page.evaluate(() => window.__versta!.nav.value.seg)).toBe(6);
+});
+
+test("a real ride far from stop 1: choosing stop 1 heads for stop 1", async ({ page, context }) => {
+  await rideFromStop7(page, context);
+  await page.getByTestId("start-choice").getByRole("button", { name: /^Start at 01 Tower Bridge/ }).click();
+  await expect(page.getByTestId("banner")).toContainText("Head for the start, 01 Tower Bridge");
+  expect(await page.evaluate(() => window.__versta!.nav.value.seg)).toBe(0);
 });
 
 test("scene hides itself when the rider leaves the stop, leaving the mini bar", async ({ page }) => {

@@ -122,6 +122,10 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   let needFull = false;
   /** Index of the stop the rider is waiting at while status is at_stop. */
   let atStop = -1;
+  /** The stop the rider chose to start at (`startAt`), or -1: then no joining part way, the ride goes to that stop. */
+  let chosenStart = -1;
+  /** Metres of the route before the chosen start, taken off the distances done and left. */
+  let origin = 0;
   /** The corridor graph, once given. Null means no way back is looked for. */
   let index: GraphIndex | null = null;
   let active: ActiveDetour | null = null;
@@ -228,18 +232,18 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function derive(): void {
     if (s.status === "finished") {
-      s.toStop = 0; s.distanceDone = total; s.distanceLeft = 0; s.nextCue = null; s.toCue = null; s.thenCue = null; s.toThen = null;
+      s.toStop = 0; s.distanceDone = total - origin; s.distanceLeft = 0; s.nextCue = null; s.toCue = null; s.thenCue = null; s.toThen = null;
       return;
     }
     if (s.status === "locating" || s.status === "idle") return;
     if (s.status === "to_start") {
-      s.distanceDone = 0; s.distanceLeft = total; s.nextCue = null; s.toCue = null; s.currentCue = null; s.routeBearing = null; s.thenCue = null; s.toThen = null;
+      s.distanceDone = 0; s.distanceLeft = total - origin; s.nextCue = null; s.toCue = null; s.currentCue = null; s.routeBearing = null; s.thenCue = null; s.toThen = null;
       return;
     }
     const g = segAt(s.seg);
     const along = Math.min(g.len, Math.max(0, s.alongSeg));
-    s.distanceDone = before[s.seg]! + along;
-    s.distanceLeft = Math.max(0, total - s.distanceDone);
+    s.distanceDone = Math.max(0, before[s.seg]! + along - origin);
+    s.distanceLeft = Math.max(0, total - before[s.seg]! - along);
     const pa = pointAlong(g.pts, along, g.cum);
     s.snapped = unproject(proj, pa.point);
     s.routeBearing = pa.bearing;
@@ -480,19 +484,20 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   }
 
   function toStart(fix: Fix, p: XY, ev: NavEvent[]): void {
-    const d0 = dist(p, stopAt(0));
-    if (d0 <= radiusOf(0)) {
-      arriveAt(0, ev);
+    const goal = s.seg;
+    const d0 = dist(p, stopAt(goal));
+    if (d0 <= radiusOf(goal)) {
+      arriveAt(goal, ev);
       s.status = "at_stop";
-      atStop = 0;
-      s.seg = 1;
+      atStop = goal;
+      s.seg = goal + 1;
       s.alongSeg = 0;
-      s.toStop = segs[1]?.len ?? 0;
+      s.toStop = segs[goal + 1]?.len ?? 0;
       derive();
-      s.snapped = unproject(proj, stopAt(0));
+      s.snapped = unproject(proj, stopAt(goal));
       return;
     }
-    if (d0 > JOIN_MIN_FROM_START) {
+    if (chosenStart < 0 && d0 > JOIN_MIN_FROM_START) {
       let best: { seg: number; along: number; dist: number } | null = null;
       for (let k = 1; k < segs.length; k++) {
         const n = nearestOnPolyline(segAt(k).pts, p, segAt(k).cum);
@@ -522,7 +527,8 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.toStop = d0;
     s.offBy = 0;
     s.offRoute = false;
-    if (nearestAt === null || fix.time - nearestAt >= NEAREST_SECONDS * 1000 || !s.nearest) {
+    if (chosenStart >= 0) s.nearest = null;
+    else if (nearestAt === null || fix.time - nearestAt >= NEAREST_SECONDS * 1000 || !s.nearest) {
       nearestAt = fix.time;
       let near: NavState["nearest"] = null;
       for (let k = 1; k < segs.length; k++) {
@@ -566,7 +572,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     const p = project(proj, [fix.lng, fix.lat]);
     trackMotion(fix, p);
     if (s.status === "locating" || s.status === "idle") s.status = "to_start";
-    if (s.status === "to_start" && s.seg === 0) toStart(fix, p, ev);
+    if (s.status === "to_start" && s.seg === Math.max(0, chosenStart)) toStart(fix, p, ev);
     else if (s.status === "to_start") { s.nearest = null; s.status = "riding"; riding(fix, p, ev, false); }
     else if (s.status === "at_stop") atStopStep(fix, p, ev);
     else riding(fix, p, ev, false);
@@ -575,6 +581,8 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function jumpToSegment(seg: number): void {
     const target = Math.max(0, Math.min(lastStop, Math.floor(seg)));
+    chosenStart = -1;
+    origin = 0;
     resetFlags();
     for (let i = 0; i < target; i++) markBehind(i, Infinity);
     s.seg = target;
@@ -589,6 +597,29 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     atStop = -1;
     needFull = target > 0;
     s.status = target === 0 ? "to_start" : "riding";
+    clearWrongWay();
+    derive();
+  }
+
+  function startAt(stop: number): void {
+    const k = Math.max(0, Math.min(lastStop - 1, Math.floor(stop)));
+    resetFlags();
+    // the stops before it, and the stretch leading to it, are behind: no cue or aside there ever fires
+    for (let i = 0; i <= k; i++) markBehind(i, Infinity);
+    chosenStart = k;
+    origin = k > 0 ? before[k + 1] ?? 0 : 0;
+    s.seg = k;
+    s.alongSeg = 0;
+    s.arrived = [];
+    s.offRoute = false;
+    clearDetour();
+    s.nearest = null;
+    nearestAt = null;
+    s.offBy = 0;
+    offSince = null;
+    atStop = -1;
+    needFull = false;
+    s.status = "to_start";
     clearWrongWay();
     derive();
   }
@@ -611,12 +642,15 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     offSince = null;
     needFull = false;
     atStop = -1;
+    chosenStart = -1;
+    origin = 0;
   }
 
   return {
     update,
     get state() { return s; },
     jumpToSegment,
+    startAt,
     setGraph,
     reset,
   };

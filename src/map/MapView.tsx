@@ -4,7 +4,7 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./map.css";
 import { nav, openStop, settings } from "../state";
-import { finishOpen, followZoom, joinChoice, joinTarget, lastTouch, leaveFollow, peek, wholeRoute } from "../ui/uistate";
+import { finishOpen, followZoom, lastTouch, leaveFollow, peek, wholeRoute } from "../ui/uistate";
 import { tileTemplate } from "../offline";
 import type { LngLat, NavState, Pack } from "../types";
 import { angleDiff, cameraZoom, clampFollowZoom, lineLength, lookAheadPadding, metresPerPixel, splitAt } from "./geometry";
@@ -316,8 +316,7 @@ export function MapView(props: MapViewProps) {
         const cueKey = JSON.stringify(cueFc);
         if (cueKey !== lastCue) { lastCue = cueKey; data.cue = cueFc; setData(ROUTE_SOURCES.cue, cueFc); }
         const rider0 = n.fix ? ([n.fix.lng, n.fix.lat] as LngLat) : null;
-        const join = joinChoice(n, pack);
-        const goal = join ? (join.chosen === "route" && join.at.route ? join.at.route : join.at.start) : null;
+        const goal = n.status === "to_start" ? pack.stops[n.seg]?.at ?? null : null;
         const guideFc: GeoJSON.FeatureCollection = rider0 && goal
           ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [rider0, goal] } }] } : EMPTY;
         const guideKey = JSON.stringify(guideFc);
@@ -357,7 +356,6 @@ export function MapView(props: MapViewProps) {
       cleanups.push(effect(() => {
         const n = nav.value;
         const courseUp = settings.value.courseUp;
-        void joinTarget.value;
         const view = `${wholeRoute.value}|${peek.value?.until ?? 0}|${courseUp}`;
         const lowered = sheetUp(n);
         if (!m.loaded() && !m.getSource(ROUTE_SOURCES.lines)) return;

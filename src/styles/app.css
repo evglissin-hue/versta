@@ -162,14 +162,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .continue-line { margin: 0; font-size: 18px; text-align: center; }
 .continue .btn.small { align-self: center; }
 
-/* joining the route */
-.banner.join .b-text { width: 100%; }
-.b-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.choice { min-height: 56px; padding: 6px 10px; border: 2px solid var(--ink); border-radius: 2px; background: transparent; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; text-align: left; }
-.choice b { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; line-height: 1; }
-.choice span { font-family: var(--f-display); font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1; color: var(--muted); }
-.choice[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-.choice[aria-pressed="true"] span { color: var(--paper); }
+/* where do you start */
+.start-opts { display: flex; flex-direction: column; gap: 10px; padding-bottom: 4px; }
+.start-opt { min-height: 64px; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 2px; background: transparent; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; text-align: left; }
+.start-opt b { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: .06em; text-transform: uppercase; line-height: 1.05; }
+.start-opt span { font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--muted); }
+.start-opt.primary { background: var(--ink); color: var(--paper); }
+.start-opt.primary span { color: var(--paper); }
 
 /* bottom sheet: the map stays visible and tappable above it */
 .sheet-layer { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
@@ -223,13 +222,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink) 55%, transparent); animation: scrimin .18s ease-out; }
 .scene { animation: fadein .25s ease-out; }
 .aside { animation: risein .22s ease-out; }
-.btn:not(:disabled):active, .scene .sbtn:active, .choice:active, .mc-btn:active, .seg:active { transform: scale(.97); filter: brightness(.88); }
+.btn:not(:disabled):active, .scene .sbtn:active, .start-opt:active, .mc-btn:active, .seg:active { transform: scale(.97); filter: brightness(.88); }
 .switchrow:active, .stoprow:active, .linkbtn:active { background: var(--shoal); }
-.btn, .scene .sbtn, .choice, .mc-btn, .seg { transition: transform .08s, filter .08s; }
+.btn, .scene .sbtn, .start-opt, .mc-btn, .seg { transition: transform .08s, filter .08s; }
 @media (prefers-reduced-motion: reduce) {
   .sheet, .sheet.bottom, .scrim, .scene, .aside, .mc-label { animation: none; }
-  .btn, .scene .sbtn, .choice, .mc-btn, .seg { transition: none; }
-  .btn:not(:disabled):active, .scene .sbtn:active, .choice:active, .mc-btn:active, .seg:active { transform: none; }
+  .btn, .scene .sbtn, .start-opt, .mc-btn, .seg { transition: none; }
+  .btn:not(:disabled):active, .scene .sbtn:active, .start-opt:active, .mc-btn:active, .seg:active { transform: none; }
 }
 .tips { margin: 0; padding: 0 0 0 22px; font-size: 18px; display: flex; flex-direction: column; gap: 6px; }
 .inside { margin: 0; font-size: 17px; color: var(--muted); }
