@@ -37,6 +37,8 @@ export function initNative(): void {
     try { Object.defineProperty(navigator.serviceWorker, "register", { value: () => new Promise(() => {}), configurable: true }); } catch {}
   }
   void removeServiceWorkers();
+  // No ride runs at launch: a ride notice still showing was left by an app Android killed mid-ride. Clear it.
+  void import("./notify").then((m) => m.rideNotice.clear()).catch(() => {});
   void import("@capacitor/app").then(({ App }) => {
     void App.addListener("resume", () => { void import("../routes/store").then((m) => m.routeStore.check()); });
     void App.addListener("backButton", () => { handleBack(() => { void App.minimizeApp(); }); });

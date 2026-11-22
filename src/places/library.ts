@@ -1,5 +1,6 @@
 /** Where the Nearby screen gets its places: the site's places.json, with the phone's last good copy behind it. */
 import { isNative } from "../native/platform";
+import { siteGetJson } from "../native/site";
 import { SITE_URL } from "../state";
 import type { PlacesFile } from "../types";
 
@@ -28,7 +29,8 @@ export async function loadPlaces(): Promise<PlacesFile> {
     return j;
   }
   try {
-    const j = await getJson(`${SITE_URL}places.json`, TIMEOUT_MS);
+    // not fetch: inside the app the site refuses cross-origin requests (src/native/site.ts)
+    const j = await siteGetJson(`${SITE_URL}places.json`, TIMEOUT_MS);
     if (valid(j)) {
       try { localStorage.setItem(KEY, JSON.stringify(j)); } catch { /* storage full: next start fetches again */ }
       return j;
