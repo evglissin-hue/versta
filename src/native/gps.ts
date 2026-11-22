@@ -39,6 +39,15 @@ export const WATCHER_OPTIONS: WatcherOptions = {
   distanceFilter: 3,
 };
 
+/** The background watcher for place alerts with the screen off: a quieter notice and a wider distance filter. */
+export const PLACE_WATCHER_OPTIONS: WatcherOptions = {
+  backgroundTitle: "Versta",
+  backgroundMessage: "Watching for places nearby.",
+  requestPermissions: true,
+  stale: false,
+  distanceFilter: 10,
+};
+
 function finite(n: number | null | undefined): number | null {
   return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
@@ -76,7 +85,7 @@ async function loadPlugins(): Promise<NativePlugins> {
   };
 }
 
-export function createNativeGpsSource(load: () => Promise<NativePlugins> = loadPlugins): FixSource {
+export function createNativeGpsSource(load: () => Promise<NativePlugins> = loadPlugins, options: WatcherOptions = WATCHER_OPTIONS): FixSource {
   // Each start gets a number, so a stop (or a restart) that happens while the plugin is still loading is honoured.
   let run = 0;
   let plugins: NativePlugins | null = null;
@@ -99,7 +108,7 @@ export function createNativeGpsSource(load: () => Promise<NativePlugins> = loadP
         const api = loaded.geo;
         // A failed wake lock must not stop the ride: location still works, the page just may sleep sooner.
         if (loaded.keepAwake) void loaded.keepAwake.acquire().catch(() => {});
-        const id = await api.addWatcher(WATCHER_OPTIONS, (location, error) => {
+        const id = await api.addWatcher(options, (location, error) => {
           if (mine !== run) return;
           if (error || !location) { onError(errorToGps(error)); return; }
           onFix(locationToFix(location));

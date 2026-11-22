@@ -10,6 +10,7 @@ import { isNative } from "../native/platform";
 import { createGpsSource } from "../nav/sources";
 import { loadPlaces } from "../places/library";
 import { createArrivalWatcher, nearbyPlaces, paraAt } from "../places/nearby";
+import { REFUSED_NOTE, placeWatchOn, startPlaceWatch, stopPlaceWatch } from "../places/watch";
 import { packBase, packIndex, routeStatus } from "../state";
 import type { LngLat, Mixer, Pack, Place, PlacesFile } from "../types";
 import { fmtDist } from "./format";
@@ -25,7 +26,7 @@ const MAP_MARKERS = 12;
 /** A story is playing on the Nearby screen (Back stops it before it closes the screen). */
 export const nearbyPlaying = signal(false);
 /** Play a place's first story, or stop the one playing, from outside the screen (Back, a notification tap). */
-export const nearbyControls: { play: ((placeId: string) => void) | null; stop: (() => void) | null } = { play: null, stop: null };
+export const nearbyControls: { play: ((placeId: string) => boolean) | null; stop: (() => void) | null } = { play: null, stop: null };
 
 interface StoryText { paras: string[]; marks?: number[]; breaks?: number[] }
 interface Playing { place: Place; storyId: string; title: string; pic: string | null; caption: string | null; text: StoryText; para: number; paused: boolean; dur: number }
@@ -60,6 +61,7 @@ type Where = "waiting" | "found" | "denied";
 
 export function Nearby() {
   const demo = nearbyDemo.value;
+  const native = isNative();
   const [file, setFile] = useState<PlacesFile | null>(null);
   const [failed, setFailed] = useState(false);
   const [here, setHere] = useState<LngLat | null>(demo?.at ?? null);
@@ -68,6 +70,7 @@ export function Nearby() {
   const [playing, setPlaying] = useState<Playing | null>(null);
   const [auto, setAuto] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [pocketNote, setPocketNote] = useState("");
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mixer = useRef<Mixer | null>(null);
@@ -245,7 +248,8 @@ export function Nearby() {
   }
   playRef.current = (p) => { void play(p); };
   useEffect(() => { nearbyPlaying.value = playing !== null; }, [playing]);
-  nearbyControls.play = (id) => { const p = places.find((x) => x.id === id); if (p) void play(p); };
+  /** True when the place is known (the places file has loaded), so a caller can retry until it is. */
+  nearbyControls.play = (id) => { const p = places.find((x) => x.id === id); if (p) void play(p); return !!p; };
   nearbyControls.stop = stop;
 
   function stop(): void {
@@ -265,6 +269,12 @@ export function Nearby() {
     watcher.current.reset();
     setAuto(true);
     await ensureMixer(); // made on this tap, so a walk-up story is allowed to sound
+  }
+
+  async function togglePocket(): Promise<void> {
+    setPocketNote("");
+    if (placeWatchOn.value) { stopPlaceWatch(); return; }
+    if ((await startPlaceWatch()) === "refused") setPocketNote(REFUSED_NOTE);
   }
 
   /* the preview opens with a story playing */
@@ -319,7 +329,12 @@ export function Nearby() {
           <span class="swtext"><b>Play when I get there</b><small>Plays a place's story once when you reach it, with the app open.</small></span>
           <span class="swstate">{auto ? "On" : "Off"}</span>
         </button>
+        <button type="button" role="switch" aria-checked={native && placeWatchOn.value} class="switchrow" disabled={!native} data-testid="pocket-switch" onClick={() => void togglePocket()}>
+          <span class="swtext"><b>Tell me when I pass a place</b><small>{native ? "Keeps watching your location with the screen off. Turns itself off after 8 hours." : "In the Android app"}</small></span>
+          {native ? <span class="swstate">{placeWatchOn.value ? "On" : "Off"}</span> : null}
+        </button>
       </div>
+      {pocketNote ? <p class="nb-lead nb-note-warn" role="status" data-testid="pocket-note">{pocketNote}</p> : null}
       {failed ? <p class="nb-lead" role="status">The places could not be loaded. Check your connection and try again.</p> : null}
       {!failed && file && where === "found" && list.length === 0 ? <p class="nb-lead">No places within 3 km of you.</p> : null}
       <ol class="nb-list" data-testid="nearby-list">
