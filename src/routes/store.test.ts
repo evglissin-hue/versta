@@ -336,20 +336,25 @@ describe("route store", () => {
     expect([...r.dev.files.keys()].filter((k) => k.startsWith(`packs/alpha/${a2.entry.version}/`))).toEqual([]);
   });
 
-  it("13b. Transfer.total counts only the downloaded bytes", async () => {
+  it("13b. the update's cost and Transfer.total count only the changed files' bytes", async () => {
     const a1 = await A_V1();
     const a2 = await route("alpha", { "audio/a.mp3": "AAAA2", "pic.jpg": "pppp" }, "2026-03-01T00:00:00Z");
     const r = rig({ builtIn: [a1] });
     putIndex(r.dev, [a2]); putSite(r.dev, a2);
     r.ctl.wifi = false;
     await r.store.start();
+    // only audio/a.mp3 changed: 5 bytes, the unchanged picture is copied, not downloaded
+    expect(r.status().alpha).toMatchObject({ update: { bytes: 5, held: "not-wifi" } });
+    const seen: { done: number; total: number }[] = [];
+    r.dev.afterWrite = () => {
+      const st = r.status().alpha;
+      const t = st?.kind === "on-phone" ? st.update?.transfer : null;
+      if (t) seen.push({ done: t.done, total: t.total });
+    };
     await r.store.fetch("alpha");
-    const staged = JSON.parse(r.storage.get("versta:routes")!).alpha;
-    expect(staged.version).toBe(a2.entry.version);
-    // update.bytes was the cost before switching: 5 bytes for audio/a.mp3
-    r.ctl.wifi = true;
-    const costs = JSON.stringify(r.status());
-    expect(costs).not.toContain("failed");
+    expect(seen.length).toBeGreaterThan(0);
+    for (const t of seen) expect(t.total).toBe(5);
+    expect(JSON.parse(r.storage.get("versta:routes")!).alpha.version).toBe(a2.entry.version);
   });
 
   it("on mobile data an update waits with held not-wifi and its cost, then a tap downloads it", async () => {

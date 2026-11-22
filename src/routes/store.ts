@@ -154,6 +154,32 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
     return { sha, downloaded };
   }
 
+  /** The site's manifest of a route, checked against the index entry; null when it cannot be read or does not match. */
+  async function siteManifest(id: string, version: string | undefined): Promise<PackManifest | null> {
+    try {
+      const res = await dev.get(`${deps.siteUrl}packs/${encodeURIComponent(id)}/manifest.json`, 15_000);
+      if (res.status !== 200) return null;
+      const m = JSON.parse(b64ToText(res.data)) as PackManifest;
+      return m.id === id && m.version === version && Array.isArray(m.files) ? m : null;
+    } catch { return null; }
+  }
+
+  /**
+   * What each update of a route on the phone would download: the files whose checksum differs from the copy on the
+   * phone. Worked out as soon as the update is seen, so a card on mobile data shows the real cost before a tap.
+   */
+  async function estimateCosts(): Promise<void> {
+    for (const e of site ?? []) {
+      if (!e.version || costs[e.id]?.version === e.version || (e.format ?? 1) > deps.appFormat) continue;
+      const chosen = chooseCopy(builtIn.find((b) => b.id === e.id), record[e.id]);
+      if (!chosen || chosen.source === "drop" || chosen.version === e.version) continue;
+      const m = await siteManifest(e.id, e.version);
+      if (!m) continue;
+      const cur = await currentManifest(e.id);
+      costs[e.id] = { version: m.version, bytes: m.files.filter((f) => cur.sha.get(f.path) !== f.sha256).reduce((n, f) => n + f.bytes, 0) };
+    }
+  }
+
   async function currentStopIds(id: string): Promise<string[] | null> {
     const chosen = chooseCopy(builtIn.find((e) => e.id === id), record[id]);
     try {
@@ -340,7 +366,7 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
   function check(force = false): Promise<void> {
     if (!started) return Promise.resolve();
     if (!force && deps.now() - lastOkCheck < CHECK_EVERY_MS) return pump();
-    if (!checking) checking = readSite().finally(() => { checking = null; });
+    if (!checking) checking = readSite().then(estimateCosts).finally(() => { checking = null; });
     return checking.then(() => pump());
   }
 
