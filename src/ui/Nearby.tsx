@@ -256,6 +256,8 @@ export function Nearby() {
     token.current++;
     pending.current = [];
     mixer.current?.stopVoice(0.4);
+    // at once, not after the next render: a second Back pressed straight after must close the screen
+    nearbyPlaying.value = false;
     setPlaying(null);
   }
   function togglePause(): void {
