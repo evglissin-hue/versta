@@ -181,9 +181,13 @@ function Card({ entry }: { entry: IndexEntry }) {
       ) : (
         <div class="acts">
           {resume ? null : <button type="button" class={`btn play ${phase ? "busy" : ""}`} disabled={busy} onClick={() => requestRide(entry.id)}>{phase ? label : "Ride"}</button>}
-          <button type="button" class="btn ghost" disabled={st.s === "saving" || st.s === "saved"} onClick={() => void save(entry)}>
-            {st.s === "saving" ? `Saving ${Math.round((st.done / st.total) * 100)}%` : st.s === "saved" ? "Saved for offline" : st.s === "error" ? "Try saving again" : "Save for offline"}
-          </button>
+          {/* In the Android app the route's files are already on the phone, and the app does not read saved map tiles:
+              the button would promise what it does not do. */}
+          {onPhoneApp() ? null : (
+            <button type="button" class="btn ghost" disabled={st.s === "saving" || st.s === "saved"} onClick={() => void save(entry)}>
+              {st.s === "saving" ? `Saving ${Math.round((st.done / st.total) * 100)}%` : st.s === "saved" ? "Saved for offline" : st.s === "error" ? "Try saving again" : "Save for offline"}
+            </button>
+          )}
         </div>
       )}
       {failure ? (
@@ -192,7 +196,7 @@ function Card({ entry }: { entry: IndexEntry }) {
           <button type="button" class="btn" disabled={busy} onClick={() => void ride(failure.id, failure.resume)}>Try again</button>
         </div>
       ) : null}
-      {offlineUnsaved && !failure ? <p class="warn-note" data-testid="offline-note">You are offline and this route is not saved on this device. Connect to ride it.</p> : null}
+      {offlineUnsaved && !failure && !onPhoneApp() ? <p class="warn-note" data-testid="offline-note">You are offline and this route is not saved on this device. Connect to ride it.</p> : null}
       {st.s === "saving" ? <div class="progress"><i style={{ width: `${(st.done / st.total) * 100}%` }} /></div> : null}
       {st.s === "error" ? <p class="warn-note">Some files did not save. Check your connection and try again.</p> : null}
       {phone?.update ? <UpdateLine id={entry.id} u={phone.update} /> : null}
@@ -203,7 +207,7 @@ function Card({ entry }: { entry: IndexEntry }) {
         </p>
       ) : null}
       {changed ? <p class="saved-note" data-testid="changed-note">This route changed. Save it again for offline use.</p> : null}
-      {st.s === "saved" ? (
+      {st.s === "saved" && !onPhoneApp() ? (
         <p class="saved-note">
           {st.savedAt ? `Saved ${fmtDate(st.savedAt)}, ` : "Saved, "}{fmtMB(st.bytes)}. Works without signal.{" "}
           <button type="button" class="linkbtn" onClick={() => void removePackOffline(entry.id).then(() => set(entry.id, { s: "idle" }))}>Remove</button>

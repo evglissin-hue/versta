@@ -581,12 +581,22 @@ test("nearby places: without location the list still shows, with a note", async 
   await expect(page.getByTestId("nearby-row").first()).toBeVisible();
 });
 
-test("nearby places: Back closes the screen", async ({ page, context }) => {
+test("nearby places: Back stops a playing story first, then closes the screen; the map shows at most 12 markers", async ({ page, context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 51.5056, longitude: -0.0756 });
   await page.goto("/");
   await page.getByTestId("nearby-open").click();
   await expect(page.getByTestId("nearby")).toBeVisible();
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("versta:back", { cancelable: true })));
+  await expect(page.getByTestId("nearby-row").first()).toBeVisible();
+  const stops = page.locator("[data-testid=nearby-map] .vm-stop");
+  await expect.poll(() => stops.count(), { timeout: 15_000 }).toBeGreaterThan(0);
+  expect(await stops.count()).toBeLessThanOrEqual(12);
+  await page.getByTestId("nearby-row").first().getByRole("button", { name: /^Play/ }).click();
+  await expect(page.getByTestId("nearby-panel")).toBeVisible();
+  const back = (): Promise<void> => page.evaluate(() => { window.dispatchEvent(new CustomEvent("versta:back", { cancelable: true })); });
+  await back();
+  await expect(page.getByTestId("nearby-panel")).toHaveCount(0);
+  await expect(page.getByTestId("nearby")).toBeVisible();
+  await back();
   await expect(page.getByTestId("nearby")).toHaveCount(0);
 });

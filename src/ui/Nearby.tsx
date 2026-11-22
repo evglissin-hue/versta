@@ -19,6 +19,13 @@ import { nearbyOpen } from "./uistate";
 export const nearbyDemo = signal<{ at: LngLat; playing: boolean } | null>(null);
 
 const RANGE = 3000;
+/** Markers on the map: the nearest few only, so they do not pile up; the list below still holds every place in range. */
+const MAP_MARKERS = 12;
+
+/** A story is playing on the Nearby screen (Back stops it before it closes the screen). */
+export const nearbyPlaying = signal(false);
+/** Play a place's first story, or stop the one playing, from outside the screen (Back, a notification tap). */
+export const nearbyControls: { play: ((placeId: string) => void) | null; stop: (() => void) | null } = { play: null, stop: null };
 
 interface StoryText { paras: string[]; marks?: number[]; breaks?: number[] }
 interface Playing { place: Place; storyId: string; title: string; pic: string | null; caption: string | null; text: StoryText; para: number; paused: boolean; dur: number }
@@ -154,9 +161,10 @@ export function Nearby() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
-    const keep = new Set(list.map((l) => l.place.id));
+    const shown = list.slice(0, MAP_MARKERS);
+    const keep = new Set(shown.map((l) => l.place.id));
     for (const [id, m] of markers.current) if (!keep.has(id)) { m.marker.remove(); markers.current.delete(id); }
-    list.forEach((l, i) => {
+    shown.forEach((l, i) => {
       if (markers.current.has(l.place.id)) { const m = markers.current.get(l.place.id)!; m.el.firstElementChild!.textContent = String(i + 1); return; }
       const outer = document.createElement("div");
       const el = document.createElement("button");
@@ -236,6 +244,9 @@ export function Nearby() {
     );
   }
   playRef.current = (p) => { void play(p); };
+  useEffect(() => { nearbyPlaying.value = playing !== null; }, [playing]);
+  nearbyControls.play = (id) => { const p = places.find((x) => x.id === id); if (p) void play(p); };
+  nearbyControls.stop = stop;
 
   function stop(): void {
     token.current++;
@@ -262,6 +273,7 @@ export function Nearby() {
   }, [demo, listKey]);
 
   /* leaving the screen stops the story and releases the audio */
+  useEffect(() => () => { nearbyPlaying.value = false; nearbyControls.play = null; nearbyControls.stop = null; }, []);
   useEffect(() => () => {
     token.current++;
     try { mixer.current?.stopVoice(0.1); mixer.current?.dispose?.(); } catch { /* already gone */ }
@@ -281,7 +293,7 @@ export function Nearby() {
         <div class="nb-main">
           <b>{place.name}</b>
           <small>{routeName(place.pack)}{dist !== null ? `, ${fmtDist(dist)}` : ""}</small>
-          <span class="nb-story">{first.title}</span>
+          {first.title !== place.name ? <span class="nb-story">{first.title}</span> : null}
           {can === "needs-app" ? <small class="nb-note">This route needs a newer app.</small> : null}
           {can === "download" || can === "downloading" ? <small class="nb-note">Download the route to hear this</small> : null}
         </div>
