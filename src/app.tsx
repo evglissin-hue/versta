@@ -6,9 +6,10 @@ import { syncVersions } from "./offline";
 import { enterDemo, useDemoKeys } from "./ui/Demo";
 import { Home } from "./ui/Home";
 import { Ride } from "./ui/Ride";
+import { Nearby } from "./ui/Nearby";
 import { Recordings } from "./ui/Recordings";
 import { SoundCheck } from "./ui/SoundCheck";
-import { recordingsOpen, soundCheckOpen } from "./ui/uistate";
+import { nearbyOpen, recordingsOpen, soundCheckOpen } from "./ui/uistate";
 
 const query = new URLSearchParams(location.search);
 const demo = query.get("demo") === "ride";
@@ -26,6 +27,7 @@ export function App() {
   return (
     <>
       {screen.value === "ride" ? <Ride /> : <Home />}
+      {nearbyOpen.value && screen.value === "home" ? <Nearby /> : null}
       {soundCheckOpen.value ? <SoundCheck /> : null}
       {recordingsOpen.value ? <Recordings /> : null}
     </>

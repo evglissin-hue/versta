@@ -547,3 +547,46 @@ test("web Home has none of the Android route states", async ({ page }) => {
   await expect(thamesCard(page).getByRole("button", { name: "Ride", exact: true })).toBeVisible();
   await expect(thamesCard(page).getByRole("button", { name: "Save for offline" })).toBeVisible();
 });
+
+test("nearby places: Tower Bridge first, Play starts a story, Close returns Home", async ({ page, context }) => {
+  const errors = watchConsole(page);
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 51.5056, longitude: -0.0756 });
+  await page.goto("/");
+  await expect(thamesCard(page)).toBeVisible();
+  await page.getByTestId("nearby-open").click();
+  const rows = page.getByTestId("nearby-row");
+  await expect(rows.first()).toContainText("Tower Bridge");
+  await expect(page.getByTestId("nearby-map")).toBeVisible();
+  await rows.first().getByRole("button", { name: /^Play/ }).click();
+  const panel = page.getByTestId("nearby-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("The richest water on earth");
+  await expect(page.getByTestId("nearby-text")).not.toBeEmpty();
+  await expect.poll(() => page.evaluate(() => (window.__verstaAudio?.timeline() ?? []).some((e) => e.src.includes("tower-bridge-0")))).toBe(true);
+  await panel.getByRole("button", { name: "Pause" }).click();
+  await expect(panel.getByRole("button", { name: "Resume" })).toBeVisible();
+  await panel.getByRole("button", { name: "Stop" }).click();
+  await expect(panel).toHaveCount(0);
+  await page.getByTestId("nearby").getByRole("button", { name: "Close" }).click();
+  await expect(page.getByTestId("nearby")).toHaveCount(0);
+  await expect(thamesCard(page)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("nearby places: without location the list still shows, with a note", async ({ page }) => {
+  await page.goto("/");
+  await page.getByTestId("nearby-open").click();
+  await expect(page.getByTestId("nearby-nogps")).toContainText("Allow location to see places near you.");
+  await expect(page.getByTestId("nearby-row").first()).toBeVisible();
+});
+
+test("nearby places: Back closes the screen", async ({ page, context }) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 51.5056, longitude: -0.0756 });
+  await page.goto("/");
+  await page.getByTestId("nearby-open").click();
+  await expect(page.getByTestId("nearby")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("versta:back", { cancelable: true })));
+  await expect(page.getByTestId("nearby")).toHaveCount(0);
+});
