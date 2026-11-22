@@ -8,6 +8,25 @@ if (override) test.use({ baseURL: override });
 const demoCard = (page: Page) => page.getByTestId("route-card").first();
 const thamesCard = (page: Page) => page.getByTestId("route-card").filter({ has: page.getByRole("heading", { name: "Thames Loop", exact: true }) });
 
+test("a stale cached index loses to the network copy", async ({ page }) => {
+  await page.goto("/");
+  await expect(thamesCard(page)).toBeVisible();
+  // Wait until the service worker controls the page, so the next load goes through its caching rules.
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await page.reload();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  // Plant an old index in the pack cache (only one made-up route), as if saved by an earlier visit.
+  await page.evaluate(async () => {
+    const cache = await caches.open("versta-packs");
+    const url = new URL("packs/index.json", document.baseURI).href;
+    const stale = { packs: [{ id: "old-route", name: "Old Route", mode: "walk", km: 1, stops: 1, hero: "packs/old-route/hero.jpg", blurb: "stale" }] };
+    await cache.put(url, new Response(JSON.stringify(stale), { headers: { "Content-Type": "application/json" } }));
+  });
+  await page.reload();
+  await expect(thamesCard(page)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Old Route", exact: true })).toHaveCount(0);
+});
+
 function watchConsole(page: import("@playwright/test").Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });

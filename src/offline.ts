@@ -1,7 +1,8 @@
+import { signal } from "@preact/signals";
 import catalogue from "./audio/catalogue.json";
 import { loopsFor } from "./audio/soundscapes";
 import { packBase } from "./state";
-import type { LngLat, Pack } from "./types";
+import type { LngLat, Pack, PackIndexEntry } from "./types";
 
 export interface OfflineStatus { saved: boolean; bytes: number; savedAt: number | null }
 interface OfflineMeta { savedAt: number; bytes: number; tileTemplate: string }
@@ -242,4 +243,52 @@ export async function removePackOffline(packId: string): Promise<void> {
   // Tiles are shared between packs: drop them only when no other pack is saved.
   // Sounds are shared too, and the loop library may have cached more than a pack lists.
   if (savedMetas().length === 0) { await caches.delete(TILE_CACHE); await caches.delete(SOUND_CACHE); }
+}
+
+/* ------------------------------------------------------------------ versions */
+
+const SEEN_KEY = "versta:seen-versions";
+/** Ids of routes whose saved copy was dropped because the site has a newer version. Shown on the card by Home. */
+export const updatedSinceSaved = signal<Record<string, true>>({});
+
+/**
+ * Call with the index just fetched from the network. A route whose `version` changed since last seen has its cached
+ * files dropped (all but pack.json and manifest.json, which are the fresh network copies), so old narration never
+ * mixes with new text. Returns the ids whose offline-saved copy was dropped; also sets `updatedSinceSaved`.
+ */
+export async function syncVersions(entries: PackIndexEntry[]): Promise<string[]> {
+  let seen: Record<string, string> = {};
+  try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) ?? "{}") as Record<string, string>; } catch {}
+  const dropped: string[] = [];
+  for (const e of entries) {
+    if (!e.version) continue;
+    const old = seen[e.id];
+    if (old && old !== e.version) {
+      const hadSaved = readMeta(e.id) !== null;
+      try {
+        if ("caches" in globalThis) {
+          const cache = await caches.open(PACK_CACHE);
+          const folder = new URL(packBase(e.id), location.href).href;
+          for (const req of await cache.keys()) {
+            if (!req.url.startsWith(folder)) continue;
+            const rest = req.url.slice(folder.length);
+            if (rest === "pack.json" || rest === "manifest.json") continue;
+            await cache.delete(req);
+          }
+        }
+      } catch {}
+      if (hadSaved) {
+        try { localStorage.removeItem(META_PREFIX + e.id); } catch {}
+        dropped.push(e.id);
+      }
+    }
+    seen[e.id] = e.version;
+  }
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch {}
+  if (dropped.length) {
+    const next = { ...updatedSinceSaved.value };
+    for (const id of dropped) next[id] = true;
+    updatedSinceSaved.value = next;
+  }
+  return dropped;
 }
