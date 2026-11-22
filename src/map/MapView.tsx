@@ -7,7 +7,7 @@ import { nav, openStop, settings } from "../state";
 import { finishOpen, followZoom, joinChoice, joinTarget, lastTouch, leaveFollow, peek, wholeRoute } from "../ui/uistate";
 import { tileTemplate } from "../offline";
 import type { LngLat, NavState, Pack } from "../types";
-import { angleDiff, cameraZoom, clampFollowZoom, lineLength, lookAheadPadding, metresPerPixel, splitAt } from "./geometry";
+import { angleDiff, cameraZoom, clampFollowZoom, lineLength, lookAheadPadding, metresPerPixel, splitAt, turnFrame } from "./geometry";
 import { DARK, EMPTY, LIGHT, ROUTE_SOURCES, TILEJSON_URL, buildStyle, type Palette, type RouteData } from "./style";
 
 export interface MapViewProps {
@@ -196,6 +196,9 @@ export function MapView(props: MapViewProps) {
       let camBearing: number | null = null;
       /** What the camera added to the rider's own zoom at the last frame (turn close, fast). */
       let zoomAdj = 0;
+      /** The turn the camera is framing now, and the turn the rider took the zoom from (no frame for it again). */
+      let framing: string | null = null;
+      let frameCancelled: string | null = null;
       /** Fingers (or the mouse) on the map right now, and when the last wheel turn or touch move was. A camera move in the middle of a gesture cancels it. */
       const down = new Map<number, number>();
       let lastGesture = -1e9;
@@ -264,12 +267,16 @@ export function MapView(props: MapViewProps) {
           const want = courseUp ? (n.routeBearing ?? camBearing ?? m.getBearing()) : 0;
           if (first || camBearing === null || !courseUp || Math.abs(angleDiff(want, camBearing)) >= BEARING_DEADBAND) camBearing = want;
           const speed = n.speedAvg ?? n.fix?.speed ?? null;
-          const turnAhead = !!n.nextCue && n.nextCue.turn !== "straight" && n.nextCue.turn !== "depart";
-          const zoom = cameraZoom(clampFollowZoom(followZoom.peek()), { toCue: n.toCue, turnAhead, speed });
-          zoomAdj = zoom - clampFollowZoom(followZoom.peek());
+          const base = clampFollowZoom(followZoom.peek());
+          const tf = turnFrame(n, base);
+          const framed = tf && tf.cue !== frameCancelled ? tf : null;
+          framing = framed ? framed.cue : null;
+          const zoom = framed ? framed.zoom : cameraZoom(base, { speed });
+          zoomAdj = zoom - base;
+          const centre = framed?.focus ?? target;
           const pad = courseUp ? lookAheadPadding(h, inset.top, inset.bottom, LOOK_AHEAD) : inset;
           m.easeTo({
-            center: target, zoom, bearing: camBearing, padding: { top: pad.top, bottom: pad.bottom, left: 0, right: 0 },
+            center: centre, zoom, bearing: camBearing, padding: { top: pad.top, bottom: pad.bottom, left: 0, right: 0 },
             duration: first ? 800 : glideMs, easing: first ? (t: number) => t * (2 - t) : (t: number) => t, essential: true,
           });
         } else if (n.status === "idle" || n.status === "locating" || n.status === "to_start" || n.status === "finished") {
@@ -389,6 +396,8 @@ export function MapView(props: MapViewProps) {
       m.on("zoom", (e) => {
         const byRider = !!(e as { originalEvent?: unknown }).originalEvent || performance.now() - lastGesture < 1000;
         if (!byRider || !live.current.follow || mode !== "follow") return;
+        // the rider's hand wins: a zoom during a turn frame cancels the frame for that turn
+        if (framing) { frameCancelled = framing; framing = null; zoomAdj = 0; }
         followZoom.value = clampFollowZoom(m.getZoom() - zoomAdj);
       });
       // Any touch on the map restarts the wait before following comes back by itself.

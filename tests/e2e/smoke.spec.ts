@@ -418,3 +418,29 @@ test("sound check opens from the ride's sound sheet and closing it returns to th
   await expect(page.getByTestId("sound-sheet")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("on a simulated ride the map zooms in for the first real turn and eases back after it", async ({ page }) => {
+  test.setTimeout(120_000);
+  await startSim(page);
+  const out = await page.evaluate(async () => {
+    const w = window as unknown as { __verstaMap: { getZoom(): number }; __versta: { nav: { value: { nextCue: { id: string; turn: string } | null; toCue: number | null; currentCue: { id: string } | null; distanceDone: number } } } };
+    const real = (c: { turn: string } | null): boolean => !!c && c.turn !== "straight" && c.turn !== "depart";
+    let id: string | null = null;
+    let before = -1; let during = -1; let after = -1; let passedAt = -1;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 100_000) {
+      const n = w.__versta.nav.value;
+      const z = w.__verstaMap.getZoom();
+      if (id === null && real(n.nextCue)) { id = n.nextCue!.id; before = z; }
+      if (id !== null && n.nextCue?.id === id && n.toCue !== null && n.toCue < 25) during = Math.max(during, z);
+      if (id !== null && passedAt < 0 && n.currentCue?.id === id) passedAt = n.distanceDone;
+      if (passedAt >= 0 && n.distanceDone - passedAt > 90) { after = z; break; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return { before, during, after };
+  });
+  console.log("turn zoom samples", JSON.stringify(out));
+  expect(out.before).toBeLessThan(17);
+  expect(out.during).toBeGreaterThanOrEqual(17.4);
+  expect(out.after).toBeLessThan(17);
+});
