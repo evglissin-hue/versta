@@ -37,6 +37,9 @@ export function initNative(): void {
     try { Object.defineProperty(navigator.serviceWorker, "register", { value: () => new Promise(() => {}), configurable: true }); } catch {}
   }
   void removeServiceWorkers();
+  // Pocket alerts: listen for taps on place notifications (a cold start from a tap too), and resume the watch if it
+  // was on and has not expired.
+  void import("../places/watch").then((m) => m.initPlaceWatch()).catch(() => {});
   // No ride runs at launch: a ride notice still showing was left by an app Android killed mid-ride. Clear it.
   void import("./notify").then((m) => m.rideNotice.clear()).catch(() => {});
   void import("@capacitor/app").then(({ App }) => {

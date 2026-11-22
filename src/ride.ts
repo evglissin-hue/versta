@@ -82,6 +82,8 @@ function onVisible(): void {
 /** Start riding. Call it from a tap: it unlocks audio and asks for the location permission. */
 export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), resume: SavedRide | null = null): Promise<void> {
   endRide(false);
+  // a route ride and the pocket watch for places never run together: the ride's GPS and voice come first
+  if (!sim) void import("./places/watch").then((m) => m.stopPlaceWatch()).catch(() => {});
   const source = sim ? createSimSource(p, sim) : createGpsSource();
   const clock = (): number => (source.now ? source.now() : Date.now());
   const mixer = createMixer({ baseUrl: packBase(p.id), virtual: sim?.virtualAudio ?? false, timeScale: sim?.scale ?? 1, clock });
