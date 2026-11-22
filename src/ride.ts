@@ -2,7 +2,7 @@
  * The ride controller: wires position source -> navigation engine -> director -> state.
  * This is the only place those modules meet. UI code calls startRide / endRide and reads state.
  */
-import { createNavEngine } from "./nav/engine";
+import { DEFAULT_NAV_OPTIONS, createNavEngine } from "./nav/engine";
 import { createGpsSource, createSimSource } from "./nav/sources";
 import { geoDistance } from "./geo";
 import { createMixer } from "./audio/mixer";
@@ -143,6 +143,9 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       if (gpsError.value) gpsError.value = null;
       ride.rec?.fix(fix);
       if (choosing) {
+        // a coarse first fix (a network position hundreds of metres out) would offer the wrong stop: wait for one the
+        // engine would also accept
+        if (fix.accuracy > DEFAULT_NAV_OPTIONS.maxAccuracy) { nav.value = { ...nav.value, fix }; return; }
         const offer = startOffer(p, fix);
         if (!offer) choosing = false;
         else {

@@ -132,6 +132,19 @@ test("a real ride far from stop 1: Back to the routes, or the Back button, ends 
   await expect(thamesCard(page)).toBeVisible();
 });
 
+test("a real ride: a coarse first fix is not used to offer a start; a good one is", async ({ page, context }) => {
+  await context.grantPermissions(["geolocation"]);
+  // 120 m from stop 7 of the Thames Loop, but only to 600 m: no offer yet
+  await context.setGeolocation({ latitude: 51.4881, longitude: -0.0081588, accuracy: 600 });
+  await page.addInitScript(() => { try { localStorage.setItem("versta:firstride", "1"); } catch {} });
+  await page.goto("/");
+  await thamesCard(page).getByRole("button", { name: /^Ride/ }).click();
+  await page.waitForTimeout(3000);
+  await expect(page.getByTestId("start-choice")).toHaveCount(0);
+  await context.setGeolocation({ latitude: 51.4881, longitude: -0.0081588, accuracy: 8 });
+  await expect(page.getByTestId("start-choice")).toBeVisible({ timeout: 20_000 });
+});
+
 test("a real ride far from stop 1: choosing stop 1 heads for stop 1", async ({ page, context }) => {
   await rideFromStop7(page, context);
   await page.getByTestId("start-choice").getByRole("button", { name: /^Start at 01 Tower Bridge/ }).click();
