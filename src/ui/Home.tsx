@@ -7,7 +7,7 @@ import { packIndex } from "../state";
 import type { PackIndexEntry } from "../types";
 import { fmtDate, fmtListening, fmtMB, pad2 } from "./format";
 import { Sheet } from "./Sheet";
-import { firstRideSheet, netDown, soundCheckOpen, startFailure, startPhase } from "./uistate";
+import { firstRideSheet, netDown, recordingsOpen, soundCheckOpen, startFailure, startPhase } from "./uistate";
 
 /** What the route index may carry beyond the contract: counts and listening time for the line under the blurb. */
 type IndexEntry = PackIndexEntry & { stories?: number; asides?: number; minutes?: number };
@@ -174,6 +174,7 @@ export function Home() {
         <p>Pictures are public domain works from Wikimedia Commons. Map data &copy; OpenStreetMap contributors. Map tiles by OpenFreeMap. Your progress stays on this device.</p>
         {isNative() ? null : <p><a class="linkbtn" href={RELEASES} target="_blank" rel="noopener" data-testid="android-link">Android app</a> keeps guiding with the screen off.</p>}
         <p><button type="button" class="linkbtn" onClick={() => { soundCheckOpen.value = true; }}>Sound check</button> lets you hear every sound before you ride.</p>
+        <p><button type="button" class="linkbtn" onClick={() => { recordingsOpen.value = true; }}>Ride recordings</button> is what the phone saw on your last rides.</p>
         {simOn
           ? <p>Simulation is on: Ride starts a pretend ride. <a class="linkbtn" href={import.meta.env.BASE_URL}>Use real GPS</a></p>
           : <a class="linkbtn" href={`${import.meta.env.BASE_URL}?sim=1&speed=5&scale=8`}>Simulate a ride</a>}
