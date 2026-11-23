@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { nav, settings, updateSettings } from "../state";
+import { Squiggle } from "./icons";
 import { RECENTRE_MS, RECENTRE_WHOLE_MS, following, lastTouch, resumeFollow, ringDemo, showWholeRoute, wholeRoute } from "./uistate";
 
 /** How long the word "Recentre" stays beside the button once the rider has left following. */
@@ -20,14 +21,6 @@ const Needle = () => (
     <path d="M16 31 L21 21 L16 19.5 L11 21 Z" fill="none" stroke="var(--ink)" stroke-width="1.8" stroke-linejoin="round" />
   </svg>
 );
-const Squiggle = () => (
-  <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" class="mc-icon">
-    <path d="M5 25 C5 16 14 21 14 14 C14 8 8 10 10 5 M14 14 C14 9 23 14 25 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-    <circle cx="5" cy="25" r="2.6" fill="currentColor" />
-    <circle cx="25" cy="7" r="2.6" fill="var(--paper)" stroke="currentColor" stroke-width="2.2" />
-  </svg>
-);
-
 /** The two round buttons on the map while riding: follow (and course up or north up), and the whole route. */
 export function MapControls() {
   const n = nav.value;
@@ -79,7 +72,7 @@ export function MapControls() {
         aria-label={whole ? "Back to following" : "Show the whole route"}
         onClick={() => (whole ? resumeFollow() : showWholeRoute())}
       >
-        <Squiggle />
+        <Squiggle size={28} class="mc-icon" />
       </button>
       <div class="mc-row">
         {state === "free" && label ? <span class="mc-label" data-testid="recentre-label">Recentre</span> : null}

@@ -1,4 +1,4 @@
-import { gpsError, nav, pack, simulated, startChoice } from "../state";
+import { gpsError, nav, pack, practice, simulated, startChoice } from "../state";
 import type { GpsError } from "../types";
 import { fmtDist, pad2, thenText, turnAngle, turnLabel } from "./format";
 import { peekAt } from "./uistate";
@@ -23,7 +23,7 @@ export function Banner() {
   const p = pack.value;
   const err = gpsError.value;
   const stop = p?.stops[n.seg];
-  const tag = simulated.value ? <span class="sim-tag">Simulated</span> : null;
+  const tag = simulated.value || practice.value ? <span class="sim-tag">{practice.value ? "Practice" : "Simulated"}</span> : null;
 
   let tone = "";
   let body;

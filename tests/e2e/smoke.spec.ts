@@ -9,7 +9,7 @@ const demoCard = (page: Page) => page.getByTestId("route-card").first();
 const thamesCard = (page: Page) => page.getByTestId("route-card").filter({ has: page.getByRole("heading", { name: "Thames Loop", exact: true }) });
 
 test("a stale cached index loses to the network copy", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await expect(thamesCard(page)).toBeVisible();
   // Wait until the service worker controls the page, so the next load goes through its caching rules.
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
@@ -36,13 +36,14 @@ function watchConsole(page: import("@playwright/test").Page): string[] {
 
 test("home shows the Thames Loop card", async ({ page }) => {
   const errors = watchConsole(page);
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Versta" })).toBeVisible();
+  await page.goto("/?page=routes");
+  await expect(page.getByRole("heading", { name: "Routes" })).toBeVisible();
   const card = thamesCard(page);
   await expect(card).toContainText("Thames Loop");
   await expect(card).toContainText("km");
   await expect(card.getByRole("button", { name: "Ride" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Save for offline" })).toBeVisible();
+  await page.goto("/?page=about");
   await expect(page.getByRole("link", { name: "Simulate a ride" })).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -101,7 +102,7 @@ async function rideFromStop7(page: Page, context: import("@playwright/test").Bro
   // 120 m from Foot Tunnel & Island Gardens, 7th stop: far from stop 1, and the nearest stop is not the last
   await context.setGeolocation({ latitude: 51.4881, longitude: -0.0081588 });
   await page.addInitScript(() => { try { localStorage.setItem("versta:firstride", "1"); } catch {} });
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await thamesCard(page).getByRole("button", { name: /^Ride/ }).click();
   await expect(page.getByTestId("start-choice")).toBeVisible({ timeout: 20_000 });
 }
@@ -137,7 +138,7 @@ test("a real ride: a coarse first fix is not used to offer a start; a good one i
   // 120 m from stop 7 of the Thames Loop, but only to 600 m: no offer yet
   await context.setGeolocation({ latitude: 51.4881, longitude: -0.0081588, accuracy: 600 });
   await page.addInitScript(() => { try { localStorage.setItem("versta:firstride", "1"); } catch {} });
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await thamesCard(page).getByRole("button", { name: /^Ride/ }).click();
   await page.waitForTimeout(3000);
   await expect(page.getByTestId("start-choice")).toHaveCount(0);
@@ -208,10 +209,11 @@ test("the Stops button counts the stops done, and the aside card shows its tags"
 /* ---------------------------------------------------------------- iteration 3: polish */
 
 test("home: what is inside the route, the Android line, no offline warning online", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await expect(thamesCard(page).getByTestId("inside")).toHaveText("13 stops, 18 stories, 21 passing-by stories, about 30 min of listening");
-  await expect(page.getByTestId("android-link")).toHaveAttribute("href", "https://github.com/evglissin-hue/versta/releases/tag/android-latest");
   await expect(page.getByTestId("offline-note")).toHaveCount(0);
+  await page.goto("/?page=about");
+  await expect(page.getByTestId("android-link")).toHaveAttribute("href", "https://github.com/evglissin-hue/versta/releases/tag/android-latest");
 });
 
 test("home preview states: first ride sheet, loading, load failure, offline, all with big targets and no overflow", async ({ page }) => {
@@ -239,7 +241,7 @@ test("home preview states: first ride sheet, loading, load failure, offline, all
 test("the first-ride sheet shows once, before the browser asks for anything, and never again", async ({ page, context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 51.5, longitude: -0.1 });
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await demoCard(page).getByRole("button", { name: "Ride", exact: true }).click();
   const sheet = page.getByTestId("first-ride");
   await expect(sheet).toBeVisible();
@@ -247,7 +249,7 @@ test("the first-ride sheet shows once, before the browser asks for anything, and
   await sheet.getByRole("button", { name: "Start the ride" }).click();
   await expect(page.getByTestId("ride")).toBeVisible({ timeout: 20_000 });
   expect(await page.evaluate(() => localStorage.getItem("versta:firstride"))).toBe("1");
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await demoCard(page).getByRole("button", { name: /^Ride|Continue/ }).first().click();
   await expect(page.getByTestId("ride")).toBeVisible({ timeout: 20_000 });
 });
@@ -355,11 +357,11 @@ test("a wheel zoom while following keeps following and is remembered", async ({ 
   const before = await page.evaluate(() => (window as unknown as Win).__verstaUi!.followZoom.value);
   await page.mouse.move(195, 420);
   await page.mouse.wheel(0, -400);
-  await page.waitForTimeout(900);
+  // the zoom lands after the map's own easing, later on a loaded machine: wait for it rather than a fixed time
+  const zoom = (): Promise<number> => page.evaluate(() => (window as unknown as Win).__verstaUi!.followZoom.value);
+  await expect.poll(zoom, { timeout: 5000 }).toBeGreaterThan(before);
   await expect(followBtn(page)).toHaveAttribute("data-state", "course");
-  const after = await page.evaluate(() => (window as unknown as Win).__verstaUi!.followZoom.value);
-  expect(after).toBeGreaterThan(before);
-  expect(after).toBeLessThanOrEqual(18);
+  expect(await zoom()).toBeLessThanOrEqual(18);
 });
 
 test("the whole route button fits the route, and a second tap goes back to following", async ({ page }) => {
@@ -394,7 +396,7 @@ test("tapping the turn banner peeks at the turn for a few seconds, then follows 
 });
 
 async function startSim(page: Page): Promise<void> {
-  await page.goto("/?sim=1&speed=5&scale=4&virtual=1");
+  await page.goto("/?page=routes&sim=1&speed=5&scale=4&virtual=1");
   await page.getByRole("button", { name: /^Ride/ }).first().click();
   await page.waitForFunction(() => window.__versta?.nav.value.status === "riding", null, { timeout: 30_000 });
   await mapReady(page);
@@ -423,7 +425,7 @@ test("with autoRecentre off the map stays where the rider put it", async ({ page
 
 test("sound check opens from Home, lists every sound, toggles the narrator, closes and answers Back", async ({ page }) => {
   const errors = watchConsole(page);
-  await page.goto("/");
+  await page.goto("/?page=settings");
   await page.getByRole("button", { name: "Sound check" }).click();
   const sc = page.getByTestId("sound-check");
   await expect(sc).toBeVisible();
@@ -455,7 +457,7 @@ test("sound check opens from Home, lists every sound, toggles the narrator, clos
   expect(small).toEqual([]);
   await sc.getByRole("button", { name: "Close" }).click();
   await expect(sc).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Versta" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Sound check" }).click();
   await expect(sc).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new CustomEvent("versta:back", { cancelable: true })));
@@ -553,7 +555,7 @@ test("route states demo: updates held for a ride say why", async ({ page }) => {
 });
 
 test("web Home has none of the Android route states", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?page=routes");
   await expect(thamesCard(page)).toBeVisible();
   await expect(page.getByTestId("update-line")).toHaveCount(0);
   await expect(page.getByTestId("on-phone-note")).toHaveCount(0);
@@ -566,8 +568,7 @@ test("nearby places: Tower Bridge first, Play starts a story, Close returns Home
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 51.5056, longitude: -0.0756 });
   await page.goto("/");
-  await expect(thamesCard(page)).toBeVisible();
-  await page.getByTestId("nearby-open").click();
+  await page.getByTestId("menu-nearby").click();
   const rows = page.getByTestId("nearby-row");
   await expect(rows.first()).toContainText("Tower Bridge");
   await expect(page.getByTestId("nearby-map")).toBeVisible();
@@ -583,13 +584,13 @@ test("nearby places: Tower Bridge first, Play starts a story, Close returns Home
   await expect(panel).toHaveCount(0);
   await page.getByTestId("nearby").getByRole("button", { name: "Close" }).click();
   await expect(page.getByTestId("nearby")).toHaveCount(0);
-  await expect(thamesCard(page)).toBeVisible();
+  await expect(page.getByTestId("menu-nearby")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test("nearby places: the pocket alerts switch is disabled on the web", async ({ page }) => {
   await page.goto("/");
-  await page.getByTestId("nearby-open").click();
+  await page.getByTestId("menu-nearby").click();
   const sw = page.getByTestId("pocket-switch");
   await expect(sw).toBeDisabled();
   await expect(sw).toContainText("Tell me when I pass a place");
@@ -598,7 +599,7 @@ test("nearby places: the pocket alerts switch is disabled on the web", async ({ 
 
 test("nearby places: without location the list still shows, with a note", async ({ page }) => {
   await page.goto("/");
-  await page.getByTestId("nearby-open").click();
+  await page.getByTestId("menu-nearby").click();
   await expect(page.getByTestId("nearby-nogps")).toContainText("Allow location to see places near you.");
   await expect(page.getByTestId("nearby-row").first()).toBeVisible();
 });
@@ -607,7 +608,7 @@ test("nearby places: Back stops a playing story first, then closes the screen; t
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 51.5056, longitude: -0.0756 });
   await page.goto("/");
-  await page.getByTestId("nearby-open").click();
+  await page.getByTestId("menu-nearby").click();
   await expect(page.getByTestId("nearby")).toBeVisible();
   await expect(page.getByTestId("nearby-row").first()).toBeVisible();
   const stops = page.locator("[data-testid=nearby-map] .vm-stop");

@@ -42,6 +42,8 @@ export interface Bed {
   stop(fadeSeconds: number): void;
   /** One-shot effect on the bed bus. `level` scales EFFECT_LEVEL. Dropped when it is not decoded within 0.5 s. */
   effect(name: string, level: number): void;
+  /** Ramp every effect still sounding to silence over `fadeSeconds` and stop it; effects still loading are dropped. */
+  stopEffects(fadeSeconds: number): void;
   /** Two soft clicks on the nav bus. */
   tick(): void;
   /** Scale the soundscape and music. Remembered across beds and until the graph exists. */
@@ -67,6 +69,10 @@ export function createBed(hooks: BedHooks): Bed {
   const layers: Record<LayerKind, Layer | null> = { ambience: null, music: null };
   const tokens: Record<LayerKind, number> = { ambience: 0, music: 0 };
   const timers = new Set<ReturnType<typeof setTimeout>>();
+  /** Effects sounding now. `stopEffects` ramps their gains down. */
+  const playing = new Set<{ src: AudioBufferSourceNode; gn: GainNode }>();
+  /** Counts `stopEffects` calls: an effect still loading when it changes is dropped. */
+  let fxEpoch = 0;
 
   const later = (ms: number, fn: () => void): void => {
     const t = setTimeout(() => { timers.delete(t); fn(); }, ms);
@@ -166,7 +172,7 @@ export function createBed(hooks: BedHooks): Bed {
 
     effect(name, lvl) {
       if (!ensure() || !g || !loops) return;
-      const x = g.synth, lib = loops, key = `fx/${name}`;
+      const x = g.synth, lib = loops, key = `fx/${name}`, epoch = fxEpoch;
       const play = (buf: AudioBuffer): void => {
         if (disposed || !g) return;
         const src = x.ctx.createBufferSource();
@@ -175,7 +181,9 @@ export function createBed(hooks: BedHooks): Bed {
         src.buffer = buf;
         src.connect(gn);
         gn.connect(x.bed);
-        src.onended = () => { try { gn.disconnect(); } catch {} hooks.emit("effect", "off", name); };
+        const fx = { src, gn };
+        playing.add(fx);
+        src.onended = () => { playing.delete(fx); try { gn.disconnect(); } catch {} hooks.emit("effect", "off", name); };
         src.start();
         hooks.emit("effect", "on", name);
       };
@@ -185,10 +193,23 @@ export function createBed(hooks: BedHooks): Bed {
       later(EFFECT_WAIT_MS, () => { late = true; });
       void lib.load([key]).then(() => {
         const buf = lib.get(key);
-        if (buf && !late) play(buf);
+        if (buf && !late && epoch === fxEpoch) play(buf);
       });
     },
 
+    stopEffects(fadeSeconds) {
+      fxEpoch++;
+      if (!g) return;
+      const t = g.synth.ctx.currentTime, fade = Math.max(0, fadeSeconds);
+      for (const { src, gn } of playing) {
+        try {
+          gn.gain.cancelScheduledValues(t);
+          gn.gain.setValueAtTime(gn.gain.value, t);
+          gn.gain.linearRampToValueAtTime(0, t + fade);
+          src.stop(t + fade + 0.05); // its onended reports the effect off
+        } catch {}
+      }
+    },
     tick() {
       if (!ensure() || !g) return;
       g.tick();

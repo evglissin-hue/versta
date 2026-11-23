@@ -15,7 +15,7 @@ export function AsideCard({ aside }: { aside: Aside }) {
         {aside.text}
         <span class="aside-more">{open ? "Tap to shorten" : "Tap to read it all"}</span>
       </button>
-      <button type="button" class="btn ghost" onClick={() => currentDirector()?.stopAll()}>Stop</button>
+      <button type="button" class="btn ghost" data-testid="aside-stop" onClick={() => currentDirector()?.stopAll()}>Stop</button>
     </div>
   );
 }

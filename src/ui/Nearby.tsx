@@ -209,7 +209,7 @@ export function Nearby() {
   /* ---- playing ---- */
   async function ensureMixer(): Promise<Mixer> {
     if (mixer.current) return mixer.current;
-    const m = createMixer({ baseUrl: "", virtual: demo !== null });
+    const m = createMixer({ baseUrl: "", virtual: demo !== null, owner: "nearby" });
     mixer.current = m;
     try { await m.unlock(); } catch { /* a blocked context stays silent; the panel still shows */ }
     return m;
@@ -259,6 +259,23 @@ export function Nearby() {
     // at once, not after the next render: a second Back pressed straight after must close the screen
     nearbyPlaying.value = false;
     setPlaying(null);
+  }
+  /** A tap on the story text: one paragraph on (+1) or back (-1). Past either end it stops or restarts the story. */
+  function stepPara(delta: 1 | -1): void {
+    const p = playingRef.current;
+    if (!p) return;
+    const marks = p.text.marks;
+    const last = p.text.paras.length - 1;
+    if (p.para + delta > last) { stop(); return; }
+    const to = Math.max(0, p.para + delta);
+    const t = marks?.[to] ?? (to === 0 ? 0.1 : undefined);
+    if (t !== undefined) mixer.current?.seekVoiceTo?.(Math.max(0, t - 0.1));
+    setPlaying({ ...p, para: to });
+  }
+  function onPanelClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).closest("button")) return;
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    stepPara(e.clientX - box.left < box.width / 3 ? -1 : 1);
   }
   function togglePause(): void {
     const p = playingRef.current;
@@ -346,10 +363,15 @@ export function Nearby() {
         <div class="scene nb-scene" role="dialog" aria-label="Story" data-testid="nearby-panel">
           <div class={`scene-bg ${playing.pic ? "" : "none"}`} style={playing.pic ? { backgroundImage: `url("${playing.pic}")` } : undefined} />
           <div class="scene-shade" />
-          <div class="scene-top"><span class="label">{playing.place.name}</span></div>
-          <div class="scene-body">
+          <div class="scene-top">
+            <button type="button" class="sbtn" data-testid="nearby-back" onClick={stop}>Back</button>
+            <span class="label scene-label">{playing.place.name}</span>
+          </div>
+          <div class="scene-body" data-testid="nearby-tap" onClick={onPanelClick}>
             <h2>{playing.title}</h2>
             {playing.text.paras.length > 0 ? <p class="scene-text" key={playing.para} aria-live="polite" data-testid="nearby-text">{playing.text.paras[playing.para]}</p> : null}
+            <button type="button" class="sr-only" onClick={() => stepPara(1)}>Next part</button>
+            <button type="button" class="sr-only" onClick={() => stepPara(-1)}>Previous part</button>
           </div>
           <div class="scene-foot">
             {playing.text.paras.length > 1 ? (

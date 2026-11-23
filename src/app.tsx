@@ -10,6 +10,7 @@ import { Nearby } from "./ui/Nearby";
 import { Recordings } from "./ui/Recordings";
 import { SoundCheck } from "./ui/SoundCheck";
 import { nearbyOpen, recordingsOpen, soundCheckOpen } from "./ui/uistate";
+import { Tour } from "./tour/Tour";
 
 const query = new URLSearchParams(location.search);
 const demo = query.get("demo") === "ride";
@@ -30,6 +31,7 @@ export function App() {
       {nearbyOpen.value && screen.value === "home" ? <Nearby /> : null}
       {soundCheckOpen.value ? <SoundCheck /> : null}
       {recordingsOpen.value ? <Recordings /> : null}
+      <Tour />
     </>
   );
 }

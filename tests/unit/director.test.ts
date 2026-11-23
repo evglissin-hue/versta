@@ -258,10 +258,11 @@ describe("skip and stopAll", () => {
     r.d.skip();
     expect(last(r)).toBeNull();
     expect(r.mixer.voiceBusy).toBe(false);
-    // the bed lingers after the last story, then fades
-    expect(r.mixer.bed).not.toBeNull();
-    await ms(21_000);
+    // a skip with nothing queued closes in silence: no close signal, no linger, the bed fades within 1.5 s
     expect(r.mixer.bed).toBeNull();
+    await ms(2000);
+    expect(r.mixer.timeline.filter((e) => e.ch === "signal" && e.ev === "on")).toEqual([]);
+    expect(r.mixer.timeline.filter((e) => e.ch === "ambience" && e.ev === "off").length).toBe(1);
   });
 
   it("stopAll leaves nothing playing, nothing queued and the bed stopped", async () => {
@@ -703,7 +704,7 @@ describe("the bed around stories", () => {
     expect(riverOff).toBeGreaterThan(noirOn);
   });
 
-  it("after the last story: close, then the bed is off 25 to 27 s after the story ends", async () => {
+  it("after the last story: close, then the bed is off 14 to 15 s after the story ends", async () => {
     const r = rig();
     r.d.markHeard?.(["peter-the-great-0"]);
     r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
@@ -713,8 +714,9 @@ describe("the bed around stories", () => {
     expect(timeline(r, "signal", "on").map((e) => e.src)).toEqual(["arrive", "close"]);
     for (const ch of ["ambience", "music"]) {
       const off = timeline(r, ch, "off")[0]!;
-      expect(off.at - end).toBeGreaterThanOrEqual(25_000);
-      expect(off.at - end).toBeLessThanOrEqual(27_000);
+      // the 2.5 s end gap, the 8 s linger and the 4 s fade
+      expect(off.at - end).toBeGreaterThanOrEqual(14_000);
+      expect(off.at - end).toBeLessThanOrEqual(15_000);
     }
   });
 
@@ -756,7 +758,7 @@ describe("the bed around stories", () => {
     expect(r.mixer.bed).toEqual({ ambience: "yard", music: "russia" });
   });
 
-  it("auto-play off: the soundscape alone for 30 s then a 6 s fade", async () => {
+  it("auto-play off: the soundscape alone for 15 s then a 4 s fade", async () => {
     const r = rig({ autoPlayStories: false });
     const t0 = Date.now();
     r.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
@@ -764,12 +766,12 @@ describe("the bed around stories", () => {
     await ms(60_000);
     expect(timeline(r, "music")).toEqual([]);
     const off = timeline(r, "ambience", "off")[0]!;
-    expect(off.at - t0).toBeGreaterThanOrEqual(35_500);
-    expect(off.at - t0).toBeLessThanOrEqual(36_500);
+    expect(off.at - t0).toBeGreaterThanOrEqual(18_500);
+    expect(off.at - t0).toBeLessThanOrEqual(19_500);
     expect(r.mixer.bed).toBeNull();
   });
 
-  it("auto-play off: a tap within the 30 s keeps the soundscape and adds the music", async () => {
+  it("auto-play off: a tap within the 15 s keeps the soundscape and adds the music", async () => {
     const q = rig({ autoPlayStories: false });
     q.d.handle(arrive(DEPTFORD), nav({ status: "at_stop" }));
     await ms(10_000);

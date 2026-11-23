@@ -33,7 +33,7 @@
  * THE NAV CHANNEL is a FIFO of cues and signals (at most three waiting) on two elements used in turn, so that the
  * next entry is loaded while the current one plays and a distance call and its cue sound as one utterance.
  */
-import type { Mixer, MixerOptions, PlayHandle, SignalName, SoundEvent } from "../types";
+import type { LiveMixer, Mixer, MixerOptions, MixerOwner, PlayHandle, SignalName, SoundEvent } from "../types";
 import { type BedEmit, type LayerKind, createBed } from "./bed";
 import catalogue from "./catalogue.json";
 import { type Clip, type ClipFactory, elementClipFactory, prepareElement, silentWavUri, virtualClipFactory } from "./clips";
@@ -51,6 +51,17 @@ export interface MixerWithBed extends Mixer {
   /** The distinct `preload` requests so far, in order. */
   readonly preloaded: readonly string[];
 }
+
+/** Every mixer that exists right now, for `liveMixers` (the dead-end hunt proves nothing is left sounding). */
+const liveSet = new Set<{ owner: MixerOwner | "unknown"; sounding: () => string[] }>();
+
+/** The mixers that exist right now, each with its owner and what it is sounding ("<ch>:<src>" per open sound). */
+export function liveMixers(): LiveMixer[] {
+  return [...liveSet].map((m) => ({ owner: m.owner, sounding: m.sounding() }));
+}
+
+declare global { interface Window { __verstaSound?: { live(): LiveMixer[] } } }
+if (typeof window !== "undefined") window.__verstaSound = { live: liveMixers };
 
 interface Deferred { promise: Promise<void>; resolve(): void; reject(reason: "stopped" | "error"): void; settled: boolean }
 
@@ -129,12 +140,20 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   const siteBase = typeof import.meta.env?.BASE_URL === "string" ? import.meta.env.BASE_URL : "/";
 
   const timeline: SoundEvent[] = [];
+  /** Sounds on the timeline without their `off`: "<ch>:<src>" to the count of ons minus offs. Not capped like the timeline. */
+  const open = new Map<string, number>();
+  /** After dispose nothing more is logged (a late `ended` from a released node is not a sound). */
+  let closed = false;
   const logEvent = (ch: SoundEvent["ch"], ev: "on" | "off", src: string, pos?: number, ended = false): void => {
+    if (closed) return;
     const e: SoundEvent = { at: clock(), ch, ev, src };
     if (pos !== undefined) e.pos = pos;
     if (ended) e.ended = true;
     timeline.push(e);
     if (timeline.length > TIMELINE_MAX) timeline.shift();
+    const k = `${ch}:${src}`;
+    const n = (open.get(k) ?? 0) + (ev === "on" ? 1 : -1);
+    if (n > 0) open.set(k, n); else open.delete(k);
   };
 
   const bedEmit: BedEmit = (ch, ev, src) => logEvent(ch, ev, src);
@@ -214,6 +233,9 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   const navWaiting: NavEntry[] = [];
   let navIdx = 0;
   let resumeTimer: (() => void) | null = null;
+  /** Virtual mode: effects that are sounding, with the cancel of their end timer. */
+  interface VirtualEffect { name: string; cancel: () => void; stopping: boolean }
+  const effects = new Set<VirtualEffect>();
 
   /** Where the elements are not routed through Web Audio, tell the bed's pocket when speech is sounding. */
   function updateDuck(): void {
@@ -379,7 +401,7 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
     const v = voice;
     if (!v) { updateDuck(); return; }
     if (v.userPause) return;
-    if (v.phase === "loading") startSound(v);
+    if (v.phase === "loading") startSound(v, v.cut?.kind === "exact" ? v.cut.pos : undefined);
     else if (v.phase === "silent") startSound(v, resumePosition(v));
   }
 
@@ -461,6 +483,22 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
   }
 
   /* ------------------------------------------------------------ the mixer */
+
+  /** Put the voice at `target` seconds (clamped to the clip): faded when sounding, held exactly when not, applied at the start when loading. */
+  function seekEntry(v: VoiceEntry, target: number): void {
+    const length = v.clip ? v.clip.duration() : (v.est ?? Infinity);
+    target = Math.max(0, Math.min(target, length));
+    if (v.phase === "in" || v.phase === "playing") {
+      v.seekTarget = target;
+      fadeOut(v, "seek", cutNow(v, "exact"));
+    } else if (v.phase === "out" && v.reason === "seek") {
+      v.seekTarget = target;
+    } else {
+      // silent (held by a cue or the rider's pause), out for a cue or a pause, or not started yet: resume at the target
+      v.cut = { kind: "exact", pos: target, at: clock() };
+    }
+    v.onTime?.(target);
+  }
 
   const stoppedHandle = (): PlayHandle => {
     const d = deferred();
@@ -546,16 +584,12 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
       } else {
         target = Math.max(0, head + deltaSeconds);
       }
-      target = Math.min(target, v.clip.duration());
-      if (v.phase === "in" || v.phase === "playing") {
-        v.seekTarget = target;
-        fadeOut(v, "seek", cutNow(v, "exact"));
-      } else if (v.phase === "out" && v.reason === "seek") {
-        v.seekTarget = target;
-      } else {
-        v.cut = { kind: "exact", pos: target, at: clock() };
-      }
-      v.onTime?.(target);
+      seekEntry(v, target);
+    },
+    seekVoiceTo(seconds) {
+      const v = voice;
+      if (!v || !Number.isFinite(seconds)) return;
+      seekEntry(v, seconds);
     },
 
     playNav(src, o): PlayHandle {
@@ -584,7 +618,20 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
       const level = o?.level ?? 1;
       if (real) { bed.effect(name, level); return; }
       logEvent("effect", "on", name);
-      after(ms(EFFECT_SECONDS[name] ?? 3), () => logEvent("effect", "off", name));
+      const fx: VirtualEffect = { name, stopping: false, cancel: () => {} };
+      fx.cancel = after(ms(EFFECT_SECONDS[name] ?? 3), () => { effects.delete(fx); logEvent("effect", "off", name); });
+      effects.add(fx);
+    },
+    stopEffects(fadeSeconds = 0.3) {
+      if (disposed) return;
+      const fade = Math.max(0, fadeSeconds);
+      if (real) { bed.stopEffects(fade); return; }
+      for (const fx of effects) {
+        if (fx.stopping) continue;
+        fx.stopping = true;
+        fx.cancel();
+        fx.cancel = after(ms(fade), () => { effects.delete(fx); logEvent("effect", "off", fx.name); });
+      }
     },
 
     preload(srcs) {
@@ -634,6 +681,15 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
     dispose() {
       if (disposed) return;
       disposed = true;
+      // everything still on the timeline ends at this moment, then the nodes are released
+      for (const [k, n] of [...open]) {
+        const i = k.indexOf(":");
+        for (let j = 0; j < n; j++) logEvent(k.slice(0, i) as SoundEvent["ch"], "off", k.slice(i + 1));
+      }
+      closed = true;
+      for (const x of [voice, retiring]) if (x) x.sounding = false;
+      effects.clear();
+      liveSet.delete(live);
       for (const t of timers) clearTimeout(t);
       timers.clear();
       clearInterval(volTimer);
@@ -660,5 +716,7 @@ export function createMixer(opts: MixerOptions): MixerWithBed {
     get timeline() { return timeline; },
     get preloaded() { return preloaded; },
   };
+  const live: { owner: MixerOwner | "unknown"; sounding: () => string[] } = { owner: opts.owner ?? "unknown", sounding: () => [...open.keys()] };
+  liveSet.add(live);
   return mixer;
 }
