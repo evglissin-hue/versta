@@ -9,9 +9,12 @@ interface Live { owner: string; sounding: string[] }
 interface Ev { at: number; ch: string; ev: string; src: string; pos?: number }
 
 const live = (page: Page): Promise<Live[]> => page.evaluate(() => (window as unknown as { __verstaSound?: { live(): Live[] } }).__verstaSound?.live() ?? []);
-/** What is still sounding, nav speech left out ("<owner> <ch>:<src>"). */
+/**
+ * What is still sounding ("<owner> <ch>:<src>"), with turn speech and chimes left out: both sit on the nav queue, are
+ * a few seconds long and finish by themselves. Tests that care check separately that no new chime starts.
+ */
 async function sounding(page: Page): Promise<string[]> {
-  return (await live(page)).flatMap((m) => m.sounding.filter((s) => !s.startsWith("nav:")).map((s) => `${m.owner} ${s}`));
+  return (await live(page)).flatMap((m) => m.sounding.filter((s) => !s.startsWith("nav:") && !s.startsWith("signal:")).map((s) => `${m.owner} ${s}`));
 }
 /** Nothing but queued turn speech within 2 s (plus the round trip of the poll). */
 async function quiet(page: Page, why: string): Promise<void> {
