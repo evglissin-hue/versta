@@ -27,7 +27,7 @@ async function snapshot(page: Page): Promise<Snapshot> {
 async function ride(page: Page, entry: Entry, query: string): Promise<Snapshot> {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(`/?${query}`);
+  await page.goto(`/?page=routes&${query}`);
   const card = page.getByTestId("route-card").filter({ has: page.getByRole("heading", { name: entry.name, exact: true }) });
   await card.getByRole("button", { name: /^Ride/ }).click();
   await page.waitForFunction(() => window.__versta?.pack.value != null && window.__versta.nav.value.status !== "idle", null, { timeout: 15_000 });
