@@ -1,1 +1,78 @@
 /* The tutorial: the spotlight, the step card and its small pictures (task 34). Colours come from tokens.css only. */
+
+/* the overlay: above everything, the dim and its hole as one SVG path */
+.tour { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.tour-dim { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tour-dim path { fill: var(--scene-bg); fill-opacity: .74; pointer-events: auto; }
+/* the hole: it blocks taps unless the step lets them through */
+.tour-hole { position: absolute; border: 2px solid var(--mark); border-radius: 10px; pointer-events: auto; background: transparent; }
+.tour-hole.open { pointer-events: none; }
+
+/* the card */
+.tour-card { position: absolute; background: var(--paper); color: var(--ink); border: 2px solid var(--ink); padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; box-shadow: 0 4px 18px rgba(0, 0, 0, .45); outline: none; overflow: hidden; }
+.tour-head { display: flex; align-items: center; gap: 12px; min-height: 48px; }
+.tour-count { flex: 1; }
+.tour-close { margin-left: auto; }
+.tour-title { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 24px; line-height: 1.05; letter-spacing: .04em; text-transform: uppercase; }
+.tour-line { margin: 0; font-size: 18px; line-height: 1.35; }
+.tour-acts { display: flex; gap: 8px; margin-top: 6px; }
+.tour-acts .btn { flex: 1 1 0; min-height: 48px; padding: 8px 10px; }
+/* not enough room above or below the lit part: the picture goes and the card shrinks */
+.tour-card.tight { padding: 8px 12px 12px; gap: 2px; }
+.tour-card.tight .tp { display: none; }
+.tour-card.tight .tour-line { font-size: 17px; line-height: 1.25; }
+
+/* the pictures: ink strokes, the mark colour for the moving part, transforms and opacity only */
+.tp { flex: none; color: var(--ink); overflow: visible; }
+.tp * { transform-box: fill-box; transform-origin: center; }
+.tp .arc { opacity: .25; animation: tp-arc 2.4s ease-in-out infinite; }
+.tp .arc.a1 { animation-delay: 0s; } .tp .arc.a2 { animation-delay: .25s; } .tp .arc.a3 { animation-delay: .5s; }
+.tp-speaker .arc { opacity: 1; animation-name: tp-arc-speaker; }
+.tp-aside .arc { opacity: 0; }
+@keyframes tp-arc { 0%, 15% { opacity: 0; } 35%, 70% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@keyframes tp-arc-speaker { 0%, 15% { opacity: .2; } 35%, 70% { opacity: 1; } 90%, 100% { opacity: .2; } }
+/* 1: the distance ticks down */
+.tp-turn .d { opacity: 0; }
+.tp-turn .d1 { opacity: 1; animation: tp-d1 3s steps(1, end) infinite; }
+.tp-turn .d2 { animation: tp-d2 3s steps(1, end) infinite; }
+.tp-turn .d3 { animation: tp-d3 3s steps(1, end) infinite; }
+.tp-turn .head { animation: tp-nudge 3s ease-in-out infinite; }
+@keyframes tp-d1 { 0% { opacity: 1; } 33% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes tp-d2 { 0%, 32% { opacity: 0; } 33% { opacity: 1; } 66% { opacity: 0; } 100% { opacity: 0; } }
+@keyframes tp-d3 { 0%, 65% { opacity: 0; } 66% { opacity: 1; } 100% { opacity: 1; } }
+@keyframes tp-nudge { 0%, 60% { transform: translateX(0); } 80%, 100% { transform: translateX(-3px); } }
+/* 2: the map arrow comes back to the middle */
+.tp-mapbtn .nav { animation: tp-recentre 2.6s ease-in-out infinite; }
+@keyframes tp-recentre { 0% { transform: translate(0, 0) rotate(0); } 30% { transform: translate(8px, 6px) rotate(25deg); } 70%, 100% { transform: translate(0, 0) rotate(0); } }
+/* 3: the progress bar fills */
+.tp-dock .fill { transform-origin: left center; transform: scaleX(.15); animation: tp-fill 2.8s ease-in-out infinite; }
+@keyframes tp-fill { 0% { transform: scaleX(.15); } 80%, 100% { transform: scaleX(.8); } }
+/* 4: a finger taps the right, the last tick lights */
+.tp-tap .tick { opacity: 0; animation: tp-tick 2.4s steps(1, end) infinite; }
+.tp-tap .finger { animation: tp-tapdown 2.4s ease-in-out infinite; }
+@keyframes tp-tick { 0%, 40% { opacity: 0; } 41%, 100% { opacity: 1; } }
+@keyframes tp-tapdown { 0%, 25%, 100% { transform: translateY(0); } 40% { transform: translateY(5px); } 55% { transform: translateY(0); } }
+/* 5: the pause bars press */
+.tp-pause .bar { animation: tp-press 2.4s ease-in-out infinite; }
+@keyframes tp-press { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
+/* 6: the story card slides down into the bar */
+.tp-scene .card { animation: tp-slide 2.8s ease-in-out infinite; }
+@keyframes tp-slide { 0%, 20% { transform: translateY(0) scaleY(1); } 70%, 100% { transform: translateY(28px) scaleY(.2); } }
+/* 7: the stop square pulses */
+.tp-mini .stopsq { animation: tp-pulse 2.4s ease-in-out infinite; }
+@keyframes tp-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+/* 8: a marker passes and the sound arcs open */
+.tp-aside .marker { transform: translateX(0); animation: tp-pass 3s ease-in-out infinite; }
+.tp-aside .arc { animation-name: tp-arc-aside; animation-duration: 3s; }
+@keyframes tp-pass { 0% { transform: translateX(-4px); } 60%, 100% { transform: translateX(10px); } }
+@keyframes tp-arc-aside { 0%, 35% { opacity: 0; } 55%, 80% { opacity: 1; } 100% { opacity: 0; } }
+/* the flag */
+.tp-flag .flagcloth { transform-origin: left center; animation: tp-wave 2.4s ease-in-out infinite; }
+@keyframes tp-wave { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.88); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tp *, .tp-turn .d, .tp-turn .d1 { animation: none !important; }
+  .tp .arc { opacity: 1; }
+  .tp-aside .arc { opacity: 1; }
+  .tp-tap .tick { opacity: 0; }
+}
