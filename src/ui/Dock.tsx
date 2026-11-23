@@ -24,11 +24,14 @@ export function Dock() {
       {np?.kind === "story" && !sceneOpen.value ? (
         <div class="mini" data-testid="mini-bar">
           <div class="mini-title"><span class="label">Story playing</span><strong>{np.story.title}</strong></div>
-          {canRewind(np.manual, currentDirector()) ? <button type="button" class="btn small ghost" data-testid="mini-back" onClick={() => currentDirector()?.rewind?.(15)}>Back 15 s</button> : null}
-          <button type="button" class="btn small" onClick={() => (np.manual ? currentDirector()?.nextParagraph() : currentDirector()?.togglePause())}>
-            {np.manual ? "Next" : np.paused ? "Resume" : "Pause"}
-          </button>
-          <button type="button" class="btn small play" onClick={() => { sceneOpen.value = true; }}>Open</button>
+          <div class="mini-btns">
+            {canRewind(np.manual, currentDirector()) ? <button type="button" class="btn small ghost" data-testid="mini-back" onClick={() => currentDirector()?.rewind?.(15)}>Back 15 s</button> : null}
+            <button type="button" class="btn small" onClick={() => (np.manual ? currentDirector()?.nextParagraph() : currentDirector()?.togglePause())}>
+              {np.manual ? "Next" : np.paused ? "Resume" : "Pause"}
+            </button>
+            <button type="button" class="btn small ghost" data-testid="mini-stop" onClick={() => { const d = currentDirector(); if (d) d.stopAll(); else nowPlaying.value = null; }}>Stop</button>
+            <button type="button" class="btn small play" onClick={() => { sceneOpen.value = true; }}>Open</button>
+          </div>
         </div>
       ) : null}
       <div class="dock-label">
