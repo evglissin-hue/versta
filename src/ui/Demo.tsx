@@ -1,19 +1,22 @@
 import { useEffect } from "preact/hooks";
 import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, routeStatus, screen, settings, simulated, startChoice } from "../state";
 import type { Detour, LngLat, NavState, Pack, PackIndexEntry, RouteStatus } from "../types";
-import { nativeDemo } from "./Home";
+import { nativeDemo } from "./Routes";
 import { nearbyDemo } from "./Nearby";
-import { nearbyOpen, recordingsDemo, recordingsOpen, soundCheckOpen, demoRide, finishOpen, finishedAt, following, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
+import { tutorialSeen } from "../tour";
+import { nearbyOpen, pages, recordingsDemo, recordingsOpen, soundCheckOpen, demoRide, finishOpen, finishedAt, following, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
 
 /** Preview route /?demo=ride&step=N[&pack=<id>]: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings", "routes", "routes-held", "nearby", "nearby-playing"] as const;
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings", "routes", "routes-held", "nearby", "nearby-playing", "menu", "menu-continue", "menu-new", "settings", "about"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
 function shift(p: LngLat, dx: number, dy: number): LngLat {
   return [p[0] + dx / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + dy / 111320];
 }
 
-const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline", "routes", "routes-held", "nearby", "nearby-playing"];
+const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline", "routes", "routes-held", "nearby", "nearby-playing", "menu", "menu-continue", "menu-new", "settings", "about"];
+/** The home steps that show the Routes page. */
+const ROUTES_PAGE = ["continue", "first-ride", "loading", "load-failed", "offline", "routes", "routes-held"];
 
 /** The real index, kept so stepping away from the route-state demos puts it back. */
 let realIndex: PackIndexEntry[] = [];
@@ -58,6 +61,9 @@ function demoState(p: Pack, step: string): void {
   nativeDemo.value = routesStep;
   if (routesStep) { const r = routeCards(step); packIndex.value = r.cards; routeStatus.value = r.status; }
   else { packIndex.value = realIndex; routeStatus.value = {}; }
+  tutorialSeen.value = step !== "menu-new";
+  pages.value = ROUTES_PAGE.includes(step) ? ["menu", "routes"] : step === "settings" || step === "about" ? ["menu", step] : ["menu"];
+  if (step !== "continue" && step !== "menu-continue") { try { localStorage.removeItem("versta:ride"); } catch {} }
   screen.value = HOME_STEPS.includes(step) ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
   const tagged = p.asides.find((a) => a.tags.length > 0) ?? p.asides[0]!;
@@ -131,7 +137,7 @@ function demoState(p: Pack, step: string): void {
     }
     case "wrong-way": nav.value = { ...base, nextCue: null, toCue: null, wrongWay: true }; break;
     case "dock-time": nav.value = { ...base, nextCue: null, toCue: null, toStop: 1240, speedAvg: 4.1 }; break;
-    case "continue": {
+    case "continue": case "menu-continue": {
       const saved = { packId: p.id, seg: 5, arrived: [0, 1, 2, 3, 4], heard: [], startedAt: Date.now() - 3600000, savedAt: Date.now() };
       try { localStorage.setItem("versta:ride", JSON.stringify(saved)); } catch {}
       nav.value = IDLE_NAV;

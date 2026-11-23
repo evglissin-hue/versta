@@ -81,6 +81,27 @@ export const startFailure = signal<{ id: string; kind: "load" | "start"; resume:
 /** The device has no network. */
 export const netDown = signal(typeof navigator !== "undefined" && navigator.onLine === false);
 
+/** The pages of the home side, a stack with the menu at the bottom. The top one shows. A ride leaves it alone, so ending a ride returns to the page it started from. */
+export type Page = "menu" | "routes" | "settings" | "about";
+function startPages(): Page[] {
+  const q = typeof location !== "undefined" ? new URLSearchParams(location.search).get("page") : null;
+  return q === "routes" || q === "settings" || q === "about" ? ["menu", q] : ["menu"];
+}
+export const pages = signal<Page[]>(startPages());
+/** Open a page over the current one. Does nothing when it is already on top. */
+export function openPage(p: Page): void {
+  const now = pages.value;
+  if (now[now.length - 1] === p) return;
+  pages.value = [...now, p];
+}
+/** Go back one page. Returns false on the menu, where there is nothing to go back to. */
+export function backPage(): boolean {
+  const now = pages.value;
+  if (now.length <= 1) return false;
+  pages.value = now.slice(0, -1);
+  return true;
+}
+
 /** Back 15 s is offered when a recorded story is playing (not read by tapping) and the director can rewind. The preview has no director. */
 export function canRewind(manual: boolean, director: { rewind?: unknown } | null): boolean {
   if (manual) return false;
