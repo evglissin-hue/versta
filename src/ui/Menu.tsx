@@ -42,7 +42,6 @@ function ContinueCard({ saved }: { saved: NonNullable<ReturnType<typeof savedRid
 
 export function Menu() {
   const saved = savedRide();
-  const count = packIndex.value.length;
   return (
     <main class="home" data-testid="menu">
       <header class="home-top">
@@ -51,7 +50,7 @@ export function Menu() {
       </header>
       {saved ? <ContinueCard saved={saved} /> : null}
       <nav class="menu-list" aria-label="Menu">
-        <Row testid="menu-routes" icon={<Squiggle size={32} />} title="Routes" line="Bike rides and walks, with their stories." extra={count > 0 ? <span class="menu-count">{count}</span> : null} onClick={() => openPage("routes")} />
+        <Row testid="menu-routes" icon={<Squiggle size={32} />} title="Routes" line="Bike rides and walks, with their stories." onClick={() => openPage("routes")} />
         <Row testid="menu-nearby" icon={<PinIcon />} title="Nearby places" line="Stories of the places around you, off any route." onClick={() => { nearbyOpen.value = true; }} />
         <Row testid="menu-settings" icon={<SlidersIcon />} title="Settings" line="Voices, soundscape, map and riding." onClick={() => openPage("settings")} />
         <Row
