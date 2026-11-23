@@ -51,7 +51,7 @@ function end(): Card {
     id: "end", picture: "flag", title: "Ready to ride", line: "Pick a route, or come back to this from the menu.",
     actions: [
       { label: "Choose a route", primary: true, run: () => { endTutorial(); openPage("routes"); } },
-      { label: "Back to the menu", run: () => endTutorial() },
+      { label: "Menu", run: () => endTutorial() },
     ],
   };
 }

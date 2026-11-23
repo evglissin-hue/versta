@@ -18,7 +18,9 @@ export function practiceSteps(pack: Pack, pick: PracticePick, practice: Practice
   const storyId = pack.stops[pick.stop]!.stories.find((s) => s.kind === "core")!.id;
   const approach: NavEvent = { type: "cue", cue: pick.cue, phase: "approach" };
   let arrivedOnce = false;
-  let baseline: number | null = null;
+  /** Step 4 moves on only after a tap on the story: the voice also moves the paragraph on by itself. */
+  let tapped = false;
+  let hooked: Element | null = null;
   let asideGen = 0;
 
   const para = (): number => { const n = nowPlaying.value; return n?.kind === "story" ? n.para : -1; };
@@ -82,11 +84,16 @@ export function practiceSteps(pack: Pack, pick: PracticePick, practice: Practice
     { id: "buttons", target: q('[data-testid="map-controls"]'), title: "Map buttons", line: "The arrow keeps the map on you. The line shows the whole route.", picture: "mapbtn", interactive: true, enter: toBefore },
     { id: "dock", target: q('[aria-label="Ride controls"]'), title: "Where you are heading", line: "The next stop, how far and how long. End ride stops it all.", picture: "dock", enter: toBefore },
     {
-      id: "story", target: q('[data-testid="scene-tap"]'), title: "Tap to move on", line: "Tap the right of the story for the next part, the left to go back.", picture: "tap", waitMs: 8000, interactive: true,
-      enter: () => { baseline = null; toStory(); },
-      done: () => { const p = para(); if (p < 0) return false; if (baseline === null) { baseline = p; return false; } return p > baseline; },
+      // the paragraph only, not the whole story body, so the card has room for its buttons
+      id: "story", target: q('[data-testid="scene-tap"] .scene-text'), title: "Tap to move on", line: "Tap the right of the story for the next part, the left to go back.", picture: "tap", waitMs: 8000, interactive: true,
+      enter: () => { tapped = false; toStory(); },
+      done: () => {
+        const body = document.querySelector('[data-testid="scene-tap"]');
+        if (body && body !== hooked) { hooked = body; body.addEventListener("click", () => { tapped = true; }); }
+        return tapped && para() >= 0;
+      },
     },
-    { id: "foot", target: q('[data-testid="scene-foot"]'), title: "Pause or close", line: "Pause holds the voice and the music. Back 15 s repeats the last words.", picture: "pause", interactive: true, enter: () => toStory() },
+    { id: "foot", target: q('[data-testid="scene-foot"]'), title: "Pause or close", line: "Pause holds the voice and the music. Close story ends it.", picture: "pause", interactive: true, enter: () => toStory() },
     { id: "map", target: q('[data-testid="scene-map"]'), title: "Listen with the map", line: "Map keeps the story playing. Back stops it.", picture: "scene", interactive: true, enter: () => toStory(), done: () => !sceneOpen.value },
     {
       id: "mini", target: q('[data-testid="mini-bar"]'), title: "The story goes on", line: "Pause it, stop it, or open it again here.", picture: "mini", waitMs: 3000, interactive: true,

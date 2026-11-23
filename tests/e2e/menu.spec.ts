@@ -11,7 +11,8 @@ test("the menu shows its rows in order, and no Continue without a saved ride", a
   const ids = await page.locator("[data-testid^=menu-]").evaluateAll((els) => els.map((e) => e.getAttribute("data-testid")).filter((x) => x && !["menu", "menu-dot", "menu-continue"].includes(x)));
   expect(ids).toEqual(ROWS);
   await expect(page.getByTestId("menu-routes")).toContainText("Bike rides and walks, with their stories.");
-  await expect(page.getByTestId("menu-routes")).toContainText(/\d/);
+  // no bare count beside Routes: it read as a time next to the tutorial's "2 min"
+  await expect(page.getByTestId("menu-routes")).not.toContainText(/\d/);
 });
 
 for (const [row, page_, title] of [["menu-routes", "route-card", "Routes"], ["menu-settings", "settings-page", "Settings"], ["menu-about", "about-page", "About"]] as const) {

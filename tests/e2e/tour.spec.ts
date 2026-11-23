@@ -11,7 +11,7 @@ interface Ev { at: number; ch: string; ev: string; src: string; pos?: number }
 const IDS = ["turn", "buttons", "dock", "story", "foot", "map", "mini", "aside"];
 /** What each step lights, for the geometry check. */
 const TARGETS: Record<string, string> = {
-  turn: '[data-testid="banner"]', buttons: '[data-testid="map-controls"]', dock: '[aria-label="Ride controls"]', story: '[data-testid="scene-tap"]',
+  turn: '[data-testid="banner"]', buttons: '[data-testid="map-controls"]', dock: '[aria-label="Ride controls"]', story: '[data-testid="scene-tap"] .scene-text',
   foot: '[data-testid="scene-foot"]', map: '[data-testid="scene-map"]', mini: '[data-testid="mini-bar"]', aside: '[data-testid="aside-card"]',
 };
 
@@ -68,6 +68,9 @@ test.describe("every step, at every size, in light and dark", () => {
           if (card.left < 0 || card.top < 0 || card.right > (vw as number) + e || card.bottom > (vh as number) + e) return `card off screen ${JSON.stringify(card)}`;
           if (card.left < 15 || card.right > (vw as number) - 15) return `card too near the edge ${JSON.stringify(card)}`;
           if (card.left < hole.right && hole.left < card.right && card.top < hole.bottom && hole.top < card.bottom) return `card ${JSON.stringify(card)} over hole ${JSON.stringify(hole)}`;
+          // the card's buttons are never cut off: Next lies wholly inside the card and on screen
+          const next = document.querySelector('[data-testid="tour-next"]')?.getBoundingClientRect();
+          if (!next || next.height < 47.5 || next.top < card.top - e || next.bottom > card.bottom + e || next.bottom > (vh as number) + e) return `Next cut off ${JSON.stringify(next)} in card ${JSON.stringify(card)}`;
           return "ok";
         }, [TARGETS[IDS[i]!], w, h]), { message: `step ${IDS[i]}`, timeout: 5000, intervals: [100] }).toBe("ok");
         // every control on the card is 48 px
@@ -97,8 +100,8 @@ test("the sound is real: the turn, the arrival, a tap on the story, Map and the 
   // a tap on the right of the story: the paragraph and the voice move on to the next mark
   const marks = await page.evaluate(() => { const n = window.__versta!.nowPlaying.value; return n?.kind === "story" ? n.story.audio!.marks : []; });
   const before = await page.evaluate(() => { const n = window.__versta!.nowPlaying.value; return n?.kind === "story" ? n.para : -1; });
-  const box = (await page.getByTestId("scene-tap").boundingBox())!;
-  await page.mouse.click(box.x + box.width * 0.85, box.y + box.height * 0.4);
+  const box = (await page.locator('[data-testid="scene-tap"] .scene-text').boundingBox())!;
+  await page.mouse.click(box.x + box.width * 0.85, box.y + box.height * 0.5);
   await expect.poll(() => page.evaluate(() => { const n = window.__versta!.nowPlaying.value; return n?.kind === "story" ? n.para : -1; })).toBe(before + 1);
   await expect.poll(async () => (await timeline(page)).filter((e) => e.ch === "voice" && e.ev === "on").some((e) => Math.abs((e.pos ?? -1) - marks[before + 1]!) < 0.5), { timeout: 5000 }).toBe(true);
   // the step moves on by itself once the paragraph has moved
