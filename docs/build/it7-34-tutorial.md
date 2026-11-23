@@ -83,7 +83,8 @@ An automated run checks that every step lights the right part with the card on s
   buttons Choose a route (ends the practice ride and opens Routes: `openPage("routes")`) and Back to the menu.
 - Closing at any point (Close, Escape, the phone's Back, Done, End ride in the dock): `endRide()` ends the practice
   ride, which disposes its mixer: every sound stops. The tour also ends by itself when the practice ride ends
-  (`practice` goes false).
+  (`practice` goes false). If the tour is closed while `loadPack` or `startPractice` is still pending (Close straight
+  after Start), end the practice ride the moment it resolves, so no ride screen is left without its tour.
 - `Banner.tsx`: the tag reads "Practice" when `practice` is true, else "Simulated" as now.
 
 ### Pictures
