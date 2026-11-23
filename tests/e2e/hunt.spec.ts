@@ -80,7 +80,10 @@ test.describe("a story at a stop", () => {
     await back(page);
     await expect(page.getByTestId("scene")).toHaveCount(0);
     await quiet(page, "Back on the scene");
-    // play it again from the stop sheet, put it under the map, then Back
+    // play it again from the stop's sheet (the simulated rider rides on once nothing plays, so open it from the
+    // stops list), put it under the map, then Back
+    await page.getByRole("button", { name: /^Stops/ }).click();
+    await page.getByTestId("stops-list").locator(".stoprow").nth(1).click();
     const sheet = page.getByTestId("stop-sheet");
     await expect(sheet).toBeVisible();
     await sheet.getByRole("button", { name: /^Play/ }).first().click();

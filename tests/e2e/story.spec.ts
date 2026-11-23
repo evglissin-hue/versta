@@ -62,7 +62,7 @@ test("the passing-by card has a Stop", async ({ page }) => {
 });
 
 async function startSim(page: Page): Promise<void> {
-  await page.goto("/?sim=1&speed=5&scale=8&virtual=1");
+  await page.goto("/?sim=1&speed=5&scale=8&virtual=1&page=routes");
   await page.getByRole("button", { name: /^Ride/ }).first().click();
   await page.waitForFunction(() => window.__versta?.nowPlaying.value?.kind === "story", null, { timeout: 90_000 });
 }
@@ -103,13 +103,13 @@ test("nearby: a right tap moves the text on, Back on the panel stops it", async 
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 51.5056, longitude: -0.0756 });
   await page.goto("/");
-  await page.getByTestId("nearby-open").click();
+  await page.getByTestId("menu-nearby").click();
   await page.getByTestId("nearby-row").first().getByRole("button", { name: /^Play/ }).click();
   const text = page.getByTestId("nearby-text");
   await expect(text).not.toBeEmpty();
   const first = await text.textContent();
   const box = (await page.getByTestId("nearby-tap").boundingBox())!;
-  // Until the real mixer's seekVoiceTo exists (task 32) the playhead pulls the text back, so watch for the change itself.
+  // watch for the change itself, and then that it holds: the voice jumps with the text, so the playhead keeps it there
   await page.evaluate(() => {
     const w = window as unknown as { __changed: boolean };
     w.__changed = false;
@@ -118,6 +118,8 @@ test("nearby: a right tap moves the text on, Back on the panel stops it", async 
   await page.mouse.click(box.x + box.width * 0.85, box.y + box.height * 0.4);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __changed: boolean }).__changed)).toBe(true);
   expect(first).not.toBeNull();
+  await page.waitForTimeout(1500);
+  expect(await text.textContent()).not.toBe(first);
   await page.getByTestId("nearby-back").click();
   await expect(page.getByTestId("nearby-panel")).toHaveCount(0);
 });

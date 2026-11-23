@@ -266,10 +266,9 @@ export function Nearby() {
     if (!p) return;
     const marks = p.text.marks;
     const last = p.text.paras.length - 1;
-    const to = p.para + delta;
-    if (to > last) { stop(); return; }
-    if (to < 0) { void play(p.place); return; }
-    const t = marks?.[to];
+    if (p.para + delta > last) { stop(); return; }
+    const to = Math.max(0, p.para + delta);
+    const t = marks?.[to] ?? (to === 0 ? 0.1 : undefined);
     if (t !== undefined) mixer.current?.seekVoiceTo?.(Math.max(0, t - 0.1));
     setPlaying({ ...p, para: to });
   }

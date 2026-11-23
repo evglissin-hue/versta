@@ -63,7 +63,10 @@ function demoState(p: Pack, step: string): void {
   else { packIndex.value = realIndex; routeStatus.value = {}; }
   tutorialSeen.value = step !== "menu-new";
   pages.value = ROUTES_PAGE.includes(step) ? ["menu", "routes"] : step === "settings" || step === "about" ? ["menu", step] : ["menu"];
-  if (step !== "continue" && step !== "menu-continue") { try { localStorage.removeItem("versta:ride"); } catch {} }
+  // a preview on a real phone must never lose the rider's own saved ride: only the demo's made-up one is removed
+  if (step !== "continue" && step !== "menu-continue") {
+    try { if ((JSON.parse(localStorage.getItem("versta:ride") ?? "null") as { demo?: boolean } | null)?.demo) localStorage.removeItem("versta:ride"); } catch {}
+  }
   screen.value = HOME_STEPS.includes(step) ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
   const tagged = p.asides.find((a) => a.tags.length > 0) ?? p.asides[0]!;
@@ -139,7 +142,7 @@ function demoState(p: Pack, step: string): void {
     case "dock-time": nav.value = { ...base, nextCue: null, toCue: null, toStop: 1240, speedAvg: 4.1 }; break;
     case "continue": case "menu-continue": {
       const saved = { packId: p.id, seg: 5, arrived: [0, 1, 2, 3, 4], heard: [], startedAt: Date.now() - 3600000, savedAt: Date.now() };
-      try { localStorage.setItem("versta:ride", JSON.stringify(saved)); } catch {}
+      try { localStorage.setItem("versta:ride", JSON.stringify({ ...saved, demo: true })); } catch {}
       nav.value = IDLE_NAV;
       break;
     }

@@ -1,7 +1,7 @@
 /* The main menu and its pages: Routes, Settings, About (task 31). Colours come from tokens.css only. */
 
 /* the list of rows */
-.menu-list { display: flex; flex-direction: column; border-top: 2px solid var(--ink); }
+.menu-list { display: flex; flex-direction: column; }
 .menu-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 10px 0; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; color: var(--ink); }
 .menu-row:active { background: var(--shoal); }
 .menu-icon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; }
