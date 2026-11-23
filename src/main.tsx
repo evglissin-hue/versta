@@ -9,6 +9,8 @@ import { initNative } from "./native";
 import { closeTopOverlay } from "./ui/back";
 import "./styles/tokens.css";
 import "./styles/app.css";
+import "./styles/menu.css";
+import "./styles/tour.css";
 
 // Inside the Android app: no service worker, and the back button closes the top sheet before anything else.
 initNative();

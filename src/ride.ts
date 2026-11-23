@@ -11,12 +11,17 @@ import { createDirector } from "./story/director";
 import { beginRecording, type RideRecorder } from "./record/recorder";
 import { isNative } from "./native/platform";
 import { ensurePermission, rideNotice } from "./native/notify";
-import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated, startChoice } from "./state";
-import type { Director, Fix, FixSource, LngLat, Mixer, NavEngine, Pack, RouteGraph, SoundEvent, StartChoice } from "./types";
+import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, practice, screen, settings, simulated, startChoice } from "./state";
+import type { Director, Fix, FixSource, LngLat, Mixer, NavEngine, NavEvent, NavState, Pack, RouteGraph, Settings, SoundEvent, StartChoice } from "./types";
 
 export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean }
 
-interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number; stopEffects: () => void; rec: RideRecorder | null }
+interface Ride {
+  pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number;
+  stopEffects: () => void; rec: RideRecorder | null;
+  /** The tutorial's practice ride: no position source, never saved, recorded or notified. */
+  practice: boolean;
+}
 const BED_LEVELS = { soft: 0.6, balanced: 1, rich: 1.6 } as const;
 /** How long the simulated rider stands after arriving before a story has started: the director's arrival lead plus a margin. */
 const ARRIVAL_HOLD_MS = 4000;
@@ -54,8 +59,8 @@ function saveRide(): void {
   const saved: SavedRide = { packId: ride.pack.id, seg: st.seg, arrived: [...st.arrived], heard: [...ride.director.heard], startedAt: ride.startedAt, savedAt: Date.now() };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch {}
 }
-/** When the current ride started, in milliseconds, or null with no ride. */
-export function rideStartedAt(): number | null { return ride?.startedAt ?? null; }
+/** When the current ride started, in milliseconds, or null with no ride (a practice ride counts as none). */
+export function rideStartedAt(): number | null { return ride && !ride.practice ? ride.startedAt : null; }
 
 /** Simulator settings from the URL: ?sim=1&speed=5&scale=20&from=0&virtual=1 */
 export function simFromUrl(): SimOptions | null {
@@ -86,7 +91,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   if (!sim) void import("./places/watch").then((m) => m.stopPlaceWatch()).catch(() => {});
   const source = sim ? createSimSource(p, sim) : createGpsSource();
   const clock = (): number => (source.now ? source.now() : Date.now());
-  const mixer = createMixer({ baseUrl: packBase(p.id), virtual: sim?.virtualAudio ?? false, timeScale: sim?.scale ?? 1, clock });
+  const mixer = createMixer({ baseUrl: packBase(p.id), virtual: sim?.virtualAudio ?? false, timeScale: sim?.scale ?? 1, clock, owner: "ride" });
   await mixer.unlock();
   // the next turn on the lock screen (Android): asked once, the ride works without it
   if (!sim) void ensurePermission();
@@ -110,7 +115,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   const stopEffects = effect(() => { mixer.setBedLevel?.(BED_LEVELS[settings.value.bedLevel] ?? 1); });
   // every real ride is recorded on the device, so a problem met on the road can be replayed as a test
   const rec = sim ? null : beginRecording({ packId: p.id, version: packIndex.value.find((e) => e.id === p.id)?.version ?? null, startAt: 0, app: isNative() ? "android" : "web" });
-  ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects, rec };
+  ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects, rec, practice: false };
   let lastFix: Fix | null = null;
   chooseHook = (stop: number) => {
     if (!choosing || ride?.engine !== engine) return;
@@ -132,7 +137,7 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   if (p.graph && engine.setGraph) {
     void fetch(`${packBase(p.id)}${p.graph}`).then((r) => (r.ok ? r.json() : null)).then((g: RouteGraph | null) => { if (g && ride?.engine === engine) engine.setGraph?.(g); }).catch(() => {});
   }
-  simulated.value = !!sim; gpsError.value = null; directorLog.value = []; openStop.value = null; startChoice.value = null;
+  simulated.value = !!sim; practice.value = false; gpsError.value = null; directorLog.value = []; openStop.value = null; startChoice.value = null;
   nav.value = { ...IDLE_NAV, status: "locating" };
   // A real ride from the beginning asks where to start when the rider is far from stop 1 and nearer another stop.
   // Until the rider chooses, the engine sees no fix: no guidance, no speech. (Simulated rides choose by URL.)
@@ -161,40 +166,109 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
       ride.rec?.events(fix.time, events);
       nav.value = { ...engine.state };
       if (!sim) rideNotice.update(engine.state, p);
-      director.handle(events, engine.state);
-      for (const e of events) {
-        if (e.type === "finished") ride.rec?.end();
-        if (e.type === "arrive") {
-          openStop.value = e.stop; buzz([60, 80, 60]);
-          // the simulated rider stands through the short lead before a stop's first story, as a real one would
-          if (sim && source.hold) {
-            source.hold(true);
-            // after an arrival the engine is already on the next leg: release only while it still is, and nothing plays
-            const leg = engine.state.seg;
-            setTimeout(() => { if (ride?.source === source && nowPlaying.value === null && engine.state.seg === leg) source.hold?.(false); }, ARRIVAL_HOLD_MS / (sim.scale > 0 ? sim.scale : 1));
-          }
-        }
-        else if (e.type === "cue" && e.phase === "now" && e.cue.turn !== "depart" && e.cue.turn !== "straight") buzz(40);
-        else if (e.type === "off_route" || e.type === "wrong_way") buzz([30, 60, 30, 60, 30]);
-        // riding away puts the map and the turn banner back in view without a tap
-        else if (e.type === "leave" && openStop.value === e.stop) openStop.value = null;
-      }
+      deliver(ride, events, engine.state, sim);
     },
     (error) => { gpsError.value = error; },
   );
 }
 
-/** End the ride. A rider who ends it on purpose does not get "Continue ride" offered again. */
+/**
+ * Hand the events of one fix to the director and do what the screen does for them: open a stop's sheet on arrival,
+ * close it on leaving, buzz at turns. Shared by rides and the practice ride (whose events come from the tour).
+ */
+function deliver(r: Ride, events: NavEvent[], state: NavState, sim: SimOptions | null): void {
+  r.director.handle(events, state);
+  for (const e of events) {
+    if (e.type === "finished") r.rec?.end();
+    if (e.type === "arrive") {
+      openStop.value = e.stop; buzz([60, 80, 60]);
+      // the simulated rider stands through the short lead before a stop's first story, as a real one would
+      const { source, engine } = r;
+      if (sim && source.hold) {
+        source.hold(true);
+        // after an arrival the engine is already on the next leg: release only while it still is, and nothing plays
+        const leg = engine.state.seg;
+        setTimeout(() => { if (ride?.source === source && nowPlaying.value === null && engine.state.seg === leg) source.hold?.(false); }, ARRIVAL_HOLD_MS / (sim.scale > 0 ? sim.scale : 1));
+      }
+    }
+    else if (e.type === "cue" && e.phase === "now" && e.cue.turn !== "depart" && e.cue.turn !== "straight") buzz(40);
+    else if (e.type === "off_route" || e.type === "wrong_way") buzz([30, 60, 30, 60, 30]);
+    // riding away puts the map and the turn banner back in view without a tap
+    else if (e.type === "leave" && openStop.value === e.stop) openStop.value = null;
+  }
+}
+
+/** What the tour hands the practice ride (task 34). */
+export interface Practice {
+  /** Show this nav state and hand these events to the director, as one fix of a ride would. */
+  feed(state: NavState, events: NavEvent[]): void;
+  /** Move the practice ride's clock on: the director's pacing rules see this many more milliseconds of riding. */
+  skipAhead(ms: number): void;
+  /** False once the practice ride has ended (End ride, the tour closing, another ride starting). */
+  readonly live: boolean;
+}
+
+/** The practice ride sounds like a ride with every voice and layer on, whatever the rider has switched off. */
+function practiceSettings(s: Settings): Settings {
+  return { ...s, storyVoice: true, navVoice: true, ambience: true, music: true, autoPlayStories: true, asides: s.asides === "off" ? "sparse" : s.asides };
+}
+
+/**
+ * Start the tutorial's practice ride on `p` (task 34): the real ride screen, director and mixer, with no position
+ * source and no engine updates. The tour sets the nav state and hands the director its events through `feed`. It is
+ * simulated, so nothing is saved, recorded or notified, and the rider's saved ride is never touched; `endRide` ends
+ * it like any ride. Call it from a tap: it unlocks audio. `?virtual=1` makes its mixer virtual (tests).
+ */
+export async function startPractice(p: Pack): Promise<Practice> {
+  endRide(false);
+  let skew = 0;
+  const clock = (): number => Date.now() + skew;
+  const virtual = new URLSearchParams(location.search).get("virtual") === "1";
+  const mixer = createMixer({ baseUrl: packBase(p.id), virtual, clock, owner: "practice" });
+  await mixer.unlock();
+  const engine = createNavEngine(p);
+  const source: FixSource = { start() {}, stop() {} };
+  const director = createDirector({
+    pack: p, mixer, clock, timeScale: 1,
+    settings: () => practiceSettings(settings.value),
+    onNowPlaying: (now) => { nowPlaying.value = now; },
+    onLog: (entry) => { directorLog.value = [...directorLog.value.slice(-400), entry]; },
+  });
+  const stopEffects = effect(() => { mixer.setBedLevel?.(BED_LEVELS[settings.value.bedLevel] ?? 1); });
+  const r: Ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: Date.now(), stopEffects, rec: null, practice: true };
+  ride = r;
+  chooseHook = null;
+  simulated.value = true; practice.value = true; gpsError.value = null; directorLog.value = []; openStop.value = null; startChoice.value = null;
+  nav.value = { ...IDLE_NAV, status: "locating" };
+  screen.value = "ride";
+  document.addEventListener("visibilitychange", onVisible);
+  return {
+    feed(state, events) {
+      if (ride !== r) return;
+      nav.value = state;
+      deliver(r, events, state, null);
+    },
+    skipAhead(ms) { if (Number.isFinite(ms) && ms > 0) skew += ms; },
+    get live() { return ride === r; },
+  };
+}
+
+/**
+ * End the ride. A rider who ends it on purpose does not get "Continue ride" offered again. A practice ride never
+ * touches the saved ride.
+ */
 export function endRide(forget = true): void {
   if (!ride) return;
-  if (forget) forgetSavedRide();
+  const real = !ride.practice;
+  if (forget && real) forgetSavedRide();
   document.removeEventListener("visibilitychange", onVisible);
   ride.rec?.tap("end"); ride.rec?.end();
-  void rideNotice.clear();
+  if (real) void rideNotice.clear();
   ride.stopEffects(); ride.source.stop(); ride.director.stopAll(); ride.director.dispose(); ride.mixer.dispose?.();
   void ride.wake?.release().catch(() => {});
   ride = null; chooseHook = null; startChoice.value = null;
-  routesRideEnded();
+  if (real) routesRideEnded();
+  practice.value = false; simulated.value = false;
   nav.value = IDLE_NAV; nowPlaying.value = null; openStop.value = null; screen.value = "home";
 }
 
@@ -226,7 +300,8 @@ export function chooseStart(stop: number): void { chooseHook?.(stop); }
 
 /** Rider chose to head for another stop (skipped one, or joined the route part way). */
 export function jumpToStop(stop: number): void {
-  if (!ride) return;
+  // the practice ride's nav state comes from the tour, not the engine
+  if (!ride || ride.practice) return;
   ride.rec?.tap("jump", stop);
   ride.engine.jumpToSegment(stop);
   nav.value = { ...ride.engine.state };

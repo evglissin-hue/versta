@@ -23,6 +23,11 @@ export const directorLog = signal<DirectorLogEntry[]>([]);
 export const openStop = signal<number | null>(null);
 /** True when the ride is driven by the built-in simulator instead of the device GPS. */
 export const simulated = signal(false);
+/**
+ * True while the ride on screen is the tutorial's practice ride (src/ride.ts `startPractice`, driven by src/tour).
+ * `simulated` is true then too. Nothing of a practice ride is saved or recorded.
+ */
+export const practice = signal(false);
 
 export function updateSettings(patch: Partial<Settings>): void {
   settings.value = { ...settings.value, ...patch };

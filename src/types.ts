@@ -486,9 +486,24 @@ export interface Mixer {
    * last break at or before the target when the clip has breaks. Does nothing when no voice clip is loaded.
    */
   seekVoice?(deltaSeconds: number): void;
+  /**
+   * Move the voice playhead to exactly `seconds` into the clip (clamped to the clip), with the same short fade as
+   * seekVoice and no snapping to breaks. A tap to the next or previous paragraph lands here (task 32). Does nothing
+   * when no voice clip is loaded.
+   */
+  seekVoiceTo?(seconds: number): void;
+  /**
+   * Fade out every effect still sounding (story effects from playEffect) over `fadeSeconds` (default 0.3), then stop
+   * them. Effects started afterwards play as usual. A story that is stopped, skipped or paused takes its effects with
+   * it (task 32).
+   */
+  stopEffects?(fadeSeconds?: number): void;
   /** Scale the soundscape and music: 1 is the designed balance. */
   setBedLevel?(level: number): void;
-  /** Stop everything and release the audio context (the Sound check screen makes and drops its own mixer). */
+  /**
+   * Stop everything at once and release the audio context (the screens that make their own mixer drop it when they
+   * close). Every sound still on the timeline gets its `off` at this moment, and the mixer leaves the live list.
+   */
   dispose?(): void;
   /** True while the nav channel is speaking (a signal counts). */
   readonly navBusy: boolean;
@@ -504,7 +519,19 @@ export interface MixerOptions {
   timeScale?: number;
   /** Clock for the sound timeline and for the 20 s pause rule, milliseconds. Defaults to Date.now. */
   clock?: Clock;
+  /** Who made this mixer, for the live list (window.__verstaSound). Defaults to "unknown". */
+  owner?: MixerOwner;
 }
+
+/** The screens that make their own mixer. Only one of them should be heard at a time. */
+export type MixerOwner = "ride" | "practice" | "nearby" | "soundcheck";
+
+/**
+ * One mixer that exists right now, as `window.__verstaSound.live()` lists them (task 32): the dead-end hunt checks
+ * that nothing is left sounding after the rider leaves what started it. `sounding` holds "<ch>:<src>" for every `on`
+ * on the mixer's timeline that has no `off` yet (a sound fading out still counts).
+ */
+export interface LiveMixer { owner: MixerOwner | "unknown"; sounding: string[] }
 
 /* ------------------------------------------------------------------ director */
 
@@ -547,11 +574,31 @@ export interface Director {
   playStory(stop: number, storyId: string): void;
   /** Play the unheard stories at a stop, core first. */
   playStop(stop: number): void;
+  /**
+   * The rider's pause. Pausing fades the voice, and the story's soundscape and music to silence within 1 s, and stops
+   * its effects; resuming brings them back (task 32).
+   */
   togglePause(): void;
   /** Read-by-tapping mode (story voice off or audio failed): go to the next paragraph. */
   nextParagraph(): void;
-  /** Skip to the next queued story, or end the story view when none is left. */
+  /**
+   * Move the story on screen to the next (+1) or previous (-1) paragraph: a tap on the story text (task 32). A
+   * recorded story's voice jumps to the start of that paragraph (its mark); a story read by tapping shows it. +1 on
+   * the last paragraph does what skip() does. -1 on the first paragraph goes back to its start. The effects of the
+   * paragraph landed on sound at once, effects jumped over never sound, and going back arms them again. A paused
+   * story stays paused at the new place. Does nothing while an aside plays, or when no story is on screen.
+   */
+  stepPara?(delta: 1 | -1): void;
+  /**
+   * Skip to the next queued story. When none is left the story view closes in silence: no close signal, the bed fades
+   * within 1.5 s and does not linger (task 32). Only a story that ends by itself gets the close signal and the linger.
+   */
   skip(): void;
+  /**
+   * The rider's Back or Stop: end the story, its queue, a story about to start on arrival and any passing-by story,
+   * at once and in silence (no signal). The voice fades in 0.15 s, the bed within 1.5 s, effects within 0.3 s. Turn
+   * cues already queued still speak.
+   */
   stopAll(): void;
   /** Story ids the rider has started. */
   readonly heard: ReadonlySet<string>;
