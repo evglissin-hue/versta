@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import catalogue from "../audio/catalogue.json";
 import { recorded } from "../audio/library";
 import { createMixer } from "../audio/mixer";
-import { currentDirector, currentMixer } from "../ride";
+import { currentDirector } from "../ride";
 import { nowPlaying, packBase, packIndex } from "../state";
 import type { Mixer, SignalName } from "../types";
 import { Sheet } from "./Sheet";
@@ -64,21 +64,25 @@ export function SoundCheck() {
   const [effects, setEffects] = useState<string[]>([]);
   const [narrator, setNarrator] = useState(false);
   const [note, setNote] = useState("");
+  const stopAllRef = useRef<() => void>(() => {});
   const bed = useRef<{ a: string | null; m: string | null }>({ a: null, m: null });
 
   useEffect(() => {
     alive.current = true;
-    // A ride may be running underneath: pause its story and let its bed go quiet. The rider taps Resume afterwards.
+    // A ride may be running underneath: pause its story (the pause fades its bed) and stop a passing-by story.
     const np = nowPlaying.value;
     if (np?.kind === "story" && !np.paused) currentDirector()?.togglePause();
-    currentMixer()?.stopBed(0.5);
-    return () => { alive.current = false; loopOn.current = false; mixer.current?.dispose?.(); mixer.current = null; };
+    else if (np?.kind === "aside") currentDirector()?.stopAll();
+    // Going to the background stops everything the sound check is playing.
+    const hide = (): void => { if (document.visibilityState === "hidden") stopAllRef.current(); };
+    document.addEventListener("visibilitychange", hide);
+    return () => { document.removeEventListener("visibilitychange", hide); alive.current = false; loopOn.current = false; mixer.current?.dispose?.(); mixer.current = null; };
   }, []);
 
   /** The sound check's own mixer, made on the first tap so the browser lets it play. */
   async function ensure(): Promise<Mixer> {
     if (mixer.current) return mixer.current;
-    const m = createMixer({ baseUrl: packBase(packIndex.value[0]?.id ?? NARRATOR_PACK), virtual: false });
+    const m = createMixer({ baseUrl: packBase(packIndex.value[0]?.id ?? NARRATOR_PACK), virtual: false, owner: "soundcheck" });
     mixer.current = m;
     try { await m.unlock(); } catch { /* a blocked context stays silent; nothing to show */ }
     return m;
@@ -134,6 +138,7 @@ export function SoundCheck() {
     mixer.current?.stopBed(0.5);
   }
 
+  stopAllRef.current = stopAll;
   const anything = ambience !== null || music !== null || signalNow !== null || effects.length > 0 || narrator;
   const close = (): void => { soundCheckOpen.value = false; };
 
