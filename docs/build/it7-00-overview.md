@@ -1,6 +1,7 @@
 # Iteration 7: a main menu, a tutorial, sound that stops, tap to move on (spec)
 
 Status: asked for by Evgeny late on 22 November 2026, scope settled on 23 November. Briefs `it7-31` to `it7-34`.
+Built on 23 November: all four tasks merged, two review rounds (`iteration-7-rounds.md`). Waiting on the phone checks.
 
 ## What Evgeny asked for
 

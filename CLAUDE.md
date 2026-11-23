@@ -18,7 +18,11 @@ rider by GPS, speaks the turns, plays a stop's stories on arrival and drops in a
 - `src/state.ts`, `src/ride.ts`: shared signals and the ride controller that wires the modules. Master-owned.
 - `src/nav`: geometry, the navigation engine (pure, no browser APIs) and position sources (GPS, simulator).
 - `src/audio`, `src/story`: the mixer and the director that decides what the rider hears.
-- `src/map`: the MapLibre view. `src/ui`, `src/app.tsx`, `src/styles`: screens and components.
+- `src/map`: the MapLibre view. `src/ui`, `src/app.tsx`, `src/styles`: screens and components. The app opens on
+  the menu (`src/ui/Menu.tsx`); its pages are a stack in `src/ui/uistate.ts`, and `src/ui/back.ts` is the one place
+  that decides what Back closes or stops.
+- `src/tour`: the tutorial, a spotlight tour of a practice ride (`startPractice` in `src/ride.ts`): a generic engine,
+  the steps, and their pictures.
 - `public/packs/<id>/`: route packs. Built by `tools/`, never hand-edited.
 - `tools/`: Python pipeline that builds packs and records narration. See `docs/adding-a-route.md`.
 - `tests/unit` (Vitest), `tests/e2e` (Playwright, simulated rides).

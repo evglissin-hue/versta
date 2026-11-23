@@ -45,3 +45,47 @@ Rider's seat (every screen at 390 by 844 light and dark, and 360 by 740 light):
 - The menu showed "2" beside Routes in the same column as the tutorial's "2 MIN": it read as a time. Removed.
 - About's "Simulate a ride" link said nothing about what it does. It now has one line.
 - The scene's top bar (Back, the stop's name, Map) and the mini bar's four buttons fit at 360 px.
+
+Wave 2, task 34 (the tutorial):
+
+- As briefed. Its own choices, kept: the picker has a looser second pass if the strict rules find nothing; a card with
+  too little room drops its picture first; Next stays disabled until the step's part is lit.
+- Found in review: step 4 lit the whole story body, which left its card room for the title only: Previous and Next
+  were cut off. The tour spec checked the card's box but not what was inside it. The step lights the paragraph now,
+  the card's line gives way before its buttons ever do, and the spec checks at every step and size that Next lies
+  wholly inside the card and on screen.
+- Found in review: step 4 moved on as soon as the paragraph changed, and the voice changes it by itself about 3.5 s
+  in (each story's first paragraph is short), so the tour skipped on before the rider had tapped. It waits for a tap.
+- Rider's seat: the dim hardly showed on dark pages (deeper now); step 5, "Pause or close", never said what Close
+  does (it does now); the end card's "Back to the menu" wrapped in its button (it is "Menu").
+- Known: going back to step 1 does not speak the turn again, because the director never repeats a cue. The banner and
+  the card still show it.
+
+## Round 2
+
+- `npm run check`: 415 unit tests pass, build clean. The full e2e suite on the final build: running.
+
+- Dead-end hunt over the tutorial (`tests/e2e/tour.spec.ts`): Close, Escape and the phone's Back at each of the eight
+  steps leave no mixer within 2 s and the saved ride as it was; Close straight after Start; End ride in the dock ends
+  the tour; Choose a route opens Routes; the follow setting the rider flips is put back.
+- Rider's seat: every menu page, ride state and tutorial step read in place at 390 by 844 light and dark and 360 by
+  740 light. Nothing new found.
+
+## Phone checks (Evgeny)
+
+1. Install the test APK. The app opens on the menu. Back on a page returns to the menu; Back on the menu sends the
+   app to the background.
+2. Settings before a ride: set the soundscape level, start a ride, hear it.
+3. The tutorial with earphones: the turn, the arrival chime and the story; tap the right of the story and the voice
+   jumps on; Map, then Stop in the bar; the passing-by story; Close at any step is silence at once. Lock the phone
+   mid-tour: the sound stops, and the step starts again when you come back.
+4. A real ride, at a stop: Back on a story stops it and its music within 2 s; Map keeps it playing with Stop in the
+   bar; Pause quiets the music too; Close story makes no chime and leaves no music behind.
+5. Nearby: tap through a place's story; Back stops it, a second Back closes Nearby.
+
+## Open
+
+- Browser history for the pages on the web: the system back gesture still leaves the site from a page, as it did from
+  Nearby. The Android app's Back is handled.
+- A passing-by chime already queued behind turn speech still sounds after a Stop (the mixer gives signals no cancel).
+  It cannot be reached from the screen: the card that has Stop appears only after the chime.
