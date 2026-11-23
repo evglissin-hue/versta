@@ -63,7 +63,11 @@ Wave 2, task 34 (the tutorial):
 
 ## Round 2
 
-- `npm run check`: 415 unit tests pass, build clean. The full e2e suite on the final build: running.
+- `npm run check`: 415 unit tests pass, build clean. The full e2e suite on the final build, four workers: 93 of 94.
+  The one failure, "a wheel zoom while following keeps following", waited a fixed 900 ms for the map's zoom, which
+  lands later on a machine busy with four browsers playing real audio. It passes alone (3 of 3) and now waits for the
+  zoom itself. It touches nothing this iteration changed.
+- The Android build passes on CI from the branch (run 45093691263); its APK is the run's artifact, for the phone checks.
 
 - Dead-end hunt over the tutorial (`tests/e2e/tour.spec.ts`): Close, Escape and the phone's Back at each of the eight
   steps leave no mixer within 2 s and the saved ride as it was; Close straight after Start; End ride in the dock ends

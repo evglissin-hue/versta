@@ -357,11 +357,11 @@ test("a wheel zoom while following keeps following and is remembered", async ({ 
   const before = await page.evaluate(() => (window as unknown as Win).__verstaUi!.followZoom.value);
   await page.mouse.move(195, 420);
   await page.mouse.wheel(0, -400);
-  await page.waitForTimeout(900);
+  // the zoom lands after the map's own easing, later on a loaded machine: wait for it rather than a fixed time
+  const zoom = (): Promise<number> => page.evaluate(() => (window as unknown as Win).__verstaUi!.followZoom.value);
+  await expect.poll(zoom, { timeout: 5000 }).toBeGreaterThan(before);
   await expect(followBtn(page)).toHaveAttribute("data-state", "course");
-  const after = await page.evaluate(() => (window as unknown as Win).__verstaUi!.followZoom.value);
-  expect(after).toBeGreaterThan(before);
-  expect(after).toBeLessThanOrEqual(18);
+  expect(await zoom()).toBeLessThanOrEqual(18);
 });
 
 test("the whole route button fits the route, and a second tap goes back to following", async ({ page }) => {
