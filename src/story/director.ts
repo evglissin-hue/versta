@@ -236,6 +236,8 @@ export function createDirector(deps: DirectorDeps): Director {
 
   /** Cut off whatever story or aside is sounding. */
   function cutCurrent(reason: string): void {
+    // a passing-by story cut short counts as ended now, so the next one keeps its gap
+    if (asideNow || asidePending) lastAsideEnd = deps.clock();
     token++;
     clearTimeout(gapTimer);
     clearTimeout(arrivalTimer);

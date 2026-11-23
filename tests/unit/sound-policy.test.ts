@@ -121,6 +121,18 @@ describe("stopAll is silent and complete", () => {
     expect(tl(r, "voice", "on").length).toBe(1);
     await stopAt(r, async () => {});
   });
+
+  it("a passing-by story stopped by the rider keeps the gap before the next one", async () => {
+    const r = rig({ autoPlayStories: false, asides: "sparse" });
+    r.d.handle([], nav());
+    await ms(61_000);
+    r.d.handle([{ type: "aside", aside: pack.asides[0]! }], nav({ seg: 2 }));
+    await ms(6000);
+    r.d.stopAll();
+    await ms(5000);
+    r.d.handle([{ type: "aside", aside: pack.asides[1]! }], nav({ seg: 2 }));
+    expect(r.log.at(-1)).toMatchObject({ what: "aside_skipped", id: pack.asides[1]!.id, reason: "too_soon" });
+  });
 });
 
 describe("skip", () => {
