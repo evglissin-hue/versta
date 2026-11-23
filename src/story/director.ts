@@ -10,13 +10,19 @@ const ASIDE_CUT_BED_FADE = 1;
 /** The story of a stop starts this long after the arrival; its bed rises at once. */
 const ARRIVAL_LEAD_SECONDS = 3;
 /** The bed lingers this long after the last story of a stop, then fades over LINGER_FADE. */
-const LINGER_SECONDS = 20;
-const LINGER_FADE = 6;
+const LINGER_SECONDS = 8;
+const LINGER_FADE = 4;
 /** Arrival without auto-play: the stop's soundscape alone plays this long, then fades over LINGER_FADE. */
-const ARRIVAL_BED_SECONDS = 30;
+const ARRIVAL_BED_SECONDS = 15;
 /** Riding away from a stop: the bed fades over this long. */
 const LEAVE_FADE = 4;
-const STOP_ALL_FADE = 1;
+/** The rider stops or skips the last story: the bed fades over this long, effects over EFFECT_STOP_FADE. */
+const STOP_BED_FADE = 1.5;
+const EFFECT_STOP_FADE = 0.3;
+/** Pausing a story fades its bed over this long. */
+const PAUSE_BED_FADE = 1;
+/** A paragraph step lands this long before the paragraph's mark. */
+const STEP_LEAD_SECONDS = 0.1;
 /** An effect fires this long before the paragraph it leads into. */
 const EFFECT_LEAD_SECONDS = 1.2;
 /**
@@ -205,6 +211,20 @@ export function createDirector(deps: DirectorDeps): Director {
       if (at !== null && t >= at) fireEffect(now, i);
     }
   }
+  /**
+   * A paragraph step lands on `p`: effects of earlier paragraphs are marked fired (they never sound), those of later
+   * ones are armed again, those of `p` sound at once when `playing` and are marked fired when not.
+   */
+  function setEffectMarks(now: CurrentStory, p: number, playing: boolean): void {
+    const list = now.story.sfx ?? [];
+    for (let i = 0; i < list.length; i++) {
+      const at = list[i]!.para;
+      if (at < p) now.fired.add(i);
+      else if (at > p) now.fired.delete(i);
+      else if (playing) { now.fired.delete(i); fireEffect(now, i); }
+      else now.fired.add(i);
+    }
+  }
   /** Read by tapping: the effects of a paragraph fire when it appears. */
   function fireParaEffects(now: CurrentStory): void {
     const list = now.story.sfx;
@@ -254,7 +274,7 @@ export function createDirector(deps: DirectorDeps): Director {
       onTime: (t) => {
         if (my !== token || current !== now) return;
         playhead = t;
-        checkEffects(now, t);
+        if (!now.paused) checkEffects(now, t);
         const p = paraAt(audio.marks, t);
         if (p !== now.para) { now.para = p; emit(); }
       },
@@ -277,7 +297,6 @@ export function createDirector(deps: DirectorDeps): Director {
     if (!current || current.ended) return;
     current.ended = true;
     log("story_end", current.story.id);
-    if (queue.length === 0) startLinger();
     const my = token;
     clearTimeout(gapTimer);
     gapTimer = setTimeout(() => { gapTimer = undefined; if (my === token) advance(); }, END_GAP_MS / scale);
@@ -559,7 +578,36 @@ export function createDirector(deps: DirectorDeps): Director {
     togglePause(): void {
       if (!current || current.manual || current.ended) return;
       current.paused = !current.paused;
-      if (current.paused) mixer.pauseVoice(); else mixer.resumeVoice();
+      if (current.paused) {
+        mixer.pauseVoice();
+        // a paused story is quiet: its effects stop and its bed fades, and neither lingers on a timer
+        mixer.stopEffects?.(EFFECT_STOP_FADE);
+        stopBed(PAUSE_BED_FADE);
+      } else {
+        mixer.resumeVoice();
+        if (!leftStop) startBed(current.stop, current.story);
+      }
+      emit();
+    },
+
+    stepPara(delta: 1 | -1): void {
+      const now = current;
+      if (!now || now.ended || asideNow || asidePending) return;
+      if (delta > 0 && now.para + 1 >= now.story.paras.length) { api.skip(); return; }
+      const p = Math.max(0, Math.min(now.story.paras.length - 1, now.para + delta));
+      const audio = now.story.audio;
+      if (now.manual || !audio) {
+        now.para = p;
+        setEffectMarks(now, p, true);
+        emit();
+        return;
+      }
+      const t = Math.max(0, (audio.marks[p] ?? 0) - STEP_LEAD_SECONDS);
+      // the marks come first: the seek reports the playhead at once and checkEffects reads them
+      setEffectMarks(now, p, !now.paused);
+      now.para = p;
+      playhead = t;
+      mixer.seekVoiceTo?.(t);
       emit();
     },
 
@@ -590,20 +638,39 @@ export function createDirector(deps: DirectorDeps): Director {
 
     skip(): void {
       if (!current) return;
+      if (queue.length > 0) {
+        if (!current.ended) {
+          log("story_stopped", current.story.id, "skip");
+          current.ended = true;
+          token++;
+          mixer.stopVoice();
+        }
+        advance();
+        return;
+      }
+      // nothing queued: the story view closes in silence (no close signal, no linger, no finish flourish)
       if (!current.ended) {
         log("story_stopped", current.story.id, "skip");
-        current.ended = true;
-        token++;
         mixer.stopVoice();
       }
-      advance();
+      token++;
+      clearTimeout(gapTimer);
+      gapTimer = undefined;
+      current = null;
+      finishAfterStories = false;
+      mixer.stopEffects?.(EFFECT_STOP_FADE);
+      stopBed(STOP_BED_FADE);
+      clearMediaSession();
+      deps.onNowPlaying(null);
     },
 
     stopAll(): void {
       cutCurrent("stop_all");
       queue = [];
+      finishAfterStories = false;
+      mixer.stopEffects?.(EFFECT_STOP_FADE);
       clearMediaSession();
-      stopBed(STOP_ALL_FADE);
+      stopBed(STOP_BED_FADE);
       deps.onNowPlaying(null);
     },
 
