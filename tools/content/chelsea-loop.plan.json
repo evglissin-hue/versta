@@ -1,0 +1,95 @@
+{
+ "comment": "Segments listed here are planned again by tools/router.py. via points are [lng, lat] gates, in order. Line ends sit on the street by each stop: Great Percy Street by Holford Gardens, Marylebone High Street outside number 112, the north side of Portman Square outside Home House, Symons Street outside number 4, Millbank by Vauxhall Bridge, the Victoria Embankment track by the Needle, the end of Wharf Road for home.",
+ "replan": {
+  "1": {
+   "why": "Great Percy Street down to King's Cross Road, quiet streets to Judd Street, the protected Tavistock Place and Torrington Place tracks across Bloomsbury, then quiet Fitzrovia and Marylebone streets to the high street. Not Euston Road.",
+   "via": [
+    [
+     -0.12619,
+     51.52538
+    ],
+    [
+     -0.13326,
+     51.52224
+    ]
+   ],
+   "gate": 30,
+   "avoid": {
+    "Euston Road": 5,
+    "Marylebone Road": 5
+   }
+  },
+  "2": {
+   "why": "Down Marylebone High Street, west along George Street across Baker Street, south on Gloucester Place to the north-west corner of Portman Square, by Home House.",
+   "via": []
+  },
+  "3": {
+   "why": "Portman Square to Marble Arch, the Park Lane cycle path inside Hyde Park to Hyde Park Corner, then quiet Belgravia streets (Cadogan Place) to Symons Street. Short on Knightsbridge and Sloane Street.",
+   "via": [
+    [
+     -0.15549,
+     51.50887
+    ],
+    [
+     -0.15768,
+     51.49735
+    ]
+   ],
+   "gate": 30
+  },
+  "4": {
+   "why": "Sloane Square, quiet Holbein Place beside Lower Sloane Street, Chelsea Bridge Road, then Cycleway 8 along Grosvenor Road and Millbank by the river to Vauxhall Bridge.",
+   "via": [
+    [
+     -0.1522615,
+     51.4874031
+    ],
+    [
+     -0.1449833,
+     51.4856477
+    ],
+    [
+     -0.138223,
+     51.4850863
+    ]
+   ],
+   "gate": 25
+  },
+  "5": {
+   "why": "Millbank past Thames House, over Lambeth Bridge, Lambeth Palace Road on the south bank, back over Westminster Bridge and north on the Cycleway 3 track on Victoria Embankment to the Needle.",
+   "via": [
+    [
+     -0.12517,
+     51.49412
+    ],
+    [
+     -0.121,
+     51.4944
+    ],
+    [
+     -0.1175,
+     51.4984
+    ]
+   ],
+   "gate": 30
+  },
+  "6": {
+   "why": "Cycleway 3 on Victoria Embankment to Blackfriars, Cycleway 6 north on New Bridge Street, Farringdon Street and Farringdon Road, quiet Clerkenwell streets by Clerkenwell Green and St John Street, then City Road past the Eagle to Wharf Road and the basin.",
+   "via": [
+    [
+     -0.1045,
+     51.513
+    ],
+    [
+     -0.1053,
+     51.5234
+    ],
+    [
+     -0.09178,
+     51.52844
+    ]
+   ],
+   "gate": 30
+  }
+ }
+}

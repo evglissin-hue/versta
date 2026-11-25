@@ -1,0 +1,113 @@
+[
+  {
+    "id": "reading-room",
+    "seg": 1,
+    "street": "Tavistock Place",
+    "near": [
+      -0.1266,
+      51.5252
+    ],
+    "frac": 0.4,
+    "title": "Reader Jacob Richter",
+    "tags": [
+      "Russia"
+    ],
+    "text": "You are on the Tavistock Place cycle track, in Bloomsbury. A few streets south is the British Museum. Lenin spends whole days in its Reading Room, on a reader's ticket made out to Jacob Richter, the same false name he gives his landlady."
+  },
+  {
+    "id": "tyburn",
+    "seg": 3,
+    "street": "Great Cumberland Place",
+    "near": [
+      -0.159,
+      51.5135
+    ],
+    "frac": 0.7,
+    "title": "The Tyburn Tree",
+    "tags": [],
+    "text": "Marble Arch. For six hundred years this corner is Tyburn, London's place of execution. Crowds of thousands come to watch hangings on the Tyburn Tree, a triangular gallows that can take more than twenty people at once. The last hanging here is in 1783. A small plaque on the traffic island marks the spot."
+  },
+  {
+    "id": "apsley",
+    "seg": 3,
+    "street": "",
+    "near": [
+      -0.153,
+      51.5055
+    ],
+    "frac": 0.5,
+    "title": "Number One, London",
+    "tags": [],
+    "text": "Ahead at Hyde Park Corner stands Apsley House, once called Number One, London, the first house after the old toll gate into town. The Duke of Wellington lives there after Waterloo. Inside is a huge nude statue of Napoleon by Canova. Napoleon himself disliked it."
+  },
+  {
+    "id": "pimlico",
+    "seg": 4,
+    "street": "Grosvenor Road",
+    "near": [
+      -0.144,
+      51.4855
+    ],
+    "frac": 0.3,
+    "title": "Operation Pimlico",
+    "tags": [
+      "Spies",
+      "Russia"
+    ],
+    "text": "You are riding through Pimlico. In 1985 MI6 borrows the name for its most daring rescue of the Cold War. Oleg Gordievsky, a KGB colonel working secretly for Britain, is under suspicion in Moscow. To call for help he stands by a bakery on Kutuzovsky Prospekt holding a Safeway carrier bag. A British officer walks past eating a Mars bar: message received. Days later he crosses into Finland in the boot of a diplomatic car."
+  },
+  {
+    "id": "lambeth-bridge",
+    "seg": 5,
+    "street": "Lambeth Bridge",
+    "near": [
+      -0.1244,
+      51.4947
+    ],
+    "frac": 0.15,
+    "title": "Red for the Lords",
+    "tags": [],
+    "text": "Lambeth Bridge is red, and Westminster Bridge, downstream, is green. The usual explanation is that they match the benches in the two houses of Parliament: red for the Lords at this end of the Palace, green for the Commons at the other."
+  },
+  {
+    "id": "westminster-bridge",
+    "seg": 5,
+    "street": "Westminster Bridge",
+    "near": [
+      -0.1231,
+      51.5008
+    ],
+    "frac": 0.3,
+    "title": "Earth has not anything",
+    "tags": [],
+    "text": "Westminster Bridge. Early one morning in September 1802, William Wordsworth crosses here and writes that earth has not anything to show more fair. The Palace he sees burns down in 1834. The one beside you is its replacement, and the clock tower is not finished until 1859."
+  },
+  {
+    "id": "fleet",
+    "seg": 6,
+    "street": "New Bridge Street",
+    "near": [
+      -0.1044,
+      51.5117
+    ],
+    "frac": 0.3,
+    "title": "The river under the road",
+    "tags": [],
+    "text": "Blackfriars. Under your wheels the River Fleet runs into the Thames. Once a working river, it becomes an open sewer so foul that it is covered over in the eighteenth century. It still flows beneath Farringdon Street and Farringdon Road, just ahead of you."
+  },
+  {
+    "id": "clerkenwell-green",
+    "seg": 6,
+    "street": "Clerkenwell Close",
+    "near": [
+      -0.105,
+      51.5242
+    ],
+    "frac": 0.5,
+    "title": "The Iskra room",
+    "tags": [
+      "Russia"
+    ],
+    "text": "Back to Lenin. You have just crossed Clerkenwell Green, and the old building on the green at number thirty seven a is the Marx Memorial Library. In 1902 and 1903 Lenin has a tiny office there, where Iskra is printed on thin paper to be smuggled into Russia. The room is still kept as it was."
+  }
+]

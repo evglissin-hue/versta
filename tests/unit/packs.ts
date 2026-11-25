@@ -48,7 +48,7 @@ export function straySide(pack: Pack, seg: number, along: number, metres: number
   const a = pointAlong(pts, along, cumulative(pts));
   const sides = [90, -90].map((turn) => {
     const rad = ((a.bearing + turn) * Math.PI) / 180;
-    const q: XY = [a.point[0] + Math.sin(rad) * metres, a.point[1] - Math.cos(rad) * metres] as XY;
+    const q: XY = [a.point[0] + Math.sin(rad) * metres, a.point[1] + Math.cos(rad) * metres] as XY;
     return { rad, clear: Math.min(...lines.map((l) => nearestOnPolyline(l, q).dist)) };
   }).sort((x, y) => y.clear - x.clear);
   return sides[0]!.clear >= room ? sides[0]!.rad : null;

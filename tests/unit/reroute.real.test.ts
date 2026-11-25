@@ -51,7 +51,7 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("rerouting on the real
       const t0 = performance.now();
       for (let i = 0; i < 40; i++) {
         const off = Math.min(130, 10 * (i + 1));
-        feed(a.point[0] + Math.sin(rad) * off, a.point[1] - Math.cos(rad) * off);
+        feed(a.point[0] + Math.sin(rad) * off, a.point[1] + Math.cos(rad) * off);
       }
       const ms = performance.now() - t0;
       expect(events.some((e) => e.type === "off_route")).toBe(true);
@@ -82,7 +82,7 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("rerouting on the real
       const feed = (x: number, y: number): void => { const ll = unproject(proj, [x, y] as never); clock += 1000; ev.push(...engine.update({ lng: ll[0], lat: ll[1], accuracy: 6, heading: null, speed: 4, time: clock })); };
       for (let d = startD; d < startD + 200; d += 4) { const a = pointAlong(pts, d, cum); feed(a.point[0], a.point[1]); }
       const a = pointAlong(pts, startD + 200, cum);
-      for (let i = 0; i < 40; i++) { const off = Math.min(130, 10 * (i + 1)); feed(a.point[0] + Math.sin(rad) * off, a.point[1] - Math.cos(rad) * off); }
+      for (let i = 0; i < 40; i++) { const off = Math.min(130, 10 * (i + 1)); feed(a.point[0] + Math.sin(rad) * off, a.point[1] + Math.cos(rad) * off); }
       if (ev.some((e) => e.type === "detour" && e.found)) found++;
     }
     expect(found).toBeGreaterThanOrEqual(Math.ceil(segs.length * 0.66));

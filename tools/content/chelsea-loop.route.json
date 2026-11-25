@@ -1,0 +1,222 @@
+[
+  {
+    "id": "chelsea-loop",
+    "name": "Chelsea Loop",
+    "mode": "bicycling",
+    "km": 19,
+    "ride": "1.5 h",
+    "blurb": "West across Bloomsbury on the Tavistock Place track to Marylebone, through Hyde Park to Chelsea, then home along the river on Cycleways 8, 3 and 6. Lenin's London lodgings, a spy's confession, two fictional agents off the King's Road, and MI5 and MI6 face to face across the Thames.",
+    "card_blurb": "West through Bloomsbury and Hyde Park to Chelsea, then home along the river past MI5 and MI6.",
+    "legs": [
+      {
+        "name": "Out: Bloomsbury, Marylebone and the park",
+        "from": 0,
+        "to": 3
+      },
+      {
+        "name": "Back: the river and Clerkenwell",
+        "from": 4,
+        "to": 6
+      }
+    ],
+    "stops": [
+      {
+        "id": "holford",
+        "name": "Holford Gardens",
+        "lat": 51.5299,
+        "lng": -0.1112,
+        "amb": "oldstreet",
+        "note": "Stop by the garden. The tall Y-shaped block of flats is Bevin Court, built where number 30 Holford Square stood.",
+        "stories": [
+          {
+            "title": "Mr and Mrs Richter",
+            "kind": "core",
+            "mood": "minor",
+            "tags": [
+              "Russia"
+            ],
+            "paras": [
+              "Look at the tall block of flats beyond the garden, Bevin Court. Now take it away, and put back a quiet square of brick terraces around a railed garden. This is Holford Square, and it is April 1902.",
+              "A foreign couple take two unfurnished rooms at number thirty. They give their name as Richter. He is short, bald and restless, and writes all day. She keeps the accounts and the secret letters to agents inside Russia. He is Vladimir Ulyanov, and the world will soon know him as Lenin. She is Nadezhda Krupskaya.",
+              "Most days he walks down to Sidmouth Street, off Gray's Inn Road, to meet the other editors of Iskra, The Spark, the paper he means to light a revolution with. Their landlady, Mrs Yeo, is scandalised that her lodgers will not hang curtains.",
+              "Early one morning in October there is a knock at the door. On the step stands a young man who has just escaped from exile in Siberia. His name is Lev Bronstein. He calls himself Trotsky.",
+              "In May 1903 the Richters move on. In 1941 a German landmine destroys most of the square. In 1942, with Leningrad under siege and Russia now an ally, a bust of Lenin is unveiled here, designed by the architect Berthold Lubetkin. After the war Lubetkin designs the flats you see, at first to be called Lenin Court. The bust is now in Islington Museum, and the legend is that Lubetkin buried part of the memorial under the building."
+            ],
+            "music": "russia"
+          }
+        ]
+      },
+      {
+        "id": "whiteco-marylebone",
+        "name": "Marylebone High Street",
+        "lat": 51.5186021,
+        "lng": -0.151614,
+        "amb": "oldstreet",
+        "note": "Gift stop. The White Company is at 112 to 114 Marylebone High Street, at the south end by the New Cavendish Street corner. Lock up and go in.",
+        "stories": [
+          {
+            "title": "The buried river",
+            "kind": "core",
+            "mood": "bright",
+            "tags": [],
+            "paras": [
+              "It is around the year fourteen hundred, and this is open country north of London. A small river called the Tyburn runs down from the hills of Hampstead towards the Thames.",
+              "The villagers build a new church beside the stream and dedicate it to Saint Mary. Saint Mary by the bourne, the stream. Say it quickly for a few hundred years and you get Marylebone.",
+              "The river still runs. It is buried now, in a brick tunnel under these streets. Marylebone Lane, just to the east, still wriggles the way it does because it follows the old bank.",
+              "A little further on, at Marble Arch, the old name Tyburn comes to mean something much darker."
+            ],
+            "music": "river"
+          }
+        ],
+        "arrive_radius": 25
+      },
+      {
+        "id": "portman",
+        "name": "Portman Square",
+        "lat": 51.5159782,
+        "lng": -0.157016,
+        "amb": "office",
+        "note": "Stop at the north-west corner of the square. Number 20, Home House, is the grand house just east of you along the north side. The Courtauld's director had the flat at the top.",
+        "stories": [
+          {
+            "title": "The confession upstairs",
+            "kind": "core",
+            "mood": "minor",
+            "tags": [
+              "Spies"
+            ],
+            "paras": [
+              "Look at number twenty, the grand house on the north side. Robert Adam finishes it in 1777 for the Countess of Home. In the twentieth century it is the Courtauld Institute of Art, and at the very top, above the lecture rooms and the paintings, lives the director.",
+              "It is the twenty third of April 1964. Sir Anthony Blunt is the most respected art historian in Britain, Surveyor of the Queen's Pictures and a knight. Today an MI5 officer called Arthur Martin climbs the stairs and sits down with him in his flat.",
+              "Martin has new evidence. An American, Michael Straight, has told the FBI that Blunt tried to recruit him for the Russians at Cambridge in the 1930s. Martin offers Blunt immunity from prosecution in exchange for the truth.",
+              "After a long silence Blunt gets up, pours himself a drink and admits it. He was recruited through his friend Guy Burgess. During the war, as an officer of MI5 itself, he passed its secrets to Moscow.",
+              "And then, astonishingly, life goes on. For years he goes on looking after the Queen's paintings and running this institute. Only a handful of people know. The public finds out in November 1979, when Margaret Thatcher names him in the Commons."
+            ],
+            "music": "noir"
+          },
+          {
+            "title": "The fourth man",
+            "kind": "optional",
+            "mood": "minor",
+            "tags": [
+              "Spies"
+            ],
+            "paras": [
+              "Go back to May 1951. Two British diplomats, Guy Burgess and Donald Maclean, vanish. Years later they surface in Moscow.",
+              "Blunt is Burgess's close friend. The story goes that he lets himself into Burgess's flat before MI5 gets there, and takes away papers that could have exposed them both.",
+              "Suspicion follows him for twelve years, but nothing can be proved. In January 1963 Kim Philby, the third man, slips away to Moscow from Beirut. A few months later Michael Straight talks to the FBI, and the thread leads here.",
+              "After his exposure in 1979 Blunt is stripped of his knighthood within days. He dies in 1983. The house where he confessed is now a private members' club."
+            ],
+            "music": "noir"
+          }
+        ],
+        "arrive_radius": 25
+      },
+      {
+        "id": "whiteco-symons",
+        "name": "Symons Street, Chelsea",
+        "lat": 51.4926158,
+        "lng": -0.1586995,
+        "amb": "oldstreet",
+        "note": "Gift stop, second chance. The White Company's first shop is at 4 Symons Street, just off Sloane Square.",
+        "stories": [
+          {
+            "title": "Two spies off the King's Road",
+            "kind": "core",
+            "mood": "bright",
+            "tags": [
+              "Spies"
+            ],
+            "paras": [
+              "This little street is home to The White Company's very first shop. Now look west, along the King's Road. A few minutes from here live Britain's two most famous spies who never existed.",
+              "It is 1955, and in Moonraker Ian Fleming gives James Bond a comfortable flat in a leafy square just off the King's Road. He never says which one. His friend and biographer John Pearson thinks it is Wellington Square. Decades later the novelist William Boyd, who has written a Bond novel of his own, works through the clues and agrees.",
+              "A few streets further on is little Bywater Street. That is where John le Carré puts George Smiley: short, plump, badly dressed, betrayed by his wife, and cleverer than anyone in the room. Bond is what the public wants a spy to be. Smiley is much closer to the real thing.",
+              "Le Carré would know. Before he writes a word about spies, he works for MI5, and then for MI6. His real name is David Cornwell."
+            ],
+            "music": "noir"
+          }
+        ]
+      },
+      {
+        "id": "vauxhall",
+        "name": "Millbank, by Vauxhall Bridge",
+        "lat": 51.4893,
+        "lng": -0.1283,
+        "amb": "river",
+        "note": "Stop by the river wall at the north end of Vauxhall Bridge. The MI6 building is straight across the water.",
+        "stories": [
+          {
+            "title": "The view across the water",
+            "kind": "core",
+            "mood": "minor",
+            "tags": [
+              "Spies"
+            ],
+            "paras": [
+              "Look across the river. The stepped building of cream stone and green glass is the headquarters of the Secret Intelligence Service, MI6. It is 1994, and the service is moving in.",
+              "Only two years earlier the British government would not even admit that MI6 existed. Now it has a landmark on the Thames that every Bond fan knows.",
+              "On a September night in the year two thousand, someone fires a Russian made anti tank rocket at the building from beside the railway. It hits the eighth floor and does little damage. Dissident Irish republicans are blamed.",
+              "Now ride on along Millbank. Just before Lambeth Bridge, on your left, is the huge grey stone block of Thames House. MI5, the Security Service, moves in there in the nineties too. For most of the last century the two services watched each other almost as warily as they watched Moscow. Now they face each other across the river."
+            ],
+            "music": "noir"
+          }
+        ]
+      },
+      {
+        "id": "needle",
+        "name": "Cleopatra's Needle",
+        "lat": 51.5085,
+        "lng": -0.1203,
+        "amb": "river",
+        "note": "Stop on the river side of the Embankment by the obelisk. The shrapnel scars are on the pedestal and the sphinxes.",
+        "stories": [
+          {
+            "title": "The needle that nearly sank",
+            "kind": "optional",
+            "mood": "bright",
+            "tags": [],
+            "paras": [
+              "It is around fourteen fifty BC, in Egypt, and masons are cutting a granite obelisk for the pharaoh Thutmose the Third, to stand before the temples of Heliopolis. Cleopatra will not be born for well over a thousand years.",
+              "It is October 1877. The obelisk is sealed inside an iron cylinder, a strange ship named Cleopatra, and towed towards London. In a storm in the Bay of Biscay it has to be cut loose. Six sailors die trying to rescue its crew. Days later the drifting cylinder is found and towed into Ferrol, in Spain.",
+              "In September 1878 the needle rises here, on the new Embankment. Under its base the Victorians bury a time capsule: newspapers, coins, a railway timetable, and photographs of twelve of the most beautiful women of the day.",
+              "Now look at the pedestal and the bronze sphinxes. The scars and holes come from a German bomb that falls close by in September 1917, in one of the first air raids on London by aeroplane."
+            ],
+            "music": "voyage",
+            "sfx": [
+              {
+                "para": 1,
+                "name": "water-lap"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "home",
+        "name": "Wenlock Basin, home",
+        "pack_id": "wenlock-basin",
+        "pack_name": "Wenlock Basin",
+        "lat": 51.53153,
+        "lng": -0.096019,
+        "amb": "canal",
+        "note": "Wenlock Basin, and the ride is done.",
+        "stories": [
+          {
+            "title": "Debrief",
+            "kind": "optional",
+            "mood": "bright",
+            "tags": [
+              "Russia"
+            ],
+            "paras": [
+              "Debrief. Today you rode from the rooms where Lenin edits his paper, past the flat where Blunt confesses, past the doors of two fictional spies, and between the headquarters of MI5 and MI6.",
+              "One more for the file. In the spring of 1907 the Russian Social Democrats hold their congress in a church on Southgate Road, a short ride north east of here. Lenin is back in London. So is Trotsky. And among the delegates is a young Georgian who will later call himself Stalin.",
+              "Case closed."
+            ],
+            "music": "bright"
+          }
+        ]
+      }
+    ]
+  }
+]

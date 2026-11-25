@@ -146,7 +146,7 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
         for (let i = 0; i < detour.seconds; i++) path.push(detour.metres);
         for (let i = steps - 1; i >= 0; i--) path.push((detour.metres * i) / steps);
         for (const off of path) {
-          const q = unproject(proj, [at.point[0] + Math.sin(rad) * off, at.point[1] - Math.cos(rad) * off] as never);
+          const q = unproject(proj, [at.point[0] + Math.sin(rad) * off, at.point[1] + Math.cos(rad) * off] as never);
           await feed(q[0], q[1], null, true);
         }
       }
