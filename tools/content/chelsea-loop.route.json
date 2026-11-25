@@ -5,18 +5,18 @@
     "mode": "bicycling",
     "km": 19,
     "ride": "1.5 h",
-    "blurb": "West across Bloomsbury on the Tavistock Place track to Marylebone, through Hyde Park to Chelsea, then home along the river on Cycleways 8, 3 and 6. Lenin's London lodgings, a spy's confession, two fictional agents off the King's Road, and MI5 and MI6 face to face across the Thames.",
+    "blurb": "West across Bloomsbury on the Tavistock Place track, past Senate House and the BT Tower to Marylebone, through Hyde Park to Chelsea, then home along the river on Cycleways 8, 3 and 6. Lenin's London lodgings, the real Ministry of Truth, a secret tower, a spy's confession, two fictional agents off the King's Road, and MI5 and MI6 face to face across the Thames.",
     "card_blurb": "West through Bloomsbury and Hyde Park to Chelsea, then home along the river past MI5 and MI6.",
     "legs": [
       {
         "name": "Out: Bloomsbury, Marylebone and the park",
         "from": 0,
-        "to": 3
+        "to": 5
       },
       {
         "name": "Back: the river and Clerkenwell",
-        "from": 4,
-        "to": 6
+        "from": 6,
+        "to": 8
       }
     ],
     "stops": [
@@ -45,6 +45,56 @@
             "music": "russia"
           }
         ]
+      },
+      {
+        "id": "senate-house",
+        "name": "Senate House, Bloomsbury",
+        "lat": 51.5228786,
+        "lng": -0.1315934,
+        "amb": "office",
+        "note": "Stop on Torrington Place by the Malet Street corner. The tall pale tower to the south, down Malet Street, is Senate House.",
+        "stories": [
+          {
+            "title": "The Ministry of Truth",
+            "kind": "core",
+            "mood": "minor",
+            "tags": [
+              "Spies"
+            ],
+            "music": "noir",
+            "paras": [
+              "Look south down Malet Street at the pale stone tower. This is Senate House, built for the University of London in the 1930s, the second tallest building in the city after Saint Paul's.",
+              "It is September 1939, and the war is days old. The academics move out and the Ministry of Information moves in: propaganda, censorship and official news for the whole country, run from these corridors.",
+              "Thousands work here. One of them is Eileen Blair. Her husband is a writer who signs himself George Orwell. Years later, when he imagines the Ministry of Truth in Nineteen Eighty-Four, this building is widely believed to be his model.",
+              "Another is the novelist Graham Greene, who finds the place absurd and mocks its endless committees in a short story. Soon he leaves to join MI6. His boss there, in the counter-intelligence section covering Spain and Portugal, is a charming officer called Kim Philby. Philby is working for Moscow."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "post-office-tower",
+        "name": "The BT Tower, Fitzrovia",
+        "lat": 51.5211167,
+        "lng": -0.1384077,
+        "amb": "office",
+        "note": "Stop on Howland Street, at the foot of the tower.",
+        "stories": [
+          {
+            "title": "The tower that was a secret",
+            "kind": "core",
+            "mood": "bright",
+            "tags": [
+              "Spies"
+            ],
+            "music": "noir",
+            "paras": [
+              "Look up. The tower above you opens in 1965 as the Post Office Tower, the tallest building in Britain, built to carry telephone calls and television across the country by microwave.",
+              "Because it matters so much to the nation's communications, the government makes information about it an official secret. For years its revolving restaurant at the top serves lunch to the public, while the tower itself is, officially, not to be talked about.",
+              "The popular story is that it is even left off the maps. In fact the Ordnance Survey shows it from the early seventies. But the secrecy is real enough that in 1993 an MP, Kate Hoey, jokes in the Commons that she hopes parliamentary privilege lets her confirm that the tower exists."
+            ]
+          }
+        ],
+        "arrive_radius": 25
       },
       {
         "id": "whiteco-marylebone",

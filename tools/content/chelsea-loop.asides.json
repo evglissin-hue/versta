@@ -16,7 +16,7 @@
   },
   {
     "id": "tyburn",
-    "seg": 3,
+    "seg": 5,
     "street": "Great Cumberland Place",
     "near": [
       -0.159,
@@ -29,7 +29,7 @@
   },
   {
     "id": "apsley",
-    "seg": 3,
+    "seg": 5,
     "street": "",
     "near": [
       -0.153,
@@ -42,7 +42,7 @@
   },
   {
     "id": "pimlico",
-    "seg": 4,
+    "seg": 6,
     "street": "Grosvenor Road",
     "near": [
       -0.144,
@@ -58,7 +58,7 @@
   },
   {
     "id": "lambeth-bridge",
-    "seg": 5,
+    "seg": 7,
     "street": "Lambeth Bridge",
     "near": [
       -0.1244,
@@ -71,7 +71,7 @@
   },
   {
     "id": "westminster-bridge",
-    "seg": 5,
+    "seg": 7,
     "street": "Westminster Bridge",
     "near": [
       -0.1231,
@@ -84,7 +84,7 @@
   },
   {
     "id": "fleet",
-    "seg": 6,
+    "seg": 8,
     "street": "New Bridge Street",
     "near": [
       -0.1044,
@@ -97,7 +97,7 @@
   },
   {
     "id": "clerkenwell-green",
-    "seg": 6,
+    "seg": 8,
     "street": "Clerkenwell Close",
     "near": [
       -0.105,

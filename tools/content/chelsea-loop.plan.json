@@ -19,11 +19,11 @@
     "Marylebone Road": 5
    }
   },
-  "2": {
+  "4": {
    "why": "Down Marylebone High Street, west along George Street across Baker Street, south on Gloucester Place to the north-west corner of Portman Square, by Home House.",
    "via": []
   },
-  "3": {
+  "5": {
    "why": "Portman Square to Marble Arch, the Park Lane cycle path inside Hyde Park to Hyde Park Corner, then quiet Belgravia streets (Cadogan Place) to Symons Street. Short on Knightsbridge and Sloane Street.",
    "via": [
     [
@@ -37,7 +37,7 @@
    ],
    "gate": 30
   },
-  "4": {
+  "6": {
    "why": "Sloane Square, quiet Holbein Place beside Lower Sloane Street, Chelsea Bridge Road, then Cycleway 8 along Grosvenor Road and Millbank by the river to Vauxhall Bridge.",
    "via": [
     [
@@ -55,7 +55,7 @@
    ],
    "gate": 25
   },
-  "5": {
+  "7": {
    "why": "Millbank past Thames House, over Lambeth Bridge, Lambeth Palace Road on the south bank, back over Westminster Bridge and north on the Cycleway 3 track on Victoria Embankment to the Needle.",
    "via": [
     [
@@ -73,7 +73,7 @@
    ],
    "gate": 30
   },
-  "6": {
+  "8": {
    "why": "Cycleway 3 on Victoria Embankment to Blackfriars, Cycleway 6 north on New Bridge Street, Farringdon Street and Farringdon Road, quiet Clerkenwell streets by Clerkenwell Green and St John Street, then City Road past the Eagle to Wharf Road and the basin.",
    "via": [
     [
