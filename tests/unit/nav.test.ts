@@ -55,15 +55,21 @@ function fixesAlong(path: XY[], opts: FixOpts = {}): Fix[] {
   const cum = cumulative(path);
   const total = at(cum, cum.length - 1);
   const fixes: Fix[] = [];
+  let prevTrue: XY | null = null;
   for (let k = 0, d = 0; ; k++, d = Math.min(total, d + speed)) {
     const pa = pointAlong(path, d, cum);
     const off = opts.offset ? opts.offset(k) : 0;
     const rad = (pa.bearing + 90) * (Math.PI / 180);
     const ang = rand() * Math.PI * 2;
     const r = rand() * noise;
-    const xy: XY = [pa.point[0] + Math.sin(rad) * off + Math.cos(ang) * r, pa.point[1] + Math.cos(rad) * off + Math.sin(ang) * r];
+    const at: XY = [pa.point[0] + Math.sin(rad) * off, pa.point[1] + Math.cos(rad) * off];
+    const xy: XY = [at[0] + Math.cos(ang) * r, at[1] + Math.sin(ang) * r];
     const ll = unproject(proj, xy);
-    fixes.push({ lng: ll[0], lat: ll[1], accuracy: opts.accuracy ?? 5, heading: pa.bearing, speed, time: T0 + k * 1000 });
+    // speed and heading are the rider's own motion, as GPS Doppler reports them, also when the rider leaves the line
+    const moved = prevTrue ? Math.hypot(at[0] - prevTrue[0], at[1] - prevTrue[1]) : speed;
+    const heading = prevTrue && off !== (opts.offset ? opts.offset(k - 1) : 0) && moved > 0.5 ? ((Math.atan2(at[0] - prevTrue[0], at[1] - prevTrue[1]) * 180) / Math.PI + 360) % 360 : pa.bearing;
+    fixes.push({ lng: ll[0], lat: ll[1], accuracy: opts.accuracy ?? 5, heading, speed: prevTrue ? moved : speed, time: T0 + k * 1000 });
+    prevTrue = at;
     if (d >= total) break;
   }
   // A few standing fixes at the end so the last stop is certain to register.
@@ -91,8 +97,12 @@ function run(fixes: Fix[]): Run {
 const arrivals = (events: NavEvent[]): number[] => events.flatMap((e) => (e.type === "arrive" ? [e.stop] : []));
 const cueEvents = (events: NavEvent[]) => events.flatMap((e) => (e.type === "cue" ? [e] : []));
 
-/** Turns so close to a stop that they are announced as the rider sets off, with no earlier warning. This ride never stands still at a stop, so the old rule applies. */
-const EXPECTED_NOW_ONLY = ["s03-003", "s09-002", "s11-003"];
+/**
+ * Turns so close to a stop that they are announced as the rider sets off, with no earlier warning. This ride never
+ * stands still at a stop, so the old rule applies. Since the position filter (iteration 7) the rider leaves stop 10 a
+ * moment later on this ride, so s11-003 now gets its warning too.
+ */
+const EXPECTED_NOW_ONLY = ["s03-003", "s09-002"];
 
 describe("navigation engine on the Thames Loop", () => {
   it("1. a noiseless ride arrives at every stop in order and speaks every cue once, in order", () => {
@@ -150,12 +160,15 @@ describe("navigation engine on the Thames Loop", () => {
   });
 
   it("4. a detour 120 m off the line for 30 s gives one off_route and one back_on_route", () => {
+    // The rider veers away at 4 m/s, stays 120 m off for 30 s and comes back the same way. (Until iteration 7 this
+    // teleported the rider 120 m sideways and back; the position filter now rightly refuses a jump no rider can make.)
     const start = 60;
-    const r = run(fixesAlong(line(), { offset: (k) => (k >= start && k < start + 30 ? 120 : 0) }));
+    const offset = (k: number): number => (k < start ? 0 : k < start + 30 ? 4 * (k - start) : k < start + 60 ? 120 : k < start + 90 ? 120 - 4 * (k - start - 60) : 0);
+    const r = run(fixesAlong(line(), { offset }));
     expect(r.events.filter((e) => e.type === "off_route")).toHaveLength(1);
     expect(r.events.filter((e) => e.type === "back_on_route")).toHaveLength(1);
-    expect(at(r.states, start + 29).offRoute).toBe(true);
-    expect(at(r.states, start + 32).offRoute).toBe(false);
+    expect(at(r.states, start + 59).offRoute).toBe(true);
+    expect(at(r.states, start + 92).offRoute).toBe(false);
     expect(arrivals(r.events)).toEqual(Array.from({ length: 13 }, (_, i) => i));
   });
 
@@ -232,7 +245,8 @@ describe("navigation engine on the Thames Loop", () => {
     for (let d = 0; d <= at(cum, cum.length - 1) - 70; d += 4) cut.push(pointAlong(seg1End, d, cum).point);
     const a = fixesAlong(cut, { speed: 4 }).slice(0, cut.length);
     const b = fixesAlong(line(2, 120), { speed: 4 }).slice(0, 40);
-    const fixes = [...a, ...b.map((f, k) => ({ ...f, time: at(a, a.length - 1).time + (k + 1) * 1000 }))];
+    // the GPS is quiet for half a minute while the rider cuts across (until iteration 7 they appeared at once)
+    const fixes = [...a, ...b.map((f, k) => ({ ...f, time: at(a, a.length - 1).time + 30_000 + (k + 1) * 1000 }))];
     const engine = createNavEngine(pack);
     const events: NavEvent[] = [];
     // stop 0 first so the ride is under way
@@ -355,9 +369,14 @@ describe("finding a way back", () => {
     return ev;
   }
   const ofType = (d: Drive, type: NavEvent["type"]) => d.events.filter((x) => x.e.type === type);
-  /** Stand 150 m off the route until off_route fires and the engine has had its chance to answer. */
+  /**
+   * The GPS goes quiet (a pocket, an underpass) and comes back with the rider standing `lateral` metres off the route;
+   * stand there until off_route fires and the engine has had its chance to answer. (Until iteration 7 the rider simply
+   * teleported; the position filter refuses a jump no rider could make, so the quiet spell is long enough to make it.)
+   */
   function strayOut(d: Drive, lateral = 150): XY {
     const p = offPoint(lateral);
+    d.time += Math.max(60_000, (lateral / 10) * 1000);
     for (let k = 0; k < 12; k++) feed(d, p);
     return p;
   }
@@ -529,7 +548,8 @@ describe("the nearest point of the route while guiding to the start", () => {
     expect(engine.state.nearest).toBe(first);
     engine.update(place(-300, 6));
     expect(engine.state.nearest).not.toBe(first);
-    engine.update(at(fixesAlong(line(4, 300)), 0));
+    // five minutes later the rider is on the line of segment 4 (until iteration 7 this fix went back in time to T0)
+    engine.update({ ...at(fixesAlong(line(4, 300)), 0), time: T0 + 300_000 });
     expect(engine.state.status).toBe("riding");
     expect(engine.state.nearest ?? null).toBeNull();
   });
@@ -565,9 +585,12 @@ function straightFixes(steps: Step[], opts: { headingNull?: boolean } = {}): Fix
     const ll = unproject(proj, [st.d, st.offset ?? 0]);
     // the first fix takes its speed and direction from the step after it
     const delta = k > 0 ? st.d - steps[k - 1]!.d : (steps[1]?.d ?? st.d) - st.d;
+    // the rider's own motion, as GPS Doppler reports it: along the line, and across it when the offset changes
+    const side = k > 0 ? (st.offset ?? 0) - (steps[k - 1]!.offset ?? 0) : 0;
+    const heading = ((Math.atan2(delta, side) * 180) / Math.PI + 360) % 360;
     return {
-      lng: ll[0], lat: ll[1], accuracy: 5, time: T0 + k * 1000, speed: Math.abs(delta),
-      heading: opts.headingNull ? null : delta < 0 ? 270 : 90,
+      lng: ll[0], lat: ll[1], accuracy: 5, time: T0 + k * 1000, speed: Math.hypot(delta, side),
+      heading: opts.headingNull ? null : side === 0 ? (delta < 0 ? 270 : 90) : heading,
     };
   });
 }
@@ -649,7 +672,8 @@ describe("approach distance", () => {
 
   it("is capped at 320 m however fast the rider goes", () => {
     const sp = straightPack();
-    const engine = createNavEngine(sp);
+    // 30 m/s is no bicycle: the position filter would rightly refuse it, so it is told to take every fix as it comes
+    const engine = createNavEngine(sp, {}, { softGate: Infinity, hardGate: Infinity });
     let d = 0;
     for (const f of straightFixes(range(500, 1100, 30).map((x) => ({ d: x })))) {
       for (const e of engine.update(f)) if (e.type === "cue" && e.phase === "approach" && e.cue.id === "C") d = engine.state.toCue!;
@@ -738,7 +762,8 @@ describe("wrong way", () => {
 
   it("does not fire while off route", () => {
     const sp = straightPack();
-    const steps: Step[] = [...forward.map((d) => ({ d })), ...back(25).map((d) => ({ d, offset: 100 }))];
+    // the rider turns back and leaves the line at the same time, 5 m out a second (until iteration 7 they jumped 100 m)
+    const steps: Step[] = [...forward.map((d) => ({ d })), ...back(25).map((d, i) => ({ d, offset: Math.min(100, 5 * (i + 1)) }))];
     const r = ride(sp, steps);
     expect(r.states.some((s) => s.offRoute)).toBe(true);
     expect(count(r.events)).toBe(0);

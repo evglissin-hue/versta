@@ -4,6 +4,7 @@
  */
 import { DEFAULT_NAV_OPTIONS, createNavEngine } from "./nav/engine";
 import { createGpsSource, createSimSource } from "./nav/sources";
+import type { JitterProfile } from "./nav/jitter";
 import { geoDistance } from "./geo";
 import { createMixer } from "./audio/mixer";
 import { effect } from "@preact/signals";
@@ -14,7 +15,7 @@ import { ensurePermission, rideNotice } from "./native/notify";
 import { IDLE_NAV, directorLog, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, screen, settings, simulated, startChoice } from "./state";
 import type { Director, Fix, FixSource, LngLat, Mixer, NavEngine, Pack, RouteGraph, SoundEvent, StartChoice } from "./types";
 
-export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean }
+export interface SimOptions { speed: number; scale: number; from: number; virtualAudio: boolean; jitter?: JitterProfile | null; seed?: number }
 
 interface Ride { pack: Pack; source: FixSource; engine: NavEngine; mixer: Mixer; director: Director; wake: WakeLockSentinel | null; startedAt: number; stopEffects: () => void; rec: RideRecorder | null }
 const BED_LEVELS = { soft: 0.6, balanced: 1, rich: 1.6 } as const;
@@ -42,9 +43,11 @@ export function forgetSavedRide(): void {
   // an update held back for the saved ride may switch in now
   routesRideEnded();
 }
-/** Tell the route store (Android app) that no ride holds its updates or transfers back now. */
+/** Tell the route store and the app update (Android app) that no ride holds their updates or transfers back now. */
 function routesRideEnded(): void {
-  if (isNative()) void import("./routes/store").then((m) => m.routeStore.rideEnded()).catch(() => {});
+  if (!isNative()) return;
+  void import("./routes/store").then((m) => m.routeStore.rideEnded()).catch(() => {});
+  void import("./update/store").then((m) => m.appStore.rideEnded()).catch(() => {});
 }
 function saveRide(): void {
   if (!ride || simulated.value) return;
@@ -57,11 +60,15 @@ function saveRide(): void {
 /** When the current ride started, in milliseconds, or null with no ride. */
 export function rideStartedAt(): number | null { return ride?.startedAt ?? null; }
 
-/** Simulator settings from the URL: ?sim=1&speed=5&scale=20&from=0&virtual=1 */
+/** Simulator settings from the URL: ?sim=1&speed=5&scale=20&from=0&virtual=1, and &jitter=urban&seed=3 for a GPS that misbehaves. */
 export function simFromUrl(): SimOptions | null {
   const q = new URLSearchParams(location.search);
   if (q.get("sim") !== "1") return null;
-  return { speed: Number(q.get("speed") ?? 5), scale: Number(q.get("scale") ?? 1), from: Number(q.get("from") ?? 0), virtualAudio: q.get("virtual") === "1" };
+  const j = q.get("jitter");
+  return {
+    speed: Number(q.get("speed") ?? 5), scale: Number(q.get("scale") ?? 1), from: Number(q.get("from") ?? 0), virtualAudio: q.get("virtual") === "1",
+    jitter: j === "urban" || j === "clean" ? j : null, seed: Number(q.get("seed") ?? 1),
+  };
 }
 
 export async function loadPack(id: string): Promise<Pack> {
@@ -111,6 +118,8 @@ export async function startRide(p: Pack, sim: SimOptions | null = simFromUrl(), 
   // every real ride is recorded on the device, so a problem met on the road can be replayed as a test
   const rec = sim ? null : beginRecording({ packId: p.id, version: packIndex.value.find((e) => e.id === p.id)?.version ?? null, startAt: 0, app: isNative() ? "android" : "web" });
   ride = { pack: p, source, engine, mixer, director, wake: await acquireWake(), startedAt: resume?.startedAt ?? Date.now(), stopEffects, rec };
+  // a new version of the app's code never switches in during a ride, even if Android restarts the app
+  if (!sim && isNative()) void import("./update/store").then((m) => m.appStore.rideStarted()).catch(() => {});
   let lastFix: Fix | null = null;
   chooseHook = (stop: number) => {
     if (!choosing || ride?.engine !== engine) return;

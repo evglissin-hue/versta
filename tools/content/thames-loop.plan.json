@@ -1,5 +1,5 @@
 {
- "comment": "Segments listed here are planned again by tools/router.py. Every other segment keeps its current line. via points are [lng, lat], approximate: the router snaps each to the nearest rideable way within 200 m.",
+ "comment": "Segments listed here are planned again by tools/router.py. Every other segment keeps its current line. via points are [lng, lat], approximate: the router snaps each to the nearest rideable way within 200 m. Splits: Whitechapel (stop 11) sits at the top of Settles Street, at the Fieldgate Street corner, where Tower House is in view across the street; the line itself is unchanged.",
  "replan": {
   "4": {
    "why": "Follow the river and National Cycle Route 4 through Deptford: South Dock lock, Pepys Park, Deptford Strand, Sayes Court, Deptford Green, then the swing bridge at the mouth of Deptford Creek. Not Evelyn Street.",
@@ -60,5 +60,11 @@
    ],
    "gate": 25
   }
+ },
+ "splits": {
+  "11": [
+   -0.06451,
+   51.517039
+  ]
  }
 }

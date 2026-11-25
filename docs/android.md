@@ -22,7 +22,33 @@ the old app.
 4. Open Versta. When it asks for location, choose "While using the app" first, then then do the settings below.
 5. Allow notifications when asked. The "Following your ride." notification is what keeps the app alive in your pocket.
 
-To update, repeat steps 1 to 3. The new APK installs over the old one.
+## Updates without reinstalling
+
+From the build that added this section (iteration 7) the installed app updates itself, and the APK above is the last
+one to install by hand, unless a later change touches native code (see below).
+
+- Routes: a new route, or a new version of one, comes from the site. Home checks when the app opens and when it comes
+  back to the front, and "Check for updates" on Home checks at once. A new route's card shows with a Download button;
+  an updated route on the phone updates itself (only the changed files download, each checked against its sha256).
+- The app's own code: every deploy of the site also publishes the Android web bundle with a manifest of every file's
+  sha256 (`dist/app/manifest.json`, written by `tools/app_manifest.mjs` in `npm run build`). Home says "A new version
+  of the app is ready to download" with its size. On Wi-Fi it downloads by itself, on mobile data when you tap
+  "Download the new version". Only the files that differ from the ones the phone has are fetched, and each is checked.
+  Nothing downloads, and nothing is switched, during a ride.
+- The new code starts the next time you open Versta, or at once with "Restart now" on Home. It runs on trial: if it
+  does not start properly within 30 seconds, or fails to start twice, the app goes back to the version before it and
+  never tries that one again. "Use the installed version" at the foot of Home goes back to the APK's own code at any
+  time.
+- When native code changes (Java, Capacitor plugins, `capacitor.config.ts`), raise `level` in
+  `src/update/native-api.json` and `NATIVE_LEVEL` in `AppUpdatePlugin.java` together and record the new fingerprint
+  (the unit test `src/update/native.test.ts` fails until you do, and prints the value). A phone with an older APK
+  then gets "A new version of the app needs a one-time install" with a "Get the app" button instead of web code its
+  APK cannot run, and the APK is installed by hand once more, as in the steps above.
+
+How it is built: `src/update/` (the check, the download into `app/<version>/` with every file verified, the record of
+bundles on the phone), `AppUpdatePlugin.java` and `UpdateState.java` (staging, the trial, rollback, all kept in
+SharedPreferences; the rules have JVM tests in `android/app/src/test`, run by the workflow before the APK is built)
+and `OverlayRoutes.java` (serves the bundle's files over the APK's own, and the APK's for anything the bundle lacks).
 
 ## Settings that stop HyperOS killing it
 
@@ -51,9 +77,9 @@ Locally you need Node 22, JDK 21 and the Android SDK (platform 36, build tools 3
     cd android
     ./gradlew assembleRelease
 
-The APK is at `android/app/build/outputs/apk/release/app-release.apk`. `android:sync` builds the web app, removes the
-service worker and source maps (the app does not need them), and copies the result into the Android project. Set
-`VERSTA_VERSION_CODE` to give a build a higher version code.
+The APK is at `android/app/build/outputs/apk/release/app-release.apk`. `android:sync` builds the web app, uses the
+Android start page `dist/app/index.html` (no service worker), and copies the result into the Android project. Set
+`VERSTA_VERSION_CODE` to give a build a higher version code. `./gradlew testReleaseUnitTest` runs the native unit tests.
 
 ## How it works
 

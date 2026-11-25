@@ -18,6 +18,10 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Plugins that live in the app itself must be registered before the bridge starts.
         registerPlugin(KeepAwakePlugin.class);
+        registerPlugin(AppUpdatePlugin.class);
+        // Live updates of the web code: promote or roll back a downloaded bundle, then serve its files over the APK's.
+        AppUpdatePlugin.boot(this);
+        bridgeBuilder.setRouteProcessor(new OverlayRoutes());
         super.onCreate(savedInstanceState);
 
         // The hardware volume buttons control the media stream, which is what the stories and the bed play on.

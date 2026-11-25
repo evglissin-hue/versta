@@ -1,19 +1,22 @@
 import { useEffect } from "preact/hooks";
-import { IDLE_NAV, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, routeStatus, screen, settings, simulated, startChoice } from "../state";
+import { IDLE_NAV, appUpdate, gpsError, nav, nowPlaying, openStop, pack, packBase, packIndex, routeStatus, screen, settings, simulated, startChoice, updateCheck } from "../state";
 import type { Detour, LngLat, NavState, Pack, PackIndexEntry, RouteStatus } from "../types";
 import { nativeDemo } from "./Home";
 import { nearbyDemo } from "./Nearby";
 import { nearbyOpen, recordingsDemo, recordingsOpen, soundCheckOpen, demoRide, finishOpen, finishedAt, following, firstRideSheet, lastTouch, netDown, peek, ringDemo, sceneOpen, soundOpen, startFailure, startPhase, stopsOpen, wholeRoute } from "./uistate";
 
-/** Preview route /?demo=ride&step=N[&pack=<id>]: the ride screen driven by hand-made state. No GPS, no audio, no ride controller. */
-export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings", "routes", "routes-held", "nearby", "nearby-playing"] as const;
+/**
+ * Preview route /?demo=ride&step=N[&pack=<id>][&stop=K]: the ride screen driven by hand-made state. No GPS, no audio, no
+ * ride controller. `stop` picks the stop the at-stop and stop-sheet screens show.
+ */
+export const DEMO_STEPS = ["locating", "to-start", "riding", "off-route", "at-stop", "story", "aside", "gps-denied", "stops-list", "sound", "recentre", "continue", "start-choice", "scene-hidden", "stop-sheet", "finish", "detour-turn", "detour-plain", "follow-course", "follow-north", "follow-free", "whole-route", "then", "wrong-way", "dock-time", "first-ride", "loading", "load-failed", "offline", "story-manual", "soundcheck", "recordings", "routes", "routes-held", "nearby", "nearby-playing", "updates", "updates-news", "updates-app"] as const;
 
 /** A point `m` metres from `p`, north (positive dy) and east (positive dx). */
 function shift(p: LngLat, dx: number, dy: number): LngLat {
   return [p[0] + dx / (111320 * Math.cos((p[1] * Math.PI) / 180)), p[1] + dy / 111320];
 }
 
-const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline", "routes", "routes-held", "nearby", "nearby-playing"];
+const HOME_STEPS = ["continue", "first-ride", "loading", "load-failed", "offline", "routes", "routes-held", "nearby", "nearby-playing", "updates", "updates-news", "updates-app"];
 
 /** The real index, kept so stepping away from the route-state demos puts it back. */
 let realIndex: PackIndexEntry[] = [];
@@ -42,6 +45,28 @@ function routeCards(step: string): { cards: PackIndexEntry[]; status: Record<str
   ]);
 }
 
+/** The Updates panel of the Android app: up to date; a new route and a new app version ready; an app update on mobile data after a failed look. */
+function demoUpdates(step: string): void {
+  const now = Date.now();
+  packIndex.value = realIndex;
+  const phone = (id: string): RouteStatus => ({ kind: "on-phone", source: "built-in", version: realIndex.find((e) => e.id === id)?.version ?? "v1", bytes: realIndex.find((e) => e.id === id)?.bytes ?? 0, update: null });
+  const st: Record<string, RouteStatus> = Object.fromEntries(realIndex.map((e) => [e.id, phone(e.id)]));
+  const installed = { version: "0973ea0599737cce", builtAt: new Date(now - 26 * 3600_000).toISOString(), source: "installed" as const };
+  if (step === "updates") {
+    updateCheck.value = { checking: false, at: now - 4 * 60_000, ok: true };
+    appUpdate.value = { running: installed, status: { kind: "none" } };
+  } else if (step === "updates-news") {
+    const last = realIndex[realIndex.length - 1];
+    if (last) st[last.id] = { kind: "on-site", bytes: last.bytes ?? 7_700_000, transfer: null, removed: false };
+    updateCheck.value = { checking: false, at: now - 60_000, ok: true };
+    appUpdate.value = { running: installed, status: { kind: "ready" } };
+  } else {
+    updateCheck.value = { checking: false, at: now - 2 * 60_000, ok: false };
+    appUpdate.value = { running: { ...installed, source: "downloaded" }, status: { kind: "available", bytes: 420_000, held: "not-wifi" } };
+  }
+  routeStatus.value = st;
+}
+
 function demoState(p: Pack, step: string): void {
   const seg = p.segments[2]!;
   const on = seg[Math.floor(seg.length * 0.4)]!;
@@ -55,11 +80,17 @@ function demoState(p: Pack, step: string): void {
   nearbyOpen.value = false; nearbyDemo.value = null;
   firstRideSheet.value = null; startPhase.value = null; startFailure.value = null; netDown.value = false;
   const routesStep = step === "routes" || step === "routes-held";
-  nativeDemo.value = routesStep;
+  const updatesStep = step.startsWith("updates");
+  nativeDemo.value = routesStep || updatesStep;
+  updateCheck.value = { checking: false, at: null, ok: null };
+  appUpdate.value = { running: null, status: { kind: "none" } };
   if (routesStep) { const r = routeCards(step); packIndex.value = r.cards; routeStatus.value = r.status; }
+  else if (updatesStep) demoUpdates(step);
   else { packIndex.value = realIndex; routeStatus.value = {}; }
   screen.value = HOME_STEPS.includes(step) ? "home" : "ride";
   const story = p.stops[2]!.stories[0]!;
+  const asked = new URLSearchParams(location.search).get("stop");
+  const stopOr = (d: number): number => (asked !== null && Number.isInteger(Number(asked)) && Number(asked) >= 0 && Number(asked) < p.stops.length ? Number(asked) : d);
   const tagged = p.asides.find((a) => a.tags.length > 0) ?? p.asides[0]!;
   const off = shift(on, 0, 70);
   const offFix = { ...fix, lng: off[0], lat: off[1] };
@@ -81,8 +112,8 @@ function demoState(p: Pack, step: string): void {
     case "off-route": nav.value = lost; break;
     case "detour-turn": nav.value = { ...lost, detour: way({ turn: "left", name: p.cues[3]?.name ?? "the next street", at: seg[Math.min(seg.length - 1, k + 2)]!, dist: 120 }) }; break;
     case "detour-plain": nav.value = { ...lost, detour: way(null) }; break;
-    case "at-stop": nav.value = { ...base, status: "at_stop", toStop: 0, nextCue: null, toCue: null, arrived: [0, 1, 2] }; openStop.value = 2; break;
-    case "stop-sheet": nav.value = base; openStop.value = 5; break;
+    case "at-stop": nav.value = { ...base, status: "at_stop", toStop: 0, nextCue: null, toCue: null, arrived: [0, 1, 2] }; openStop.value = stopOr(2); break;
+    case "stop-sheet": nav.value = base; openStop.value = stopOr(5); break;
     case "story": nav.value = { ...base, status: "at_stop", toStop: 0, arrived: [0, 1, 2] }; nowPlaying.value = { kind: "story", stop: 2, story, para: 1, paused: false, manual: false }; break;
     case "scene-hidden": nav.value = base; nowPlaying.value = { kind: "story", stop: 2, story, para: 1, paused: false, manual: false }; setTimeout(() => { sceneOpen.value = false; }, 600); break;
     case "finish": {

@@ -8,13 +8,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMixer } from "../../src/audio/mixer";
 import { createNavEngine } from "../../src/nav/engine";
 import { createDirector } from "../../src/story/director";
-import { cumulative, makeProjection, pointAlong, project, unproject } from "../../src/geo";
+import { createJitter } from "../../src/nav/jitter";
+import { cumulative, dist, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../../src/geo";
 import { DEFAULT_SETTINGS, type DirectorLogEntry, type Fix, type Mixer, type NowPlaying, type Pack, type Settings, type SoundEvent } from "../../src/types";
 import { PACKS, loaded, segInfo, straySide } from "./packs";
 import { bedAfterLeave, effectProblems, heldVoice, lateCues, speechOverlaps, waitedTooLong } from "./timeline";
 
+/** How steady the rider's marker was against where the rider really was (jittered rides). */
+interface Steadiness { p95: number; worstStep: string | null; worstBack: number; worstBackAt: string | null; samples: number }
+
 interface RideResult {
   log: DirectorLogEntry[]; arrived: number[]; status: string; overlaps: string[]; seconds: number; late: string[]; leads: number[];
+  steady: Steadiness; lateInGap: string[];
+  /** Cues the rider passed while the phone gave no fix (a gap in the last 8 s before the turn): no app could time those. */
+  gapCues: string[];
   /** The sound timeline, when the rider left each stop, when each turn was passed, and when the director stopped or paused the voice. */
   timeline: readonly SoundEvent[]; leaves: number[]; turnAt: Map<string, number>; deliberate: number[];
 }
@@ -75,8 +82,11 @@ function watched(inner: Mixer, overlaps: string[], clock: () => number, delibera
   });
 }
 
-/** Ride every segment at `speed` m/s. The rider stands still while a story plays at a stop, as a real one would. */
-async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fromSeg = 1, detour: Detour | null = null): Promise<RideResult> {
+/**
+ * Ride every segment at `speed` m/s. The rider stands still while a story plays at a stop, as a real one would. With
+ * `jitter`, every true position goes through the urban GPS model of src/nav/jitter.ts (seeded) on its way to the engine.
+ */
+async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fromSeg = 1, detour: Detour | null = null, jitter: { seed: number } | null = null): Promise<RideResult> {
   const settings = { ...DEFAULT_SETTINGS, ...patch };
   const proj = makeProjection(pack.stops[0]!.at);
   // the mixer stamps its timeline with Date.now (faked), which runs in step with the ride's clock
@@ -99,18 +109,89 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
     pack, mixer, settings: () => settings, clock: () => Date.now(), timeScale: 1,
     onNowPlaying: (n) => { now = n; }, onLog: (e) => log.push(e),
   });
-  const feed = async (lng: number, lat: number, heading: number | null, moving: boolean): Promise<void> => {
-    const fix: Fix = { lng, lat, accuracy: 6, heading, speed: moving ? speed : 0, time: clock };
+  const model = jitter ? createJitter(jitter.seed, "urban") : null;
+  /** When the GPS last gave nothing for a second, and the late cues that a gap explains. */
+  let lastGap = -Infinity;
+  const lateInGap: string[] = [];
+  const gapSeconds = new Set<number>();
+  /** When the rider really passed each cue. */
+  const passAt = new Map<string, number>();
+  const segPts = pack.segments.map((line) => { const pts = line.map((q) => project(proj, q)); return { pts, cum: cumulative(pts) }; });
+  const offs: number[] = [];
+  let worstStep: { by: number; at: number } | null = null;
+  let worstBack = 0;
+  let worstBackAt: string | null = null;
+  let prevShown: XY | null = null;
+  let prevTruth: XY | null = null;
+  /** The drawn marker's place along the line at the previous sampled second. */
+  let prevAlong: { seg: number; along: number } | null = null;
+  const trace: string[] = [];
+  let traceTruth: XY = [0, 0];
+  const feedOne = (fix: Fix): void => {
     const events = engine.update(fix);
+    if (process.env.HUNT_TRACE) {
+      const st = engine.state;
+      const raw = project(proj, [fix.lng, fix.lat]);
+      const pos = st.pos ? project(proj, st.pos) : raw;
+      const d = (a: XY, b: XY): string => Math.hypot(a[0] - b[0], a[1] - b[1]).toFixed(0);
+      trace.push(`${((clock - T0) / 1000).toFixed(0)}s seg${st.seg} ${st.status}${st.offRoute ? " OFF" : ""} along ${st.alongSeg.toFixed(0)} offBy ${st.offBy.toFixed(1)} acc ${fix.accuracy.toFixed(0)} raw-truth ${d(raw, traceTruth)} pos-truth ${d(pos, traceTruth)} truth ${traceTruth.map((v) => v.toFixed(0))} pos ${pos.map((v) => v.toFixed(0))} sigma ${(st.posAccuracy ?? 0).toFixed(1)} spd ${fix.speed?.toFixed(1)} hd ${fix.heading?.toFixed(0)} ev ${events.map((e) => e.type).join(",")}`);
+      if (trace.length > 60) trace.shift();
+      const win = process.env.HUNT_WINDOW?.split(",").map(Number);
+      if (win && (clock - T0) / 1000 >= win[0]! && (clock - T0) / 1000 <= win[1]!) {
+        const sh = st.shown ? project(proj, st.shown) : raw;
+        const g = segPts[st.seg]!;
+        console.log(`${trace[trace.length - 1]} shown-truth ${d(sh, traceTruth)} shownAlong ${nearestOnPolyline(g.pts, sh, g.cum, st.alongSeg - 150, st.alongSeg + 150).along.toFixed(0)} hd ${st.shownHeading?.toFixed(0)} route ${st.routeBearing?.toFixed(0)}`);
+      }
+      if (events.some((e) => e.type === "off_route" || e.type === "wrong_way")) console.log(`--- ${pack.id} ${events.map((e) => e.type).join(",")}\n${trace.join("\n")}`);
+    }
     const passed = engine.state.currentCue?.id;
     if (passed && !turnAt.has(passed)) turnAt.set(passed, clock);
     for (const e of events) {
       if (e.type === "leave") leaves.push(clock);
       if (e.type !== "cue" || e.cue.turn === "depart" || e.cue.quiet) continue;
       if (e.phase === "approach") { warned.add(e.cue.id); leads.push(engine.state.toCue ?? 0); }
-      else if (!warned.has(e.cue.id)) late.push(e.cue.id);
+      // "Continue onto ..." heard at the junction itself asks nothing of the rider: only real turns must be warned of
+      else if (!warned.has(e.cue.id) && e.cue.turn !== "straight") {
+        // a phone that gave no fix while the rider passed the warning point cannot warn: that is the GPS, not a dead end
+        if (clock - lastGap <= 12_000) lateInGap.push(e.cue.id);
+        else late.push(e.cue.id);
+      }
     }
     director.handle(events, engine.state);
+  };
+  const feed = async (lng: number, lat: number, heading: number | null, moving: boolean): Promise<void> => {
+    if (!model) feedOne({ lng, lat, accuracy: 6, heading, speed: moving ? speed : 0, time: clock });
+    else {
+      const truth = project(proj, [lng, lat]);
+      traceTruth = truth;
+      const got = model.next({ p: truth, time: clock, speed: moving ? speed : 0, heading: moving ? heading : null });
+      for (const r of got) {
+        const ll = unproject(proj, r.p);
+        feedOne({ lng: ll[0], lat: ll[1], accuracy: r.accuracy, heading: r.heading, speed: r.speed, time: r.time, receivedAt: r.receivedAt });
+      }
+      if (got.length === 0) { lastGap = clock; gapSeconds.add(clock); }
+      // the marker against the truth, while riding the line, at the seconds the phone gave a fix (in a gap it cannot move)
+      const st = engine.state;
+      if (got.some((r) => r.time === clock) && st.status === "riding" && !st.offRoute && st.shown) {
+        const shown = project(proj, st.shown);
+        offs.push(Math.hypot(shown[0] - truth[0], shown[1] - truth[1]));
+        if (process.env.HUNT_ERRS && offs[offs.length - 1]! > Number(process.env.HUNT_ERRS)) console.log(`err ${offs[offs.length - 1]!.toFixed(1)} | ${trace[trace.length - 1] ?? ""}`);
+        if (prevShown && prevTruth) {
+          const step = Math.hypot(shown[0] - prevShown[0], shown[1] - prevShown[1]) - Math.hypot(truth[0] - prevTruth[0], truth[1] - prevTruth[1]);
+          if (!worstStep || step > worstStep.by) worstStep = { by: step, at: clock };
+        }
+        const g = segPts[st.seg]!;
+        const along = nearestOnPolyline(g.pts, shown, g.cum, st.alongSeg - 150, st.alongSeg + 150).along;
+        // back along the line as far as the marker really moved: where the line folds back on itself near a stop, a
+        // marker that hardly moves can project onto the other fold
+        const back = moving && prevAlong && prevShown && prevAlong.seg === st.seg ? Math.min(prevAlong.along - along, dist(shown, prevShown)) : 0;
+        if (prevAlong && back > worstBack) {
+          worstBack = back;
+          worstBackAt = `${(clock - T0) / 1000} s, segment ${st.seg}, ${prevAlong.along.toFixed(0)} m to ${along.toFixed(0)} m`;
+        }
+        prevShown = shown; prevTruth = truth; prevAlong = { seg: st.seg, along };
+      } else { prevShown = null; prevTruth = null; prevAlong = null; }
+    }
     clock += 1000;
     await vi.advanceTimersByTimeAsync(1000);
   };
@@ -136,6 +217,7 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
     let strayed = false;
     for (let d = 0; d <= total; d += speed) {
       const at = pointAlong(pts, d, cum);
+      for (const c of pack.cues) if (c.seg === seg && !passAt.has(c.id) && d >= cum[c.i]!) passAt.set(c.id, clock);
       if (detour && !strayed && seg === detour.seg && d >= total * detour.at) {
         strayed = true;
         // out sideways, wait off the line, and back to the same point
@@ -161,9 +243,13 @@ async function ride(pack: Pack, speed: number, patch: Partial<Settings> = {}, fr
   for (let i = 0; i < 600 && now !== null; i++) await feed(pack.stops.at(-1)!.at[0], pack.stops.at(-1)!.at[1], null, false);
   // let the bed fade and the last sounds finish
   for (let i = 0; i < 40; i++) { clock += 1000; await vi.advanceTimersByTimeAsync(1000); }
+  const sorted = [...offs].sort((a, b) => a - b);
+  const ws = worstStep as { by: number; at: number } | null;
   const result: RideResult = {
     log, arrived: [...engine.state.arrived], status: engine.state.status, overlaps, seconds: (clock - T0) / 1000, late, leads,
-    timeline: [...inner.timeline], leaves, turnAt, deliberate,
+    timeline: [...inner.timeline], leaves, turnAt, deliberate, lateInGap,
+    gapCues: [...passAt].filter(([, t]) => [...gapSeconds].some((g) => g >= t - 8000 && g <= t + 2000)).map(([id]) => id),
+    steady: { p95: sorted.length ? sorted[Math.floor(sorted.length * 0.95)]! : 0, worstStep: ws ? `${ws.by.toFixed(1)} m at ${(ws.at - T0) / 1000} s` : null, worstBack, worstBackAt, samples: offs.length },
   };
   director.dispose();
   return result;
@@ -282,6 +368,46 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("whole rides of %s, en
     expect(r.overlaps).toEqual([]);
     expect(soundProblems(pack, r)).toEqual([]);
   }, 180_000);
+
+  // The class check for issue 1 of iteration 7: a GPS that jumps about in a city must not move the marker or make
+  // the engine say off route, wrong way or rerouting, and every stop, turn and core story must still come.
+  it.each([[4.5, 1], [4.5, 2], [7, 3], [7, 4]])("urban GPS jitter at %s m/s (seed %s): no false alarms, everything said, a steady marker", async (speed, seed) => {
+    const r = await ride(pack, speed, {}, 1, null, { seed });
+    expect(r.status).toBe("finished");
+    expect(ids(r.log, "arrive")).toEqual(pack.stops.map((_, i) => String(i)));
+    for (const what of ["off_route", "wrong_way", "detour", "back_on_route"] as const) expect(ids(r.log, what), `no ${what} in jitter`).toEqual([]);
+    const spoken = ids(r.log, "cue_spoken");
+    expect(new Set(spoken).size).toBe(spoken.length);
+    // a turn the rider reached in a GPS gap stays unsaid (said after it, it would send the rider down the wrong street);
+    // the rider is still never sent off route for it, which the checks above make sure of
+    const unsaid = pack.cues.filter((c) => !c.quiet && !spoken.includes(c.id)).map((c) => c.id);
+    expect(unsaid.filter((id) => !r.gapCues.includes(id)), "turns never spoken").toEqual([]);
+    expect(unsaid.length, `GPS gaps explain only a few unsaid turns (${unsaid.join(", ")})`).toBeLessThanOrEqual(3);
+    expect(r.late, "turns first heard at the turn").toEqual([]);
+    const core = pack.stops.flatMap((st) => st.stories.filter((x) => x.kind === "core").map((x) => x.id));
+    expect(core.filter((id) => !ids(r.log, "story_start").includes(id)), "core stories never played").toEqual([]);
+    expect(ids(r.log, "story_stopped"), "stories cut off").toEqual([]);
+    expect(r.steady.samples).toBeGreaterThan(500);
+    // at 7 m/s a GPS gap of several seconds that ends in a multipath spell pulls the estimate off for a while (see
+    // docs/build/iteration-7-rounds.md): the bound is wider there
+    const p95Max = speed >= 7 ? 18 : 15;
+    expect(r.steady.p95, `the marker within ${p95Max} m of the rider, 95 percent of the time`).toBeLessThan(p95Max);
+    const step = r.steady.worstStep ? Number(r.steady.worstStep.split(" ")[0]) : 0;
+    expect(step, `the marker never leaps more than 15 m beyond the rider's own movement (${r.steady.worstStep})`).toBeLessThan(15);
+    // back along the line no further than a leap: where the line folds back past itself the marker can hop to the
+    // right fold (11 m at worst in these rides); before the hold it slid back 30 m in multipath
+    expect(r.steady.worstBack, `the marker never slides back along the line by more than 15 m (${r.steady.worstBackAt})`).toBeLessThan(15);
+    expect(soundProblems(pack, r)).toEqual([]);
+  }, 240_000);
+
+  it("a real detour in urban GPS jitter is still caught, once, and the ride finishes", async () => {
+    const { seg, rad } = detourAt(pack);
+    const r = await ride(pack, 4, {}, 1, { seg, at: 0.5, metres: 250, seconds: 30, rad }, { seed: 5 });
+    expect(r.status).toBe("finished");
+    expect(r.arrived).toEqual(pack.stops.map((_, i) => i));
+    expect(r.log.filter((e) => e.what === "off_route").length, `one off route on segment ${seg}`).toBe(1);
+    expect(r.log.filter((e) => e.what === "back_on_route").length).toBe(1);
+  }, 240_000);
 
   it("at every stop the rider counts as at the stop until they ride away", async () => {
     // A route that doubles back past its own stop once made the engine think the rider had left at once (Deptford).

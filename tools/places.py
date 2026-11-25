@@ -49,6 +49,8 @@ def write(base=PACKS, out=None):
     out = out or os.path.join(ROOT, "public", "places.json")
     places = []
     for e in json.load(open(os.path.join(base, "index.json"), encoding="utf-8"))["packs"]:
+        # a trial build (build_pack.py --out) holds only the pack it built
+        if not os.path.exists(os.path.join(base, e["id"], "pack.json")) and base != PACKS: continue
         pack = json.load(open(os.path.join(base, e["id"], "pack.json"), encoding="utf-8"))
         places += places_of(pack, os.path.join(base, e["id"]))
     body = ",\n".join(" " + json.dumps(p, separators=(",", ":"), ensure_ascii=False) for p in places)

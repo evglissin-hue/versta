@@ -8,8 +8,13 @@ const loc: PluginLocation = { latitude: 51.5, longitude: -0.12, accuracy: 7, bea
 afterEach(() => { delete (globalThis as { Capacitor?: unknown }).Capacitor; });
 
 describe("locationToFix", () => {
-  it("maps every field, heading from bearing", () => {
-    expect(locationToFix(loc)).toEqual({ lng: -0.12, lat: 51.5, accuracy: 7, heading: 90, speed: 4.2, time: 1_700_000_000_000 });
+  it("maps every field, heading from bearing, and stamps when the fix arrived", () => {
+    expect(locationToFix(loc, () => 1_700_000_000_400)).toEqual({ lng: -0.12, lat: 51.5, accuracy: 7, heading: 90, speed: 4.2, time: 1_700_000_000_000, receivedAt: 1_700_000_000_400 });
+  });
+  it("a missing or zero accuracy is unknown (50 m), never perfect", () => {
+    expect(locationToFix({ ...loc, accuracy: null as unknown as number }).accuracy).toBe(50);
+    expect(locationToFix({ ...loc, accuracy: 0 }).accuracy).toBe(50);
+    expect(locationToFix({ ...loc, accuracy: NaN }).accuracy).toBe(50);
   });
   it("keeps unknown heading and speed as null and fills a missing time", () => {
     const fix = locationToFix({ ...loc, bearing: null, speed: null, time: null }, () => 42);

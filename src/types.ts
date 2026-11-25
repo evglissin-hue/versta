@@ -187,6 +187,34 @@ export interface RouteUpdate {
   ready: boolean;
 }
 
+/** The last look at the site for new routes and app updates (Android app): under way, and when it last ended and how. */
+export interface UpdateCheck { checking: boolean; at: number | null; ok: boolean | null }
+
+/* ------------------------------------------------------------------ the app's own code (Android app, src/update) */
+
+/** One build of the app's web code: the APK's own, or one downloaded from the site (iteration 7, task 35). */
+export interface AppVersion {
+  /** Content version: a hash of every file of the bundle (tools/app_manifest.mjs). */
+  version: string;
+  /** When it was built, UTC ISO date-time. Of two versions, the later build is the newer. */
+  builtAt: string;
+  source: "installed" | "downloaded";
+}
+
+/** What the phone knows about a newer version of the app's code. */
+export type AppUpdateStatus =
+  | { kind: "none" }
+  /** On the site, not downloaded yet: it waits for Wi-Fi or a tap (`held`), or for the ride to end. */
+  | { kind: "available"; bytes: number; held: "not-wifi" | "riding" | null }
+  | { kind: "downloading"; done: number; total: number }
+  | { kind: "failed"; bytes: number }
+  /** Downloaded, checked and staged: it starts the next time the app opens, or now with Restart now. */
+  | { kind: "ready" }
+  /** The newer version needs native changes this APK does not have: a one-time install. */
+  | { kind: "needs-app" };
+
+export interface AppUpdateState { running: AppVersion | null; status: AppUpdateStatus }
+
 /** What the Android app has of a route. The web app does not use this (it reads the site as before). */
 export type RouteStatus =
   | { kind: "on-phone"; source: "built-in" | "downloaded"; version: string; bytes: number; update: RouteUpdate | null }
@@ -256,15 +284,23 @@ export interface RideRecording {
 export interface Fix {
   lng: number;
   lat: number;
-  /** Horizontal accuracy in metres (68 percent radius). */
+  /** Horizontal accuracy in metres (68 percent radius). A source that is not told sets UNKNOWN_ACCURACY, never 0. */
   accuracy: number;
   /** Degrees clockwise from north, or null when unknown. */
   heading: number | null;
   /** Metres per second, or null when unknown. */
   speed: number | null;
-  /** Milliseconds. Real sources use Date.now(); the simulator uses its own clock. */
+  /** When the position was measured, milliseconds. Real sources use the device's time of the fix; the simulator its own clock. */
   time: number;
+  /**
+   * When the fix reached the app, on the same clock as `time`. A fix that arrives long after it was measured is
+   * stale and the position filter drops it. Absent in old recordings: then the fix counts as on time.
+   */
+  receivedAt?: number;
 }
+
+/** The accuracy a source reports when the device does not say. Large enough that such a fix moves little. */
+export const UNKNOWN_ACCURACY = 50;
 
 export type GpsError = "denied" | "unavailable" | "timeout" | "unsupported";
 
@@ -290,7 +326,19 @@ export type NavStatus =
 
 export interface NavState {
   status: NavStatus;
+  /** The last fix the engine was given, as the device reported it (shown in the banner and the recording). */
   fix: Fix | null;
+  /** Where the position filter puts the rider (src/nav/filter.ts). Every decision of the engine reads this. */
+  pos?: LngLat | null;
+  /** The filter's honest error of `pos`, metres (1 sigma). It never trusts less than a few metres. */
+  posAccuracy?: number | null;
+  /**
+   * Where the map draws the rider: on the line while the rider plausibly rides it, blending to `pos` as the
+   * offset grows, `pos` itself when off route or not yet on the route.
+   */
+  shown?: LngLat | null;
+  /** The direction the marker's arrow points, degrees clockwise from north, or null when standing. */
+  shownHeading?: number | null;
   /** Position snapped onto the route, or null before the first snap. */
   snapped: LngLat | null;
   /** Index of the stop being ridden towards. 0 means the start. */

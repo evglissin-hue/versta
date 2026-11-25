@@ -70,10 +70,10 @@ const isTurn = (c: Cue | null | undefined): c is Cue => !!c && c.turn !== "strai
  * midpoint of the rider and the turn point, so both stay on screen. `cue` is the turn it frames. Null when no frame applies.
  */
 export function turnFrame(
-  nav: Pick<NavState, "nextCue" | "toCue" | "currentCue" | "snapped" | "fix" | "speedAvg">,
+  nav: Pick<NavState, "nextCue" | "toCue" | "currentCue" | "snapped" | "fix" | "speedAvg" | "shown">,
   base: number,
 ): { zoom: number; focus: LngLat | null; cue: string } | null {
-  const rider: LngLat | null = nav.snapped ?? (nav.fix ? [nav.fix.lng, nav.fix.lat] : null);
+  const rider: LngLat | null = nav.shown ?? nav.snapped ?? (nav.fix ? [nav.fix.lng, nav.fix.lat] : null);
   const zoom = Math.min(FOLLOW_ZOOM_MAX, Math.max(base, TURN_ZOOM));
   const mid = (to: LngLat): LngLat | null => (rider ? [(rider[0] + to[0]) / 2, (rider[1] + to[1]) / 2] : null);
   const speed = nav.speedAvg ?? nav.fix?.speed ?? 4;

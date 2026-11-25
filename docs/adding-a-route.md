@@ -10,6 +10,11 @@ A route pack is built by Claude in a working session, then committed. The app on
      ([lng, lat], in order; each is a gate the line must pass within `gate` metres, default 60), optional `avoid`
      (street name to a cost multiplier for that segment only) and `keep_old: true` to keep the first line when the
      router's is worse. A via point in the water or in a closed site only makes the line wander: check the picture.
+     When a stop moves, give the segments either side `to` and `from` ([lng, lat], the stop's new point); a stop that
+     only slides along the line it already sits on goes in `"splits": {"<stop number>": [lng, lat]}` instead, which
+     moves the boundary between its two segments and leaves the line itself alone. `--only=1,2,stop11` plans just
+     those segments and splits and leaves every other segment, and its recorded cues, as it is. The tool prints a GAP
+     line wherever a segment does not start where the one before it ends.
    - `OSM_DIR=/tmp/osm python3 tools/fetch_osm.py <id> 700` downloads the OpenStreetMap extracts within 700 m of the
      line, the old line and the via points (one request per cell, with a pause, reusing what is on disk; `--dry`
      counts the missing cells first). The corridor graph needs 500 m, so fetch for the whole route.
@@ -22,6 +27,14 @@ A route pack is built by Claude in a working session, then committed. The app on
      magenta, water blue, cycle routes green, walking sections ochre, stops numbered, cue streets named). Look at every
      picture: fix lines through water, pointless loops, and walking sections that a nearby street would avoid.
      `--box=lng0,lat0,lng1,lat1` draws a zoomed view.
+   - A stop is where the rider stands to see what its stories are about: its point is the viewpoint, and the stop's
+     `note` says where to stand and where to look. When the view is off the main line, the line goes to it: the
+     segment to the stop runs down the side street to the viewpoint and the next segment starts there (Senate House
+     in the Chelsea Loop: down Malet Street to the Keppel Street corner and back). The builder gives a segment that
+     starts back the way the one before it came the depart cue "Turn back along <street>." Give a viewpoint at the end
+     of a spur `arrive_radius` 25, so the story starts where the view is. Check the view before you choose the point:
+     buildings (OpenStreetMap `height`, else `building:levels`) and street trees can hide even a tall tower from the
+     corner of its own street.
 2. Write the content: `tools/content/<id>.route.json` (stops and stories, see the Thames Loop file for the shape) and
    `<id>.asides.json` (passing-by stories, each anchored to a segment and a street name the route really uses).
    Follow the house style in `CLAUDE.md`. Check every fact. The number of stops is whatever the route file lists: the
@@ -55,9 +68,16 @@ A route pack is built by Claude in a working session, then committed. The app on
    rerouting clips, the generic turn clips and the asides, deletes cue files the pack no longer uses, and sets the
    listening minutes in the index from the recorded files. Pass `--force` to record everything again.
    Then find the phrase marks: `python3 tools/sound/find_breaks.py <id>` writes `tools/content/<id>.breaks.json` (the
-   second each phrase starts in every story and aside clip, from the pauses in the recording), and
-   `python3 tools/pack_sound.py <id>` puts them into `pack.json` without touching the map work. `build_pack.py` runs the
-   same step, so a pack built after narration needs the breaks file first. Run both again after re-recording a clip.
+   second each phrase starts in every story and aside clip, from the pauses in the recording, with every paragraph
+   mark of the audio manifest), and `python3 tools/pack_sound.py <id>` puts them into `pack.json` without touching the
+   map work. `build_pack.py` runs the same step, so a pack built after narration needs the breaks file first. Run both
+   again after re-recording a clip.
+   Changed words only (stories rewritten and recorded again, stop notes, pictures): `python3 tools/pack_content.py <id>`
+   refreshes the stops and stories in `pack.json`, then the sound fields, the index entry, the manifest and the places
+   library, without the map work, so the recorded cues stay valid. It refuses when a stop was added, removed or moved:
+   that needs `build_pack.py`. After a rebuild, a cue whose words changed but whose id stayed the same (cue ids are
+   positions on the line) keeps its old recording: delete its file before `narrate.py`, or compare the new `pack.json`
+   with the old one cue by cue.
    Sound for the pack, all in the route file, then written by `pack_sound.py`:
    - `amb` on each stop (and on a story that needs its own) is a soundscape name from `src/audio/catalogue.json`.
    - `music` on every story is a theme from the same file (`noir`, `river`, `solemn`, `russia`, `bright`, `voyage`).

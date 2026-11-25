@@ -43,7 +43,10 @@ export function initNative(): void {
   // No ride runs at launch: a ride notice still showing was left by an app Android killed mid-ride. Clear it.
   void import("./notify").then((m) => m.rideNotice.clear()).catch(() => {});
   void import("@capacitor/app").then(({ App }) => {
-    void App.addListener("resume", () => { void import("../routes/store").then((m) => m.routeStore.check()); });
+    void App.addListener("resume", () => {
+      void import("../routes/store").then((m) => m.routeStore.check());
+      void import("../update/store").then((m) => m.appStore.check()).catch(() => {});
+    });
     void App.addListener("backButton", () => { handleBack(() => { void App.minimizeApp(); }); });
   }).catch(() => {});
 }

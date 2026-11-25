@@ -20,7 +20,7 @@ def P(lat, lon): return ((lon - LON0) * KX, (LAT0 - lat) * KY)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-import pack_index, pack_sound, pack_manifest, places
+import pack_content, pack_index, pack_sound, pack_manifest, places
 CONTENT = os.path.join(ROOT, "tools", "content")
 OSM_DIR = os.environ.get("OSM_DIR", "/home/claude/osm")
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -292,6 +292,12 @@ def phrase(turn, name, kind):
     if kind == "road": return f"{verb} onto {name}." if turn != "depart" else f"Head along {name}."
     what = {"cycle_path": "the cycle path", "footpath": "the footpath. Walk the bike", "steps": "the steps. Carry the bike", "path": "the path"}[kind]
     return f"{verb} onto {what}." if turn != "depart" else f"Head along {what}."
+def phrase_back(name, kind):
+    """The depart cue of a segment that starts back the way the rider came, as after a viewpoint at the end of a spur."""
+    if kind == "road": return f"Turn back along {name}."
+    return "Turn back along " + {"cycle_path": "the cycle path", "footpath": "the footpath. Walk the bike", "steps": "the steps. Carry the bike", "path": "the path"}[kind] + "."
+# a segment starts back the way the one before it came in when the two bearings are more than this apart, degrees
+BACK_ANGLE = 150
 
 seg_tracks, cues = [[]], []
 for si in range(1, N):
@@ -338,8 +344,13 @@ for si in range(1, N):
             d = math.degrees((b2 - b1 + math.pi) % (2 * math.pi) - math.pi); ad = abs(d); side = "right" if d > 0 else "left"
             turn = "straight" if ad < 25 else ("slight_" + side) if ad < 55 else side if ad < 135 else ("sharp_" + side)
         kd = kind_of(r[0]); ln = int(round(length(r) / 10) * 10)
+        say = phrase(turn, r[0], kd)
+        if k == 0 and si > 1 and len(segs[si - 1]) > 1 and len(s) > 1:
+            prev = segs[si - 1]
+            b1 = bearing(prev[max(0, len(prev) - 5)], prev[-1]); b2 = bearing(s[0], s[min(len(s) - 1, 4)])
+            if abs(math.degrees((b2 - b1 + math.pi) % (2 * math.pi) - math.pi)) > BACK_ANGLE: say = phrase_back(r[0], kd)
         c = {"seg": si, "i": max(0, starts[k]), "at": LL(s[i0]), "turn": turn, "name": r[0] if kd == "road" else {"cycle_path": "cycle path", "footpath": "footpath", "steps": "steps", "path": "path"}[kd],
-             "kind": kd, "len": ln, "say": phrase(turn, r[0], kd)}
+             "kind": kd, "len": ln, "say": say}
         if turn == "straight" and ln < 120: c["quiet"] = True
         cues.append(c)
 
@@ -387,23 +398,7 @@ for si in range(1, len(stops)):
     if first and dep and dep["len"] < rad + 20:
         print(f"WARNING stop {stops[si - 1]['id']}: the first turn after it ({first['say']}) is {dep['len']} m away, inside or near its arrival radius of {rad} m. Set a smaller arrive_radius on the stop or move the stop.")
 
-stops_out = []
-for si, st in enumerate(stops):
-    so = {"id": st["id"], "name": st["name"], "at": [st["lng"], st["lat"]], "note": st["note"], "ambience": st["amb"], "arriveRadius": st.get("arrive_radius", 45), "stories": []}
-    if st.get("pint"): so["pint"] = True
-    for ki, story in enumerate(st["stories"]):
-        key = f"{PACK_ID}/{st['id']}-{ki}"; a = aud.get(key); p = pic_of(key)
-        o = {"id": f"{st['id']}-{ki}", "title": story["title"], "kind": story["kind"], "mood": story["mood"], "tags": story.get("tags", []), "paras": story["paras"]}
-        if story.get("amb"): o["ambience"] = story["amb"]
-        if a: o["audio"] = {"src": f"audio/{st['id']}-{ki}.mp3", "marks": a["marks"], "dur": a["dur"]}
-        if p: o["pic"] = {"src": "img/" + p[0], "caption": p[1]}
-        so["stories"].append(o)
-    stops_out.append(so)
-for st, so in zip(stops, stops_out):
-    if st.get("pack_name"): so["name"] = st["pack_name"]
-    if st.get("pack_id"):
-        so["id"] = st["pack_id"]
-        for o in so["stories"]: o["id"] = st["pack_id"] + o["id"][len(st["id"]):]
+stops_out = pack_content.stops_for(PACK_ID, stops, aud, pic_of)
 for c in cues: c["id"] = f"s{c['seg']:02d}-{c['i']:03d}"; c["audio"] = f"cues/{c['id']}.mp3"
 def seg_len(t): return sum(math.dist(M(a), M(b)) for a, b in zip(t, t[1:]))
 KM = round(sum(seg_len(t) for t in seg_tracks[1:]) / 1000)

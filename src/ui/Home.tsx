@@ -8,6 +8,7 @@ import { heroSrc, packIndex, routeStatus } from "../state";
 import type { PackIndexEntry, RouteUpdate, Transfer } from "../types";
 import { fmtDate, fmtListening, fmtMB, pad2 } from "./format";
 import { Sheet } from "./Sheet";
+import { AppVersionLine, Updates, updatesNeedYou } from "./Updates";
 import { firstRideSheet, nearbyOpen, netDown, recordingsOpen, soundCheckOpen, startFailure, startPhase } from "./uistate";
 
 /** What the route index may carry beyond the contract: counts and listening time for the line under the blurb. */
@@ -225,22 +226,28 @@ export function Home() {
     return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
   }, []);
   const simOn = new URLSearchParams(location.search).get("sim") === "1";
+  // the Updates panel (Android app): at the top while there is something to act on, else above the footer
+  const app = onPhoneApp();
+  const upTop = app && updatesNeedYou();
   return (
     <main class="home">
       <header class="home-top">
         <h1>Versta</h1>
         <p>Rides and walks that tell you their stories as you pass.</p>
       </header>
+      {upTop ? <Updates /> : null}
       <div class="nb-entry">
         <button type="button" class="btn" data-testid="nearby-open" onClick={() => { nearbyOpen.value = true; }}>Nearby places</button>
         <p>Stories of the places around you, off any route.</p>
       </div>
       {packIndex.value.map((e) => <Card key={e.id} entry={e} />)}
+      {app && !upTop ? <Updates /> : null}
       <footer class="foot">
         <p>Pictures are public domain works from Wikimedia Commons. Map data &copy; OpenStreetMap contributors. Map tiles by OpenFreeMap. Your progress stays on this device.</p>
         {isNative() ? null : <p><a class="linkbtn" href={RELEASES} target="_blank" rel="noopener" data-testid="android-link">Android app</a> keeps guiding with the screen off.</p>}
         <p><button type="button" class="linkbtn" onClick={() => { soundCheckOpen.value = true; }}>Sound check</button> lets you hear every sound before you ride.</p>
         <p><button type="button" class="linkbtn" onClick={() => { recordingsOpen.value = true; }}>Ride recordings</button> is what the phone saw on your last rides.</p>
+        {app ? <AppVersionLine /> : null}
         {simOn
           ? <p>Simulation is on: Ride starts a pretend ride. <a class="linkbtn" href={import.meta.env.BASE_URL}>Use real GPS</a></p>
           : <a class="linkbtn" href={`${import.meta.env.BASE_URL}?sim=1&speed=5&scale=8`}>Simulate a ride</a>}

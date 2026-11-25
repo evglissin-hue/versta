@@ -1,10 +1,61 @@
-import { angleDiff, bearing, cumulative, dist, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type XY } from "../geo";
+import { angleDiff, cumulative, dist, makeProjection, nearestOnPolyline, pointAlong, project, unproject, type Nearest, type XY } from "../geo";
 import type { Aside, Cue, Fix, NavEngine, NavEvent, NavOptions, NavState, Pack, RouteGraph } from "../types";
+import { createPositionFilter, type FilterTuning, type Filtered } from "./filter";
 import { buildIndex, findWayBack, type GraphIndex, type WayTarget, type WayTurn } from "./reroute";
 
 export const DEFAULT_NAV_OPTIONS: NavOptions = {
-  maxAccuracy: 80, offRouteDistance: 45, offRouteDelay: 8, cueNowDistance: 15, cueApproachSeconds: 15, cueApproachMin: 70, asideLead: 40,
+  maxAccuracy: 80, offRouteDistance: 40, offRouteDelay: 10, cueNowDistance: 15, cueApproachSeconds: 15, cueApproachMin: 70, asideLead: 40,
 };
+
+/**
+ * Off route (docs/build/it7-31-position.md): a spell starts when the filtered position is beyond the threshold
+ * (offRouteDistance plus the position's error, capped). It fires after offRouteDelay seconds, with OFF_RIDDEN metres
+ * ridden in the spell, and only when the rider is going away from the line (less than half the distance ridden went
+ * along it), or is OFF_FAR metres past the threshold, or the spell has lasted OFF_LONG_SECONDS and OFF_LONG_RIDDEN
+ * metres. Riding along the line with a biased GPS never fires it; standing still never does.
+ */
+const OFF_RIDDEN = 30;
+const OFF_FAR = 30;
+const OFF_LONG_SECONDS = 45;
+const OFF_LONG_RIDDEN = 200;
+/** The spell ends after two fixes this far inside the threshold. */
+const OFF_CLEAR = 10;
+/** The error the thresholds use: the filter's sigma, the reported accuracy (capped), never less than ERR_MIN. */
+const ERR_MIN = 8;
+const ERR_ACC_CAP = 60;
+const ERR_THRESHOLD_CAP = 40;
+/** Back on route takes this many fixes in a row within BACK_ON_ROUTE. */
+const BACK_FIXES = 2;
+/**
+ * Snap back: refused fixes this close to the line, and this close to where the dead reckoning has the rider along it
+ * (plus the distance ridden since the last fix), end a multipath spell. A fix on the line but far up the street is not
+ * the rider coming back: multipath runs along streets as often as across them.
+ */
+const SNAP_BACK_LINE = 15;
+const SNAP_BACK_ALONG = 25;
+const SNAP_BACK_FIXES = 2;
+/** The estimate counts as on the line within this many metres of it: then refused fixes on the line never reset it. */
+const EST_ON_LINE = 20;
+/** Refused fixes on the line but further along than SNAP_BACK_ALONG take over after this many in a row: the track itself was wrong. */
+const ONLINE_FIXES = 4;
+/** Riding, the position along the line advances at most this many times the rider's speed per second, plus ALONG_SLACK metres. */
+const ALONG_RATE = 1.5;
+const ALONG_SLACK = 12;
+/** The drawn marker moves at most the rider's speed times the time since the last fix, plus this many metres: no leaps. */
+const SHOWN_SLACK = 10;
+/** The marker: on the line within SNAP_FULL plus the error (capped at SNAP_FULL), blending to the filtered position over SNAP_BLEND metres. */
+const SNAP_FULL = 25;
+const SNAP_BLEND = 30;
+/**
+ * Riding on at HOLD_SPEED or more, the marker on the line does not slide back: an estimate that falls back by up to
+ * HOLD_BACK metres holds the marker where it is until the estimate catches up. Further back, or heading back, it follows.
+ */
+const HOLD_BACK = 40;
+const HOLD_SPEED = 1.5;
+/** A missed arrival (already on the next segment) needs this many fixes in a row. */
+const MISSED_FIXES = 2;
+/** After a gap in the fixes this long, seconds, the distance the estimate moved counts as ridden (the rider went somewhere). */
+const GAP_SECONDS = 5;
 
 /** Metres from stop 0 beyond which a rider on the line is taken to have joined part way. */
 const JOIN_MIN_FROM_START = 150;
@@ -58,7 +109,6 @@ const WRONG_BACK = 40;
 const WRONG_CLEAR_SECONDS = 5;
 const WRONG_CLEAR_HEADING = 60;
 const WRONG_STOP_RADIUS = 60;
-const MOVED_MIN = 2;
 /** Way back: how far behind the last known position targets are sampled, their spacing, and the penalty factor for behind. */
 const TARGET_BEHIND = 50;
 const TARGET_STEP = 50;
@@ -81,11 +131,11 @@ function initialState(): NavState {
   return {
     status: "locating", fix: null, snapped: null, seg: 0, alongSeg: 0, toStop: 0, distanceDone: 0, distanceLeft: 0,
     routeBearing: null, offRoute: false, offBy: 0, nextCue: null, toCue: null, currentCue: null, arrived: [],
-    thenCue: null, toThen: null, speedAvg: null, wrongWay: false,
+    thenCue: null, toThen: null, speedAvg: null, wrongWay: false, pos: null, posAccuracy: null, shown: null, shownHeading: null,
   };
 }
 
-export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): NavEngine {
+export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}, tuning: Partial<FilterTuning> = {}): NavEngine {
   const o: NavOptions = { ...DEFAULT_NAV_OPTIONS, ...opts };
   const proj = makeProjection(pack.stops[0]!.at);
   const stopPts: XY[] = pack.stops.map((st) => project(proj, st.at));
@@ -117,7 +167,6 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   const radiusOf = (i: number): number => pack.stops[i]!.arriveRadius;
 
   let s: NavState = initialState();
-  let offSince: number | null = null;
   /** Next riding fix searches the whole segment (after a jump). */
   let needFull = false;
   /** Index of the stop the rider is waiting at while status is at_stop. */
@@ -134,8 +183,29 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   let strayingSince: number | null = null;
   let notFoundSaid = false;
   let nearestAt: number | null = null;
-  /** Motion between usable fixes: the previous one, the first one, and what this one says about speed and heading. */
-  let prevFix: { p: XY; time: number } | null = null;
+  /** The position filter every decision reads through (src/nav/filter.ts). */
+  const filter = createPositionFilter(o.maxAccuracy, tuning);
+  /** The error of this fix's filtered position, for every threshold. */
+  let errNow = ERR_MIN;
+  /** The spell of being beyond the off route threshold, before off route fires. */
+  let spell: { since: number; along0: number; ridden: number; clear: number } | null = null;
+  let backFixes = 0;
+  let snapBacks = 0;
+  let onLineFixes = 0;
+  /** This fix as the device gave it lies on the route line, near where the rider is along it: evidence against off route. */
+  let rawOnLine = false;
+  let rawOnLineRun = 0;
+  /** The drawn marker, local metres, and where it is along the line when it is drawn on it. */
+  let shownXY: XY | null = null;
+  let shownAlong: { seg: number; along: number } | null = null;
+  let missed = 0;
+  /** Metres ridden in the current wrong way spell. */
+  let wrongRidden = 0;
+  /** The filtered position at the previous fix, and how far it has moved since. */
+  let lastPos: XY | null = null;
+  let movedNow = 0;
+  /** Motion between usable fixes: the time of the previous one, the first one, and what this one says about speed and heading. */
+  let prevFix: { time: number } | null = null;
   /** Seconds since the fix before this one (0 for the first). */
   let fixGap = 0;
   let firstTime: number | null = null;
@@ -155,23 +225,51 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.wrongWay = false;
     wrongSince = null;
     rightSince = null;
+    wrongRidden = 0;
   }
 
-  /** Update the speed average and this fix's speed and heading. Called once per usable fix. */
-  function trackMotion(fix: Fix, p: XY): void {
+  /** Update the speed average and this fix's speed and heading, from the filter. Called once per usable fix. */
+  function trackMotion(fix: Fix, f: Filtered): void {
     const prev = prevFix;
     const dt = prev ? (fix.time - prev.time) / 1000 : 0;
     fixGap = dt;
-    const moved = prev ? dist(prev.p, p) : 0;
-    curSpeed = fix.speed ?? (dt > 0 ? moved / dt : null);
-    curHeading = fix.heading ?? (prev && moved >= MOVED_MIN ? bearing(prev.p, p) : null);
+    curSpeed = f.speed;
+    curHeading = f.heading;
     if (firstTime === null) firstTime = fix.time;
-    if (curSpeed !== null) {
-      if (avg === null || dt <= 0) avg = avg ?? curSpeed;
-      else avg += (curSpeed - avg) * (1 - Math.exp(-dt / SPEED_TAU));
+    if (avg === null || dt <= 0) avg = avg ?? curSpeed;
+    else avg += (curSpeed - avg) * (1 - Math.exp(-dt / SPEED_TAU));
+    s.speedAvg = fix.time - firstTime >= SPEED_MIN_SECONDS * 1000 ? avg : null;
+    prevFix = { time: fix.time };
+  }
+
+  /** The off route threshold for this fix: wider when the position is less certain, within reason. */
+  const offThreshold = (): number => o.offRouteDistance + Math.min(errNow, ERR_THRESHOLD_CAP);
+
+  /** Metres ridden since the last fix: speed times time, or after a gap in the fixes the distance the estimate moved. */
+  const riddenNow = (): number => (fixGap >= GAP_SECONDS ? Math.max(movedNow, (curSpeed ?? 0) * Math.min(fixGap, 1)) : Math.max(0, curSpeed ?? 0) * fixGap);
+
+  /** Count a fix towards, or away from, an off route spell; fire off_route when the spell says the rider really left. */
+  function offSpell(fix: Fix, n: Nearest, threshold: number, ev: NavEvent[]): void {
+    // the device's own fixes back on the route, two in a row, end a spell: the estimate is what strayed
+    if (spell && rawOnLineRun >= 2) { spell = null; return; }
+    if (n.dist > threshold) {
+      if (!spell) spell = { since: fix.time, along0: n.along, ridden: fixGap >= GAP_SECONDS ? movedNow : 0, clear: 0 };
+      else spell.ridden += riddenNow();
+      spell.clear = 0;
+      const age = (fix.time - spell.since) / 1000;
+      const away = n.along - spell.along0 < 0.5 * spell.ridden;
+      const far = n.dist >= threshold + OFF_FAR;
+      const long = age >= OFF_LONG_SECONDS && spell.ridden >= OFF_LONG_RIDDEN;
+      if (age >= o.offRouteDelay && spell.ridden >= OFF_RIDDEN && (away || far || long) && !rawOnLine) {
+        s.offRoute = true;
+        spell = null;
+        backFixes = 0;
+        clearWrongWay();
+        ev.push({ type: "off_route" });
+      }
+    } else if (spell && n.dist <= threshold - OFF_CLEAR) {
+      if (++spell.clear >= 2) spell = null;
     }
-    s.speedAvg = avg !== null && fix.time - firstTime >= SPEED_MIN_SECONDS * 1000 ? avg : null;
-    prevFix = { p, time: fix.time };
   }
 
   /** Notice a rider following the line backwards. Only called while riding on the line. */
@@ -187,9 +285,11 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     }
     const nearStop = pack.stops.some((_, i) => dist(p, stopAt(i)) <= WRONG_STOP_RADIUS);
     const bad = !nearStop && diff !== null && diff > WRONG_HEADING && curSpeed !== null && curSpeed > WRONG_MIN_SPEED;
-    if (!bad) { wrongSince = null; return; }
-    if (wrongSince === null) { wrongSince = fix.time; wrongFrom = s.alongSeg; }
-    if (fix.time - wrongSince >= WRONG_SECONDS * 1000 && wrongFrom - s.alongSeg >= WRONG_BACK) {
+    if (!bad) { wrongSince = null; wrongRidden = 0; return; }
+    if (wrongSince === null) { wrongSince = fix.time; wrongFrom = s.alongSeg; wrongRidden = 0; }
+    else wrongRidden += (curSpeed ?? 0) * fixGap;
+    // gone back along the line, and really ridden that far: a GPS that jumps back and forth goes nowhere
+    if (fix.time - wrongSince >= WRONG_SECONDS * 1000 && wrongFrom - s.alongSeg >= WRONG_BACK && wrongRidden >= WRONG_BACK) {
       s.wrongWay = true;
       wrongSince = null;
       rightSince = null;
@@ -315,7 +415,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
   function finishArrival(ev: NavEvent[]): void {
     const stop = s.seg;
     arriveAt(stop, ev);
-    offSince = null;
+    spell = null; backFixes = 0;
     s.offRoute = false;
     clearWrongWay();
     clearDetour();
@@ -406,7 +506,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     const n = full
       ? nearestOnPolyline(g.pts, p, g.cum)
       : nearestOnPolyline(g.pts, p, g.cum, s.alongSeg - WINDOW_BEHIND, s.alongSeg + reach(), movingHeading(), AGAINST_LEG);
-    const threshold = o.offRouteDistance + Math.min(fix.accuracy, 30);
+    const threshold = offThreshold();
     s.offBy = n.dist;
 
     // Arrival by distance to the stop, or by reaching the end of the line while on it. A rider on the line whose rest
@@ -425,50 +525,52 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
       return;
     }
 
-    // Missed arrival: off the line but already on the next one.
+    // Missed arrival: off the line but already on the next one, two fixes in a row.
+    let onNext: Nearest | null = null;
     if (n.dist > threshold && s.seg < lastStop) {
       const next = segAt(s.seg + 1);
       const nx = nearestOnPolyline(next.pts, p, next.cum);
-      if (nx.dist <= MISSED_ARRIVAL_LINE) {
-        arriveAt(s.seg, ev);
-        clearWrongWay();
-        s.seg += 1;
-        s.alongSeg = nx.along;
-        s.offRoute = false;
-        clearDetour();
-        offSince = null;
-        needFull = false;
-        markBehind(s.seg, nx.along);
-        s.offBy = nx.dist;
-        derive();
-        return;
-      }
+      if (nx.dist <= MISSED_ARRIVAL_LINE) onNext = nx;
+    }
+    missed = onNext ? missed + 1 : 0;
+    if (onNext && missed >= MISSED_FIXES) {
+      const nx = onNext;
+      missed = 0;
+      arriveAt(s.seg, ev);
+      clearWrongWay();
+      s.seg += 1;
+      s.alongSeg = nx.along;
+      s.offRoute = false;
+      clearDetour();
+      spell = null;
+      needFull = false;
+      markBehind(s.seg, nx.along);
+      s.offBy = nx.dist;
+      derive();
+      return;
     }
 
-    s.alongSeg = n.along;
+    // The position along the line advances no faster than the rider can ride: an estimate off to one side at a bend
+    // must not throw it forward to the next turn. (Not after a jump or off route: then the whole line is searched.)
+    const maxAdvance = Math.max(curSpeed ?? 0, 1) * Math.max(fixGap, 1) * ALONG_RATE + ALONG_SLACK;
+    s.alongSeg = !full && n.along > s.alongSeg + maxAdvance ? s.alongSeg + maxAdvance : n.along;
     if (needFull) {
       needFull = false;
       markBehind(s.seg, n.along);
     }
 
     if (!s.offRoute) {
-      if (n.dist > threshold) {
-        if (offSince === null) offSince = fix.time;
-        if (fix.time - offSince >= o.offRouteDelay * 1000) {
-          s.offRoute = true;
-          clearWrongWay();
-          ev.push({ type: "off_route" });
-        }
-      } else {
-        offSince = null;
-      }
+      offSpell(fix, n, threshold, ev);
     } else if (n.dist <= BACK_ON_ROUTE) {
-      s.offRoute = false;
-      offSince = null;
-      markBehind(s.seg, n.along);
-      clearDetour();
-      ev.push({ type: "back_on_route" });
-    }
+      if (++backFixes >= BACK_FIXES) {
+        s.offRoute = false;
+        backFixes = 0;
+        spell = null;
+        markBehind(s.seg, n.along);
+        clearDetour();
+        ev.push({ type: "back_on_route" });
+      }
+    } else backFixes = 0;
 
     if (s.offRoute) detourStep(fix, p, ev);
     if (!s.offRoute) {
@@ -519,7 +621,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
         s.arrived = Array.from({ length: best.seg }, (_, i) => i);
         markBehind(best.seg, best.along);
         needFull = false;
-        offSince = null;
+        spell = null; backFixes = 0;
         riding(fix, p, ev, false);
         return;
       }
@@ -565,22 +667,106 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     derive();
   }
 
+  /**
+   * Where a refused fix lies against the line, while the estimate itself has strayed off it: "here" on the line where
+   * the dead reckoning has the rider (the multipath is over), "elsewhere" on the line but further along (the track may
+   * be wrong), or "off". While the estimate is on the line too, a refused fix on the line is "off": in a street of tall
+   * buildings multipath often lands along the street itself, and the estimate the device's velocity steers is the
+   * better guess. The filter's own re-acquire settles a conflict that lasts.
+   */
+  function onLineWhereExpected(raw: XY, f: Filtered, fix: Fix): "here" | "elsewhere" | "off" {
+    if ((s.status !== "riding" && s.status !== "at_stop") || s.offRoute) return "off";
+    const g = segAt(s.seg);
+    if (nearestOnPolyline(g.pts, f.p, g.cum, s.alongSeg - 200, s.alongSeg + 200).dist <= EST_ON_LINE) return "off";
+    const gap = prevFix ? Math.max(0, (fix.time - prevFix.time) / 1000) : 1;
+    const ahead = s.alongSeg + f.speed * gap;
+    const window = SNAP_BACK_ALONG + f.speed * gap;
+    const near = nearestOnPolyline(g.pts, raw, g.cum, ahead - window, ahead + window);
+    if (near.dist <= SNAP_BACK_LINE && Math.abs(near.along - ahead) <= window) return "here";
+    const wide = nearestOnPolyline(g.pts, raw, g.cum, s.alongSeg - 200, s.alongSeg + 200);
+    return wide.dist <= SNAP_BACK_LINE ? "elsewhere" : "off";
+  }
+
+  /** The device's own fix lies on the line of this segment, within 200 m along of where the rider is. */
+  function rawNearLine(raw: XY): boolean {
+    if (s.status !== "riding" || s.offRoute) return false;
+    const g = segAt(s.seg);
+    return nearestOnPolyline(g.pts, raw, g.cum, s.alongSeg - 200, s.alongSeg + 200).dist <= SNAP_BACK_LINE;
+  }
+
+  /** Where the map draws the rider, and which way the arrow points. */
+  function updateShown(f: Filtered): void {
+    const p = f.p;
+    let target: XY;
+    if ((s.status === "riding" || s.status === "at_stop") && !s.offRoute && s.snapped) {
+      const full = SNAP_FULL + Math.min(errNow, SNAP_FULL);
+      const w = s.offBy <= full ? 1 : s.offBy >= full + SNAP_BLEND ? 0 : 1 - (s.offBy - full) / SNAP_BLEND;
+      const q = project(proj, s.snapped);
+      target = [p[0] + (q[0] - p[0]) * w, p[1] + (q[1] - p[1]) * w];
+      s.shownHeading = w >= 0.5 ? s.routeBearing : f.heading;
+      const onLine = w >= 0.5 && s.status === "riding";
+      const back = onLine && shownAlong && shownAlong.seg === s.seg ? shownAlong.along - s.alongSeg : 0;
+      // riding forward: the bearing agrees with the line where the marker is, or where the estimate now projects (in a
+      // dogleg the two differ; a rider who turns back disagrees with both)
+      const held = back > 0 && shownAlong ? pointAlong(segAt(s.seg).pts, shownAlong.along, segAt(s.seg).cum).bearing : null;
+      const agrees = (b: number | null): boolean => b !== null && f.heading !== null && Math.abs(angleDiff(f.heading, b)) < 90;
+      const forward = f.speed >= HOLD_SPEED && (agrees(held) || agrees(s.routeBearing));
+      if (shownXY && back > 0 && back <= HOLD_BACK && forward) target = shownXY;
+      else shownAlong = onLine ? { seg: s.seg, along: s.alongSeg } : null;
+    } else if (s.status === "finished") {
+      target = s.snapped ? project(proj, s.snapped) : p;
+      s.shownHeading = null;
+      shownAlong = null;
+    } else {
+      target = p;
+      s.shownHeading = f.heading;
+      shownAlong = null;
+    }
+    // no leaps: the marker moves no faster than the rider plus a little; a reset or a recovery glides in over a few fixes
+    if (shownXY) {
+      const max = f.speed * Math.max(fixGap, 0) + SHOWN_SLACK;
+      const d = dist(shownXY, target);
+      shownXY = d <= max ? target : [shownXY[0] + ((target[0] - shownXY[0]) * max) / d, shownXY[1] + ((target[1] - shownXY[1]) * max) / d];
+    } else shownXY = target;
+    s.shown = unproject(proj, shownXY);
+  }
+
   function update(fix: Fix): NavEvent[] {
     const ev: NavEvent[] = [];
     s.fix = fix;
     if (s.status === "finished" || fix.accuracy > o.maxAccuracy) return ev;
-    const p = project(proj, [fix.lng, fix.lat]);
-    trackMotion(fix, p);
+    const raw = project(proj, [fix.lng, fix.lat]);
+    let f = filter.push(raw, fix);
+    // a duplicate, an old fix or a late one says nothing about now
+    if (f.why === "stale" || f.why === "late" || f.why === "poor") return ev;
+    const where = f.why === "jump" ? onLineWhereExpected(raw, f, fix) : "off";
+    rawOnLine = rawNearLine(raw);
+    rawOnLineRun = rawOnLine ? rawOnLineRun + 1 : 0;
+    snapBacks = where === "here" ? snapBacks + 1 : 0;
+    onLineFixes = where !== "off" ? onLineFixes + 1 : 0;
+    if (snapBacks >= SNAP_BACK_FIXES || onLineFixes >= ONLINE_FIXES) { f = filter.resetTo(raw, fix); snapBacks = 0; onLineFixes = 0; }
+    // a refused jump still moves the estimate on by dead reckoning: every decision reads the estimate
+    const p = f.p;
+    movedNow = lastPos ? dist(lastPos, p) : 0;
+    lastPos = p;
+    s.pos = unproject(proj, p);
+    s.posAccuracy = f.sigma;
+    errNow = Math.max(f.sigma, Math.min(fix.accuracy, ERR_ACC_CAP), ERR_MIN);
+    trackMotion(fix, f);
     if (s.status === "locating" || s.status === "idle") s.status = "to_start";
     if (s.status === "to_start" && s.seg === Math.max(0, chosenStart)) toStart(fix, p, ev);
     else if (s.status === "to_start") { s.nearest = null; s.status = "riding"; riding(fix, p, ev, false); }
     else if (s.status === "at_stop") atStopStep(fix, p, ev);
     else riding(fix, p, ev, false);
+    updateShown(f);
     return ev;
   }
 
   function jumpToSegment(seg: number): void {
     const target = Math.max(0, Math.min(lastStop, Math.floor(seg)));
+    filter.reset();
+    shownXY = null;
+    shownAlong = null;
     chosenStart = -1;
     origin = 0;
     resetFlags();
@@ -593,7 +779,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.nearest = null;
     nearestAt = null;
     s.offBy = 0;
-    offSince = null;
+    spell = null; backFixes = 0; rawOnLine = false; rawOnLineRun = 0;
     atStop = -1;
     needFull = target > 0;
     s.status = target === 0 ? "to_start" : "riding";
@@ -603,6 +789,9 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function startAt(stop: number): void {
     const k = Math.max(0, Math.min(lastStop - 1, Math.floor(stop)));
+    filter.reset();
+    shownXY = null;
+    shownAlong = null;
     resetFlags();
     // the stops before it, and the stretch leading to it, are behind: no cue or aside there ever fires
     for (let i = 0; i <= k; i++) markBehind(i, Infinity);
@@ -616,7 +805,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     s.nearest = null;
     nearestAt = null;
     s.offBy = 0;
-    offSince = null;
+    spell = null; backFixes = 0; rawOnLine = false; rawOnLineRun = 0;
     atStop = -1;
     needFull = false;
     s.status = "to_start";
@@ -631,6 +820,8 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
 
   function reset(): void {
     s = initialState();
+    filter.reset(); errNow = ERR_MIN; snapBacks = 0; onLineFixes = 0; missed = 0; wrongRidden = 0; lastPos = null; movedNow = 0; shownXY = null; shownAlong = null;
+    rawOnLine = false; rawOnLineRun = 0;
     prevFix = null; fixGap = 0; firstTime = null; avg = null; curSpeed = null; curHeading = null;
     wrongSince = null; rightSince = null;
     active = null;
@@ -639,7 +830,7 @@ export function createNavEngine(pack: Pack, opts: Partial<NavOptions> = {}): Nav
     notFoundSaid = false;
     nearestAt = null;
     resetFlags();
-    offSince = null;
+    spell = null; backFixes = 0;
     needFull = false;
     atStop = -1;
     chosenStart = -1;

@@ -17,12 +17,29 @@ export interface Device {
   list(dir: string): Promise<string[]>;
   /** The URL the WebView reads this path from. */
   uri(path: string): string;
-  /** GET from the network (the site), without CORS. Throws when the network fails or the timeout passes. */
-  get(url: string, timeoutMs?: number): Promise<GetResult>;
+  /**
+   * GET a small file from the network (the site) that is only parsed: the index, a manifest, the sound credits.
+   * Throws when the network fails or the timeout passes. A body the transport has already parsed comes back as JSON
+   * text: CapacitorHttp parses every application/json response, whatever responseType asks (issue 3 of iteration 7).
+   */
+  getText(url: string, timeoutMs?: number): Promise<{ status: number; text: string }>;
+  /**
+   * Download a file from the network to `path` in the data folder, making its folders: the exact bytes, whatever the
+   * content type. Resolves when the whole file is there; throws on any failure (network, timeout, a status other
+   * than 200), leaving nothing at `path`. The caller checks size and checksum.
+   */
+  download(url: string, path: string, timeoutMs?: number): Promise<void>;
   /** GET one of the app's own files (shipped in the APK). Throws when it cannot be read. */
   getOwn(url: string): Promise<GetResult>;
   /** Copy a file inside the data folder. */
   copy(from: string, to: string): Promise<void>;
+}
+
+/** The text of a response body as a transport hands it over: a string as it is, anything already parsed as JSON. */
+export function bodyText(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (data === null || data === undefined) return "";
+  return JSON.stringify(data);
 }
 
 /* ------------------------------------------------------------------ bytes */
@@ -74,9 +91,20 @@ export async function capacitorDevice(): Promise<Device> {
       try { return (await Filesystem.readdir({ path: dir, directory })).files.map((f) => f.name); } catch { return []; }
     },
     uri(path) { return Capacitor.convertFileSrc(`${root}/${path}`); },
-    async get(url, timeoutMs = 30000) {
-      const res = await CapacitorHttp.get({ url, responseType: "blob", connectTimeout: timeoutMs, readTimeout: timeoutMs });
-      return { status: res.status, data: typeof res.data === "string" ? res.data : "" };
+    async getText(url, timeoutMs = 15000) {
+      const res = await CapacitorHttp.get({ url, responseType: "text", connectTimeout: timeoutMs, readTimeout: timeoutMs });
+      return { status: res.status, text: bodyText(res.data) };
+    },
+    async download(url, path, timeoutMs = 30000) {
+      // Native, straight to the file: no base64 through the bridge, and no JSON parsing on the way (CapacitorHttp would).
+      const dir = dirOf(path);
+      if (dir) { try { await Filesystem.mkdir({ path: dir, directory, recursive: true }); } catch { /* exists */ } }
+      try {
+        await Filesystem.downloadFile({ url, path, directory, connectTimeout: timeoutMs, readTimeout: timeoutMs });
+      } catch (e) {
+        try { await Filesystem.deleteFile({ path, directory }); } catch { /* nothing was written */ }
+        throw e;
+      }
     },
     async getOwn(url) {
       const res = await fetch(url);
@@ -95,7 +123,7 @@ export async function capacitorDevice(): Promise<Device> {
 export interface MemoryDevice extends Device {
   /** Every file by path, base64. */
   files: Map<string, string>;
-  /** What the site answers: url to a body, or a status. Missing urls answer 404. A function can throw to cut off. */
+  /** What the site answers: url to a body (base64), or a status. Missing urls answer 404. A function can throw to cut off. */
   site: Map<string, string | { status: number; data?: string } | (() => string | { status: number; data?: string })>;
   /** The app's own files by url. */
   own: Map<string, string>;
@@ -105,15 +133,29 @@ export interface MemoryDevice extends Device {
   beforeWrite?: (path: string) => void;
   /** Called after every write. */
   afterWrite?: (path: string) => void;
+  /**
+   * Answer getText as CapacitorHttp does on the phone: a ".json" body arrives parsed, as an object, and goes through
+   * the same bodyText() the phone's device uses. On by default, so every store test runs against the real behaviour.
+   */
+  parsesJson: boolean;
 }
 
 export function memoryDevice(): MemoryDevice {
   const files = new Map<string, string>();
+  const answer = (url: string): { status: number; data: string } => {
+    dev.requests.push(url);
+    let hit = dev.site.get(url);
+    if (typeof hit === "function") hit = hit();
+    if (hit === undefined) return { status: 404, data: "" };
+    if (typeof hit === "string") return { status: 200, data: hit };
+    return { status: hit.status, data: hit.data ?? "" };
+  };
   const dev: MemoryDevice = {
     files,
     site: new Map(),
     own: new Map(),
     requests: [],
+    parsesJson: true,
     async read(path) { return files.get(path) ?? null; },
     async write(path, base64) { dev.beforeWrite?.(path); files.set(path, base64); dev.afterWrite?.(path); },
     async remove(path) {
@@ -127,13 +169,21 @@ export function memoryDevice(): MemoryDevice {
       return [...names];
     },
     uri(path) { return `mem://${path}`; },
-    async get(url) {
-      dev.requests.push(url);
-      let hit = dev.site.get(url);
-      if (typeof hit === "function") hit = hit();
-      if (hit === undefined) return { status: 404, data: "" };
-      if (typeof hit === "string") return { status: 200, data: hit };
-      return { status: hit.status, data: hit.data ?? "" };
+    async getText(url) {
+      const res = answer(url);
+      if (res.status !== 200) return { status: res.status, text: "" };
+      const text = b64ToText(res.data);
+      if (!dev.parsesJson || !/\.json(\?|$)/.test(url)) return { status: 200, text };
+      let parsed: unknown;
+      try { parsed = JSON.parse(text); } catch { return { status: 200, text }; }
+      return { status: 200, text: bodyText(parsed) };
+    },
+    async download(url, path) {
+      const res = answer(url);
+      if (res.status !== 200) throw new Error(`${url} answered ${res.status}`);
+      dev.beforeWrite?.(path);
+      files.set(path, res.data);
+      dev.afterWrite?.(path);
     },
     async getOwn(url) {
       const hit = dev.own.get(url);

@@ -1,6 +1,6 @@
 /** App-wide state as signals. Modules read and write through here; components subscribe by reading `.value`. */
 import { signal } from "@preact/signals";
-import { DEFAULT_SETTINGS, type DirectorLogEntry, type GpsError, type NavState, type NowPlaying, type Pack, type PackIndexEntry, type RouteStatus, type Settings, type StartChoice } from "./types";
+import { DEFAULT_SETTINGS, type DirectorLogEntry, type GpsError, type NavState, type NowPlaying, type Pack, type PackIndexEntry, type RouteStatus, type Settings, type StartChoice, type UpdateCheck, type AppUpdateState } from "./types";
 
 export const IDLE_NAV: NavState = {
   status: "idle", fix: null, snapped: null, seg: 0, alongSeg: 0, toStop: 0, distanceDone: 0, distanceLeft: 0,
@@ -40,6 +40,12 @@ export const startChoice = signal<StartChoice | null>(null);
 
 /** What the Android app has of each route (task 22 keeps it, task 23 shows it). Empty on the web. */
 export const routeStatus = signal<Record<string, RouteStatus>>({});
+
+/** The route store's last look at the site (Android app), for the Updates panel on Home. */
+export const updateCheck = signal<UpdateCheck>({ checking: false, at: null, ok: null });
+
+/** The app's own code on the Android app: what runs, and what newer version there is (src/update). */
+export const appUpdate = signal<AppUpdateState>({ running: null, status: { kind: "none" } });
 
 let baseResolver: ((id: string) => string | null) | null = null;
 /** The route store sets this on the Android app: the folder of a downloaded route, or null for the app's own. */

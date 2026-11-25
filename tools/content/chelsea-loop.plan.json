@@ -1,22 +1,42 @@
 {
- "comment": "Segments listed here are planned again by tools/router.py. via points are [lng, lat] gates, in order. Line ends sit on the street by each stop: Great Percy Street by Holford Gardens, Marylebone High Street outside number 112, the north side of Portman Square outside Home House, Symons Street outside number 4, Millbank by Vauxhall Bridge, the Victoria Embankment track by the Needle, the end of Wharf Road for home.",
+ "comment": "Segments listed here are planned again by tools/router.py. via points are [lng, lat] gates, in order. Line ends sit on the street by each stop: Holford Street by the garden in front of Bevin Court, Malet Street opposite the Senate House forecourt (a viewpoint: segment 1 runs down Malet Street to it and segment 2 starts there), Howland Street at the foot of the tower, Marylebone High Street outside number 112, the north side of Portman Square outside Home House, Symons Street outside number 4, Millbank by Vauxhall Bridge, the Victoria Embankment track by the Needle, the end of Wharf Road for home.",
  "replan": {
   "1": {
-   "why": "Great Percy Street down to King's Cross Road, quiet streets to Judd Street, the protected Tavistock Place and Torrington Place tracks across Bloomsbury, then quiet Fitzrovia and Marylebone streets to the high street. Not Euston Road.",
+   "why": "From Holford Street, where Bevin Court shows across the garden, along Great Percy Street down to King's Cross Road, quiet streets to Judd Street, the protected Tavistock Place and Torrington Place tracks across Bloomsbury, then left down Malet Street to the Senate House viewpoint at the Keppel Street corner, where the tower shows over the forecourt. Not Euston Road.",
+   "from": [
+    -0.11232,
+    51.530219
+   ],
+   "to": [
+    -0.12952,
+    51.52075
+   ],
    "via": [
     [
      -0.12619,
      51.52538
     ],
     [
-     -0.13326,
-     51.52224
+     -0.1314,
+     51.5229
     ]
    ],
    "gate": 30,
    "avoid": {
     "Euston Road": 5,
     "Marylebone Road": 5
+   }
+  },
+  "2": {
+   "why": "From the Senate House viewpoint on Malet Street to the foot of the BT Tower on Howland Street: quiet Bloomsbury and Fitzrovia streets, across Tottenham Court Road. Not Euston Road.",
+   "from": [
+    -0.12952,
+    51.52075
+   ],
+   "via": [],
+   "gate": 30,
+   "avoid": {
+    "Euston Road": 5
    }
   },
   "4": {

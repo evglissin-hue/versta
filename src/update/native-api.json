@@ -1,0 +1,5 @@
+{
+  "comment": "The native API level this web code needs, and a fingerprint of everything native (src/update/native.test.ts). When native code, plugins or capacitor.config.ts change: raise level here and NATIVE_LEVEL in android/app/src/main/java/app/versta/ride/AppUpdatePlugin.java together, and set fingerprint to the value the test prints. A downloaded bundle that needs a higher level than the phone's APK is never applied: the phone shows that a one-time install is needed.",
+  "level": 1,
+  "fingerprint": "c0f4c1da722e4d1f"
+}

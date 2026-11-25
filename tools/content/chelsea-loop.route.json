@@ -23,10 +23,10 @@
       {
         "id": "holford",
         "name": "Holford Gardens",
-        "lat": 51.5299,
-        "lng": -0.1112,
+        "lat": 51.530219,
+        "lng": -0.11232,
         "amb": "oldstreet",
-        "note": "Stop by the garden. The tall Y-shaped block of flats is Bevin Court, built where number 30 Holford Square stood.",
+        "note": "Start on Holford Street by the garden. Look west across it: the tall Y-shaped block of flats is Bevin Court, built where number 30 Holford Square stood.",
         "stories": [
           {
             "title": "Mr and Mrs Richter",
@@ -39,6 +39,7 @@
               "Look at the tall block of flats beyond the garden, Bevin Court. Now take it away, and put back a quiet square of brick terraces around a railed garden. This is Holford Square, and it is April 1902.",
               "A foreign couple take two unfurnished rooms at number thirty. They give their name as Richter. He is short, bald and restless, and writes all day. She keeps the accounts and the secret letters to agents inside Russia. He is Vladimir Ulyanov, and the world will soon know him as Lenin. She is Nadezhda Krupskaya.",
               "Most days he walks down to Sidmouth Street, off Gray's Inn Road, to meet the other editors of Iskra, The Spark, the paper he means to light a revolution with. Their landlady, Mrs Yeo, is scandalised that her lodgers will not hang curtains.",
+              "He wants a ticket for the Reading Room of the British Museum. On the twenty first of April he writes for one from this address, as Jacob Richter, and a trade union secretary vouches for him. Within a week he is at work under the great dome. On free afternoons he rides round London on the top deck of the omnibus, past the mansions of the West End and the slums of the East, and mutters in English, two nations.",
               "Early one morning in October there is a knock at the door. On the step stands a young man who has just escaped from exile in Siberia. His name is Lev Bronstein. He calls himself Trotsky.",
               "In May 1903 the Richters move on. In 1941 a German landmine destroys most of the square. In 1942, with Leningrad under siege and Russia now an ally, a bust of Lenin is unveiled here, designed by the architect Berthold Lubetkin. After the war Lubetkin designs the flats you see, at first to be called Lenin Court. The bust is now in Islington Museum, and the legend is that Lubetkin buried part of the memorial under the building."
             ],
@@ -49,10 +50,11 @@
       {
         "id": "senate-house",
         "name": "Senate House, Bloomsbury",
-        "lat": 51.5228786,
-        "lng": -0.1315934,
+        "lat": 51.52075,
+        "lng": -0.12952,
         "amb": "office",
-        "note": "Stop on Torrington Place by the Malet Street corner. The tall pale tower to the south, down Malet Street, is Senate House.",
+        "arrive_radius": 25,
+        "note": "Stop on Malet Street at the Keppel Street corner, opposite the Senate House forecourt. Look east across the forecourt: the tall pale stone tower is Senate House. Afterwards the route goes back up Malet Street.",
         "stories": [
           {
             "title": "The Ministry of Truth",
@@ -63,9 +65,10 @@
             ],
             "music": "noir",
             "paras": [
-              "Look south down Malet Street at the pale stone tower. This is Senate House, built for the University of London in the 1930s, the second tallest building in the city after Saint Paul's.",
+              "Look across the forecourt at the pale stone tower. This is Senate House, built for the University of London in the 1930s, the second tallest building in the city after Saint Paul's.",
               "It is September 1939, and the war is days old. The academics move out and the Ministry of Information moves in: propaganda, censorship and official news for the whole country, run from these corridors.",
               "Thousands work here. One of them is Eileen Blair. Her husband is a writer who signs himself George Orwell. Years later, when he imagines the Ministry of Truth in Nineteen Eighty-Four, this building is widely believed to be his model.",
+              "In the novel the Ministry of Truth is a vast pyramid of white concrete, with the Party's three slogans on its face. A story goes that Hitler spared this building to be his headquarters in London. It is only a story. In November 1940 a German bomb hits it and badly damages the library.",
               "Another is the novelist Graham Greene, who finds the place absurd and mocks its endless committees in a short story. Soon he leaves to join MI6. His boss there, in the counter-intelligence section covering Spain and Portugal, is a charming officer called Kim Philby. Philby is working for Moscow."
             ]
           }
@@ -77,7 +80,7 @@
         "lat": 51.5211167,
         "lng": -0.1384077,
         "amb": "office",
-        "note": "Stop on Howland Street, at the foot of the tower.",
+        "note": "Stop on Howland Street at the foot of the tower, and look up.",
         "stories": [
           {
             "title": "The tower that was a secret",
@@ -90,6 +93,7 @@
             "paras": [
               "Look up. The tower above you opens in 1965 as the Post Office Tower, the tallest building in Britain, built to carry telephone calls and television across the country by microwave.",
               "Because it matters so much to the nation's communications, the government makes information about it an official secret. For years its revolving restaurant at the top serves lunch to the public, while the tower itself is, officially, not to be talked about.",
+              "It is secret enough that in 1978, when the journalist Duncan Campbell is on trial for gathering information about places like this, the judge rules that in court the tower may be called only Location Twenty Three.",
               "The popular story is that it is even left off the maps. In fact the Ordnance Survey shows it from the early seventies. But the secrecy is real enough that in 1993 an MP, Kate Hoey, jokes in the Commons that she hopes parliamentary privilege lets her confirm that the tower exists."
             ]
           }
@@ -102,7 +106,7 @@
         "lat": 51.5186021,
         "lng": -0.151614,
         "amb": "oldstreet",
-        "note": "Gift stop. The White Company is at 112 to 114 Marylebone High Street, at the south end by the New Cavendish Street corner. Lock up and go in.",
+        "note": "Gift stop. The White Company is at 112 to 114 Marylebone High Street, at the south end by the New Cavendish Street corner. Lock up and go in. Marylebone Lane, which still follows the bank of the buried river, leaves the high street fifty metres further south.",
         "stories": [
           {
             "title": "The buried river",
@@ -112,6 +116,7 @@
             "paras": [
               "It is around the year fourteen hundred, and this is open country north of London. A small river called the Tyburn runs down from the hills of Hampstead towards the Thames.",
               "The villagers build a new church beside the stream and dedicate it to Saint Mary. Saint Mary by the bourne, the stream. Say it quickly for a few hundred years and you get Marylebone.",
+              "Its water is clean. In 1237 the City of London bought the Tyburn's springs, and pipes now carry their water three miles east to the Great Conduit in Cheapside.",
               "The river still runs. It is buried now, in a brick tunnel under these streets. Marylebone Lane, just to the east, still wriggles the way it does because it follows the old bank.",
               "A little further on, at Marble Arch, the old name Tyburn comes to mean something much darker."
             ],
@@ -140,7 +145,9 @@
               "It is the twenty third of April 1964. Sir Anthony Blunt is the most respected art historian in Britain, Surveyor of the Queen's Pictures and a knight. Today an MI5 officer called Arthur Martin climbs the stairs and sits down with him in his flat.",
               "Martin has new evidence. An American, Michael Straight, has told the FBI that Blunt tried to recruit him for the Russians at Cambridge in the 1930s. Martin offers Blunt immunity from prosecution in exchange for the truth.",
               "After a long silence Blunt gets up, pours himself a drink and admits it. He was recruited through his friend Guy Burgess. During the war, as an officer of MI5 itself, he passed its secrets to Moscow.",
-              "And then, astonishingly, life goes on. For years he goes on looking after the Queen's paintings and running this institute. Only a handful of people know. The public finds out in November 1979, when Margaret Thatcher names him in the Commons."
+              "From now on another MI5 officer, Peter Wright, comes to question him regularly. The sessions go on for six years.",
+              "And then, astonishingly, life goes on. For years he goes on looking after the Queen's paintings and running this institute. Only a handful of people know. The public finds out in November 1979, when Margaret Thatcher names him in the Commons.",
+              "The Queen takes away his knighthood that week. He dies in 1983. In two thousand and nine the British Library opens the memoir he left under seal for twenty five years. In it he calls spying for Moscow the biggest mistake of his life."
             ],
             "music": "noir"
           },
@@ -168,7 +175,7 @@
         "lat": 51.4926158,
         "lng": -0.1586995,
         "amb": "oldstreet",
-        "note": "Gift stop, second chance. The White Company's first shop is at 4 Symons Street, just off Sloane Square.",
+        "note": "Gift stop, second chance. The White Company's first shop is at 4 Symons Street, just off Sloane Square. The King's Road runs west from the end of the street.",
         "stories": [
           {
             "title": "Two spies off the King's Road",
@@ -181,7 +188,8 @@
               "This little street is home to The White Company's very first shop. Now look west, along the King's Road. A few minutes from here live Britain's two most famous spies who never existed.",
               "It is 1955, and in Moonraker Ian Fleming gives James Bond a comfortable flat in a leafy square just off the King's Road. He never says which one. His friend and biographer John Pearson thinks it is Wellington Square. Decades later the novelist William Boyd, who has written a Bond novel of his own, works through the clues and agrees.",
               "A few streets further on is little Bywater Street. That is where John le Carré puts George Smiley: short, plump, badly dressed, betrayed by his wife, and cleverer than anyone in the room. Bond is what the public wants a spy to be. Smiley is much closer to the real thing.",
-              "Le Carré would know. Before he writes a word about spies, he works for MI5, and then for MI6. His real name is David Cornwell."
+              "Le Carré would know. Before he writes a word about spies, he works for MI5, and then for MI6. His real name is David Cornwell.",
+              "His spying ends in 1964. Kim Philby, the Moscow agent you heard about at Senate House, has given away the covers of British officers to the KGB, and Cornwell's is among them. By then The Spy Who Came in from the Cold has made him famous, and he writes for the rest of his life."
             ],
             "music": "noir"
           }
@@ -205,6 +213,7 @@
             "paras": [
               "Look across the river. The stepped building of cream stone and green glass is the headquarters of the Secret Intelligence Service, MI6. It is 1994, and the service is moving in.",
               "Only two years earlier the British government would not even admit that MI6 existed. Now it has a landmark on the Thames that every Bond fan knows.",
+              "Until now it has worked from Century House, an office tower on Westminster Bridge Road, a mile away in Lambeth. Before that it was at Broadway, by St James's Park, an address a newspaper called London's worst kept secret, known to every taxi driver, tourist guide and KGB agent.",
               "On a September night in the year two thousand, someone fires a Russian made anti tank rocket at the building from beside the railway. It hits the eighth floor and does little damage. Dissident Irish republicans are blamed.",
               "Now ride on along Millbank. Just before Lambeth Bridge, on your left, is the huge grey stone block of Thames House. MI5, the Security Service, moves in there in the nineties too. For most of the last century the two services watched each other almost as warily as they watched Moscow. Now they face each other across the river."
             ],

@@ -6,7 +6,9 @@ A break is the second at which speech resumes after a pause: the silence_end of 
 silencedetect=noise=-38dB:d=0.28, rounded to 0.01 s. The leading silence is kept (its end is the first onset of the
 clip). A silence that ends within 0.3 s of the end of the clip is the tail, not a phrase, and is dropped.
 For every story, each paragraph mark is a phrase start by definition: when no break lies within 0.15 s of a mark,
-the mark itself is added as a break and a line says so.
+the mark itself is added as a break and a line says so. The marks come from the audio manifest
+(tools/content/<pack_id>.audio.json, written by narrate_stories.py), so a re-recorded story is right before the pack
+is rebuilt; a clip the manifest does not list keeps the marks in pack.json.
 Clips are every story clip and every aside clip the pack names. The file is keyed by path in the pack folder, because
 two stories can share a clip and pack ids can differ from content ids.
 """
@@ -49,6 +51,12 @@ def main():
                 marks.setdefault(a["src"], []).extend(a.get("marks", []))
     for aside in pack["asides"]:
         clips.add(aside["audio"])
+    # the marks of a re-recorded story are in the audio manifest before a pack is rebuilt with them: they win
+    man = os.path.join(ROOT, "tools", "content", f"{pack_id}.audio.json")
+    if os.path.exists(man):
+        for key, a in json.load(open(man, encoding="utf-8")).items():
+            rel = f"audio/{key.split('/', 1)[1]}.mp3"
+            if rel in clips: marks[rel] = list(a.get("marks", []))
     out = {}
     for rel in sorted(clips):
         dur, breaks = find(os.path.join(folder, rel))

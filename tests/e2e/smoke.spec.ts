@@ -209,7 +209,7 @@ test("the Stops button counts the stops done, and the aside card shows its tags"
 
 test("home: what is inside the route, the Android line, no offline warning online", async ({ page }) => {
   await page.goto("/");
-  await expect(thamesCard(page).getByTestId("inside")).toHaveText("13 stops, 18 stories, 21 passing-by stories, about 30 min of listening");
+  await expect(thamesCard(page).getByTestId("inside")).toHaveText("13 stops, 18 stories, 21 passing-by stories, about 35 min of listening");
   await expect(page.getByTestId("android-link")).toHaveAttribute("href", "https://github.com/evglissin-hue/versta/releases/tag/android-latest");
   await expect(page.getByTestId("offline-note")).toHaveCount(0);
 });

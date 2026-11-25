@@ -178,6 +178,26 @@ describe.each(PACKS.map((p) => [p.entry.id, p] as const))("pack %s", (id, p) => 
     expect(count).toBeGreaterThanOrEqual(seconds / 12);
   });
 
+  it("lets a rider who rides on at once hear the first core story of every stop to its end before the next stop", () => {
+    // The director cuts a story still playing when the next stop's stories begin (src/story/director.ts). A rider who
+    // does not wait at a stop rides on at about 4.5 m/s; a walk (a fixed segment, as through the foot tunnel) at 1.4.
+    // Iteration 7 made the core stories longer: this keeps any of them from running into the next stop.
+    const pack = loaded(p);
+    const proj = makeProjection(pack.stops[0]!.at);
+    const tooLong: string[] = [];
+    for (let i = 0; i < pack.stops.length - 1; i++) {
+      const first = pack.stops[i]!.stories.find((s) => s.kind === "core");
+      if (!first?.audio) continue;
+      const line = pack.segments[i + 1]!.map((q) => project(proj, q));
+      const metres = cumulative(line).at(-1)! - pack.stops[i]!.arriveRadius - pack.stops[i + 1]!.arriveRadius;
+      const walk = pack.cues.some((c) => c.seg === i + 1 && c.kind !== "road" && /Walk the bike/.test(c.say) && c.len >= metres * 0.8);
+      const seconds = metres / (walk ? 1.4 : 4.5);
+      const lead = 3;
+      if (first.audio.dur + lead > seconds) tooLong.push(`${first.id}: ${Math.round(first.audio.dur + lead)} s of story, ${Math.round(seconds)} s to the next stop`);
+    }
+    expect(tooLong).toEqual([]);
+  });
+
   it("has a corridor graph", () => {
     expect(p.graph, `public/packs/${id}/graph.json`).toBeDefined();
     expect(p.graph!.nodes.length).toBeGreaterThan(100);

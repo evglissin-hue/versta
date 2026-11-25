@@ -49,6 +49,11 @@ jobs:
           npm run test
           npm run android:sync
 
+      # The live update's rules and its file overlay (android/app/src/test): a bad bundle must never strand the phone.
+      - name: Native unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon testReleaseUnitTest
+
       - name: Build the signed release APK
         working-directory: android
         run: ./gradlew --no-daemon assembleRelease

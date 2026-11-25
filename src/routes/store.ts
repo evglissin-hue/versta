@@ -12,9 +12,9 @@
  *   localStorage versta:site-credits    the site's sounds/credits.json
  */
 import { packSounds } from "../offline";
-import type { Pack, PackIndexEntry, PackManifest, RouteStatus, Transfer } from "../types";
-import { PACK_FORMAT, SITE_URL, packIndex, routeStatus, setPackBaseResolver } from "../state";
-import { b64ToBytes, b64ToText, sha256Hex, type Device } from "./files";
+import type { Pack, PackIndexEntry, PackManifest, RouteStatus, Transfer, UpdateCheck } from "../types";
+import { PACK_FORMAT, SITE_URL, packIndex, routeStatus, setPackBaseResolver, updateCheck } from "../state";
+import { b64ToBytes, b64ToText, sha256Hex, textToB64, type Device } from "./files";
 import { chooseCopy, plan, type DownloadedCopy, type Plan, type StagedCopy } from "./plan";
 
 const RECORD_KEY = "versta:routes";
@@ -54,6 +54,8 @@ export interface StoreDeps {
   /** Receives what the store decided, for the app's signals. */
   publish(status: Record<string, RouteStatus>, index: PackIndexEntry[]): void;
   setResolver(fn: ((id: string) => string | null) | null): void;
+  /** Told when a look at the site starts and ends, for the Updates panel. */
+  onCheck?(c: UpdateCheck): void;
 }
 
 export interface RouteStore {
@@ -100,6 +102,8 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
   let last: Plan = { status: {}, index: [], action: { kind: "none" } };
   let started = false;
   let lastOkCheck = -Infinity;
+  /** How the last look at the site ended, for the Updates panel. */
+  let lastResult: { at: number | null; ok: boolean | null } = { at: null, ok: null };
   let checking: Promise<void> | null = null;
   let pumping: Promise<void> | null = null;
   let waiters: (() => void)[] = [];
@@ -157,9 +161,9 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
   /** The site's manifest of a route, checked against the index entry; null when it cannot be read or does not match. */
   async function siteManifest(id: string, version: string | undefined): Promise<PackManifest | null> {
     try {
-      const res = await dev.get(`${deps.siteUrl}packs/${encodeURIComponent(id)}/manifest.json`, 15_000);
+      const res = await dev.getText(`${deps.siteUrl}packs/${encodeURIComponent(id)}/manifest.json`, 15_000);
       if (res.status !== 200) return null;
-      const m = JSON.parse(b64ToText(res.data)) as PackManifest;
+      const m = JSON.parse(res.text) as PackManifest;
       return m.id === id && m.version === version && Array.isArray(m.files) ? m : null;
     } catch { return null; }
   }
@@ -203,9 +207,9 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
     let dest = "";
     try {
       const base = `${deps.siteUrl}packs/${encodeURIComponent(id)}/`;
-      const mres = await dev.get(`${base}manifest.json`, 15_000);
+      const mres = await dev.getText(`${base}manifest.json`, 15_000);
       if (mres.status !== 200) throw new Error(`manifest ${mres.status}`);
-      const manifest = JSON.parse(b64ToText(mres.data)) as PackManifest;
+      const manifest = JSON.parse(mres.text) as PackManifest;
       if (manifest.id !== id || manifest.version !== entry.version || !Array.isArray(manifest.files)) throw new Error("manifest does not match the index");
       if (manifest.format > deps.appFormat) throw new Error("needs a newer app");
       if (manifest.files.some((f) => !safePath(f.path) || f.path === "manifest.json")) throw new Error("manifest has a bad path");
@@ -239,18 +243,20 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
           if (!done) t.total += f.bytes; // the copy failed: this file is downloaded after all
         }
         if (!done) {
-          const res = await dev.get(`${base}${encodePath(f.path)}`);
-          if (res.status !== 200) throw new Error(`${f.path} answered ${res.status}`);
-          const bytes = b64ToBytes(res.data);
-          if (bytes.length !== f.bytes) throw new Error(`${f.path} has the wrong size`);
+          // straight to its place, then checked: a file that is not exactly what the manifest says fails the download
+          const at = `${dest}/${f.path}`;
+          await dev.download(`${base}${encodePath(f.path)}`, at);
+          const got = await dev.read(at);
+          const bytes = got === null ? null : b64ToBytes(got);
+          if (!bytes || bytes.length !== f.bytes) throw new Error(`${f.path} has the wrong size`);
           if ((await sha256Hex(bytes)) !== f.sha256) throw new Error(`${f.path} does not match its checksum`);
-          await dev.write(`${dest}/${f.path}`, res.data);
           t.done += f.bytes;
           publish();
         }
       }
-      // The manifest goes in last: a folder with a manifest is a complete one.
-      await dev.write(`${dest}/manifest.json`, mres.data);
+      // The manifest goes in last: a folder with a manifest is a complete one. It is the one checked at the start, so
+      // a site that moved on during the download cannot pair new files with an old list.
+      await dev.write(`${dest}/manifest.json`, textToB64(mres.text));
 
       const now = stopIds(await dev.read(`${dest}/pack.json`));
       const before = await currentStopIds(id);
@@ -281,17 +287,22 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
         try {
           if (await cache.match(key)) continue;
           await gate();
-          const res = await dev.get(`${deps.siteUrl}sounds/${name}.mp3`);
-          if (res.status !== 200 || !res.data) continue; // a sound the site lacks is silence, not an error
-          await cache.put(key, new Response(b64ToBytes(res.data) as BufferSource, { headers: { "content-type": "audio/mpeg" } }));
-          fetched++;
+          // a sound the site lacks is silence, not an error (download throws, and the catch below moves on)
+          const tmp = `tmp/sound-${fetched}-${Date.now() % 100000}.mp3`;
+          try {
+            await dev.download(`${deps.siteUrl}sounds/${name}.mp3`, tmp);
+            const data = await dev.read(tmp);
+            if (!data) continue;
+            await cache.put(key, new Response(b64ToBytes(data) as BufferSource, { headers: { "content-type": "audio/mpeg" } }));
+            fetched++;
+          } finally { await dev.remove(tmp).catch(() => {}); }
         } catch { /* silence */ }
       }
       let have = false;
       try { have = deps.storage.getItem(CREDITS_KEY) !== null; } catch { /* none */ }
       if (fetched > 0 || !have) {
-        const res = await dev.get(`${deps.siteUrl}sounds/credits.json`);
-        if (res.status === 200) { try { deps.storage.setItem(CREDITS_KEY, b64ToText(res.data)); } catch { /* none */ } }
+        const res = await dev.getText(`${deps.siteUrl}sounds/credits.json`);
+        if (res.status === 200) { try { deps.storage.setItem(CREDITS_KEY, res.text); } catch { /* none */ } }
       }
     } catch { /* sounds are never an error */ }
   }
@@ -354,19 +365,23 @@ export function createRouteStore(deps: StoreDeps): RouteStore {
 
   async function readSite(): Promise<void> {
     try {
-      const res = await dev.get(`${deps.siteUrl}packs/index.json`, INDEX_TIMEOUT_MS);
-      if (res.status !== 200) return;
-      const json = JSON.parse(b64ToText(res.data)) as { packs?: PackIndexEntry[] };
-      if (!Array.isArray(json.packs)) return;
+      const res = await dev.getText(`${deps.siteUrl}packs/index.json`, INDEX_TIMEOUT_MS);
+      if (res.status !== 200) { lastResult = { at: deps.now(), ok: false }; return; }
+      const json = JSON.parse(res.text) as { packs?: PackIndexEntry[] };
+      if (!Array.isArray(json.packs)) { lastResult = { at: deps.now(), ok: false }; return; }
       site = json.packs;
       lastOkCheck = deps.now();
-    } catch { /* unreachable: the phone keeps what it has */ }
+      lastResult = { at: lastOkCheck, ok: true };
+    } catch { lastResult = { at: deps.now(), ok: false }; /* unreachable: the phone keeps what it has */ }
   }
 
   function check(force = false): Promise<void> {
     if (!started) return Promise.resolve();
     if (!force && deps.now() - lastOkCheck < CHECK_EVERY_MS) return pump();
-    if (!checking) checking = readSite().then(estimateCosts).finally(() => { checking = null; });
+    if (!checking) {
+      deps.onCheck?.({ checking: true, ...lastResult });
+      checking = readSite().then(estimateCosts).finally(() => { checking = null; deps.onCheck?.({ checking: false, ...lastResult }); });
+    }
     return checking.then(() => pump());
   }
 
@@ -480,6 +495,7 @@ async function realDeps(): Promise<StoreDeps> {
     isBundled: (n) => bundled.has(n),
     publish: (status, index) => { routeStatus.value = status; packIndex.value = index; },
     setResolver: setPackBaseResolver,
+    onCheck: (c) => { updateCheck.value = c; },
   };
 }
 
@@ -495,7 +511,8 @@ export const routeStore = {
     })();
     return starting;
   },
-  check: (): Promise<void> => real?.check() ?? Promise.resolve(),
+  /** Look at the site. `force` (the Check for updates button) ignores the once a minute limit. */
+  check: (force = false): Promise<void> => real?.check(force) ?? Promise.resolve(),
   fetch: (id: string): Promise<void> => real?.fetch(id) ?? Promise.resolve(),
   remove: (id: string): Promise<boolean> => real?.remove(id) ?? Promise.resolve(false),
   rideEnded: (): Promise<void> => real?.rideEnded() ?? Promise.resolve(),

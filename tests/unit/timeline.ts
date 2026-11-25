@@ -65,7 +65,11 @@ export function lateCues(tl: readonly SoundEvent[], log: readonly DirectorLogEnt
     const first = navOn.find((n) => n.at >= e.at && (n.src === cue.audio || distances.has(n.src)));
     const own = navOn.find((n) => n.at >= e.at && n.src === cue.audio);
     if (!own) { out.push(`${cue.id} decided at ${sec(e.at, t0)} never sounded`); continue; }
-    const start = first && first.at <= own.at ? first.at : own.at;
+    // cues decided at the same moment (a depart and the turn just after it) are one spoken sequence: it counts from
+    // when the sequence starts
+    const together = log.some((x) => x !== e && x.what === "cue_spoken" && x.at === e.at && log.indexOf(x) < log.indexOf(e));
+    const seq = together ? navOn.find((n) => n.at >= e.at) : undefined;
+    const start = seq ? seq.at : first && first.at <= own.at ? first.at : own.at;
     if (start - e.at > maxMs) out.push(`${cue.id} decided at ${sec(e.at, t0)} started ${((start - e.at) / 1000).toFixed(1)} s later`);
   }
   return out;

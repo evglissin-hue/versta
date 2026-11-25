@@ -3,7 +3,7 @@
  * fixes keep coming with the screen off. The plugin is loaded with a dynamic import so the browser build never
  * contains it. Browser-only assumptions stay out of this file.
  */
-import type { Fix, FixSource, GpsError } from "../types";
+import { UNKNOWN_ACCURACY, type Fix, type FixSource, type GpsError } from "../types";
 
 /** The part of the plugin's location object that we read. */
 export interface PluginLocation {
@@ -52,15 +52,21 @@ function finite(n: number | null | undefined): number | null {
   return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
 
-/** Map a plugin location to a Fix. Heading comes from `bearing`. */
+/**
+ * Map a plugin location to a Fix. Heading comes from `bearing`. An accuracy the device does not give (the plugin
+ * sends null) is UNKNOWN_ACCURACY, never 0: a fix of unknown quality must not count as a perfect one.
+ */
 export function locationToFix(loc: PluginLocation, now: () => number = Date.now): Fix {
+  const acc = finite(loc.accuracy);
+  const at = now();
   return {
     lng: loc.longitude,
     lat: loc.latitude,
-    accuracy: finite(loc.accuracy) ?? 0,
+    accuracy: acc !== null && acc > 0 ? acc : UNKNOWN_ACCURACY,
     heading: finite(loc.bearing),
     speed: finite(loc.speed),
-    time: finite(loc.time) ?? now(),
+    time: finite(loc.time) ?? at,
+    receivedAt: at,
   };
 }
 

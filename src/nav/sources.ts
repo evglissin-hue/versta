@@ -1,7 +1,8 @@
 import { cumulative, makeProjection, pointAlong, project, unproject, type XY } from "../geo";
 import { createNativeGpsSource } from "../native/gps";
+import { createJitter, type JitterProfile } from "./jitter";
 import { isNative } from "../native/platform";
-import type { Fix, FixSource, GpsError, Pack } from "../types";
+import { UNKNOWN_ACCURACY, type Fix, type FixSource, type GpsError, type Pack } from "../types";
 
 /** Which device GPS the app uses: the background plugin inside the Android app, the browser API anywhere else. */
 export function gpsKind(): "native" | "browser" {
@@ -25,10 +26,11 @@ export function createBrowserGpsSource(): FixSource {
           onFix({
             lng: c.longitude,
             lat: c.latitude,
-            accuracy: c.accuracy,
+            accuracy: Number.isFinite(c.accuracy) && c.accuracy > 0 ? c.accuracy : UNKNOWN_ACCURACY,
             heading: c.heading === null || Number.isNaN(c.heading) ? null : c.heading,
             speed: c.speed === null || Number.isNaN(c.speed) ? null : c.speed,
             time: pos.timestamp,
+            receivedAt: Date.now(),
           });
         },
         (err) => {
@@ -64,9 +66,10 @@ const SIM_ACCURACY = 6;
 
 /**
  * A simulated rider that follows the pack's line from stop `from` to the end.
- * `speed` is metres per simulated second, `scale` is simulated seconds per real second.
+ * `speed` is metres per simulated second, `scale` is simulated seconds per real second. `jitter` puts the fixes
+ * through the GPS model of src/nav/jitter.ts (urban multipath, lying accuracy, stale and missing fixes), seeded.
  */
-export function createSimSource(pack: Pack, opts: { speed: number; scale: number; from: number }): FixSource {
+export function createSimSource(pack: Pack, opts: { speed: number; scale: number; from: number; jitter?: JitterProfile | null; seed?: number }): FixSource {
   const proj = makeProjection(pack.stops[0]!.at);
   const from = Math.max(0, Math.min(pack.stops.length - 1, Math.floor(opts.from)));
   const path: XY[] = [project(proj, pack.stops[from]!.at)];
@@ -80,6 +83,7 @@ export function createSimSource(pack: Pack, opts: { speed: number; scale: number
   const cum = cumulative(path);
   const length = cum[cum.length - 1]!;
   const rand = mulberry32(0x7e57a1);
+  const model = opts.jitter ? createJitter(opts.seed ?? 1, opts.jitter) : null;
 
   let timer: ReturnType<typeof setInterval> | null = null;
   let simSeconds = 0;
@@ -87,13 +91,21 @@ export function createSimSource(pack: Pack, opts: { speed: number; scale: number
   let held = false;
   let ticks = 0;
 
-  function makeFix(): Fix {
+  function makeFixes(): Fix[] {
     const pa = pointAlong(path, travelled, cum);
+    const time = SIM_EPOCH + simSeconds * 1000;
+    if (model) {
+      const still = held || travelled >= length;
+      return model.next({ p: pa.point, time, speed: still ? 0 : opts.speed, heading: still ? null : pa.bearing }).map((r) => {
+        const ll = unproject(proj, r.p);
+        return { lng: ll[0], lat: ll[1], accuracy: r.accuracy, heading: r.heading, speed: r.speed, time: r.time, receivedAt: r.receivedAt };
+      });
+    }
     const angle = rand() * Math.PI * 2;
     const radius = rand() * SIM_JITTER;
     const xy: XY = [pa.point[0] + Math.cos(angle) * radius, pa.point[1] + Math.sin(angle) * radius];
     const ll = unproject(proj, xy);
-    return { lng: ll[0], lat: ll[1], accuracy: SIM_ACCURACY, heading: pa.bearing, speed: opts.speed, time: SIM_EPOCH + simSeconds * 1000 };
+    return [{ lng: ll[0], lat: ll[1], accuracy: SIM_ACCURACY, heading: pa.bearing, speed: opts.speed, time, receivedAt: time }];
   }
 
   return {
@@ -105,7 +117,7 @@ export function createSimSource(pack: Pack, opts: { speed: number; scale: number
         while (simSeconds < due) {
           simSeconds += 1;
           if (!held) travelled = Math.min(length, travelled + opts.speed);
-          onFix(makeFix());
+          for (const f of makeFixes()) onFix(f);
         }
       }, TICK_MS);
     },

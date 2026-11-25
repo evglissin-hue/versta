@@ -323,3 +323,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--mark); outline-
 .nb-btn { flex: none; min-width: 96px; }
 .nb-scene { z-index: 50; }
 .versta-map .vm-stop.is-next .vm-stop-dot { background: var(--mark); color: var(--on-mark); border-color: var(--mark); }
+
+/* The Updates panel on Home (Android app): what the last look at the site found, and a button to look now. */
+.updates { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; background: var(--paper); }
+.updates .label { margin: 0; }
+.updates .btn { align-self: stretch; }

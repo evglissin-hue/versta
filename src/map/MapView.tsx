@@ -296,8 +296,11 @@ export function MapView(props: MapViewProps) {
       };
       camera.current = frame;
 
+      /** Where the rider is drawn and the camera follows: the engine's steady position (src/nav/filter.ts), on the line while the rider rides it. */
       const riderTarget = (n: NavState): LngLat | null => {
+        if (n.shown) return n.shown;
         if (n.snapped && !n.offRoute) return n.snapped;
+        if (n.pos) return n.pos;
         return n.fix ? [n.fix.lng, n.fix.lat] : null;
       };
 
@@ -322,7 +325,7 @@ export function MapView(props: MapViewProps) {
           ? { type: "FeatureCollection", features: [point(n.nextCue.at)] } : EMPTY;
         const cueKey = JSON.stringify(cueFc);
         if (cueKey !== lastCue) { lastCue = cueKey; data.cue = cueFc; setData(ROUTE_SOURCES.cue, cueFc); }
-        const rider0 = n.fix ? ([n.fix.lng, n.fix.lat] as LngLat) : null;
+        const rider0 = n.pos ?? (n.fix ? ([n.fix.lng, n.fix.lat] as LngLat) : null);
         const goal = n.status === "to_start" ? pack.stops[n.seg]?.at ?? null : null;
         const guideFc: GeoJSON.FeatureCollection = rider0 && goal
           ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [rider0, goal] } }] } : EMPTY;
@@ -343,8 +346,9 @@ export function MapView(props: MapViewProps) {
         const t = riderTarget(n);
         if (!t) { hideRider(); return; }
         moveRider(t);
-        accuracy = n.fix?.accuracy ?? 0;
-        heading = n.fix?.heading ?? n.routeBearing ?? null;
+        // the ring shows the filter's honest error, not the device's figure (which can say 5 m and be 50 m out)
+        accuracy = n.posAccuracy ?? n.fix?.accuracy ?? 0;
+        heading = n.shownHeading !== undefined ? n.shownHeading : (n.fix?.heading ?? n.routeBearing ?? null);
         rider.el.classList.toggle("no-heading", heading === null);
         rider.el.classList.toggle("is-off", n.offRoute);
         paintHeading();

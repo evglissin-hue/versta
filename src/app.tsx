@@ -17,7 +17,12 @@ const demo = query.get("demo") === "ride";
 export function App() {
   useEffect(() => {
     if (demo) { void enterDemo(query.get("step") ?? "riding"); return; }
-    if (isNative()) { void import("./routes/store").then((m) => m.routeStore.start()); return; }
+    if (isNative()) {
+      void import("./routes/store").then((m) => m.routeStore.start());
+      // the app's own code: newer versions come from the site, between rides (src/update)
+      void import("./update/store").then((m) => m.appStore.start()).catch(() => {});
+      return;
+    }
     void fetch(`${import.meta.env.BASE_URL}packs/index.json`)
       .then((r) => r.json() as Promise<{ packs: PackIndexEntry[] }>)
       .then((j) => { packIndex.value = j.packs; void syncVersions(j.packs); })

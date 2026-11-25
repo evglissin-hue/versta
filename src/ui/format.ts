@@ -49,6 +49,16 @@ export function fmtDate(ms: number): string {
 export function fmtMB(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1048576))} MB`;
 }
+/** A download's size as a rider wants it: "under 1 MB" or "15 MB". */
+export function fmtSize(bytes: number): string {
+  return bytes < 1048576 ? "under 1 MB" : fmtMB(bytes);
+}
+/** A time of day, with the date when it is not today: "14:32" or "24 Nov, 14:32". */
+export function fmtClock(ms: number, now: number = Date.now()): string {
+  const d = new Date(ms);
+  const hm = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return new Date(now).toDateString() === d.toDateString() ? hm : `${fmtDate(ms)}, ${hm}`;
+}
 
 /** Time taken, as a rider says it: "48 min" or "2 h 14 min". */
 export function fmtDuration(ms: number): string {

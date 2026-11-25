@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PackIndexEntry, RouteStatus } from "../types";
-import { memoryDevice, sha256Hex, textToB64, b64ToText, type MemoryDevice } from "./files";
+import { bodyText, memoryDevice, sha256Hex, textToB64, b64ToText, type MemoryDevice } from "./files";
 import { createRouteStore, type RouteStore, type StoreDeps } from "./store";
 
 const SITE = "https://site.test/";
@@ -42,6 +42,7 @@ const putIndex = (dev: MemoryDevice, routes: Route[]): void => { dev.site.set(`$
 interface Rig {
   dev: MemoryDevice; store: RouteStore; ctl: { wifi: boolean; riding: string | null; saved: string | null; clock: number };
   storage: Map<string, string>; cache: Map<string, Response>; status(): Record<string, RouteStatus>; index(): PackIndexEntry[];
+  checks: { checking: boolean; at: number | null; ok: boolean | null }[];
 }
 
 function rig(opts: { builtIn?: Route[]; dev?: MemoryDevice; storage?: Map<string, string>; cache?: Map<string, Response> } = {}): Rig {
@@ -52,6 +53,7 @@ function rig(opts: { builtIn?: Route[]; dev?: MemoryDevice; storage?: Map<string
   const builtIn = opts.builtIn ?? [];
   for (const r of builtIn) putOwn(dev, r);
   const out = { status: {} as Record<string, RouteStatus>, index: [] as PackIndexEntry[] };
+  const checks: Rig["checks"] = [];
   const deps: StoreDeps = {
     device: dev,
     storage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => { storage.set(k, v); }, removeItem: (k) => { storage.delete(k); } },
@@ -68,8 +70,9 @@ function rig(opts: { builtIn?: Route[]; dev?: MemoryDevice; storage?: Map<string
     isBundled: (n) => n !== "music/bright",
     publish: (s, i) => { out.status = s; out.index = i; },
     setResolver: () => {},
+    onCheck: (c) => { checks.push(c); },
   };
-  return { dev, store: createRouteStore(deps), ctl, storage, cache, status: () => out.status, index: () => out.index };
+  return { dev, store: createRouteStore(deps), ctl, storage, cache, status: () => out.status, index: () => out.index, checks };
 }
 
 const A_V1 = (): Promise<Route> => route("alpha", { "audio/a.mp3": "aaaa", "pic.jpg": "pppp" }, "2026-01-01T00:00:00Z");
@@ -389,5 +392,43 @@ describe("route store", () => {
     again.ctl.wifi = false;
     await again.store.start();
     expect(again.status().bravo).toMatchObject({ kind: "on-site" });
+  });
+});
+
+describe("the site as the phone sees it (iteration 7, issue 3)", () => {
+  it("bodyText passes text through and turns a parsed body back into JSON", () => {
+    expect(bodyText("abc")).toBe("abc");
+    expect(JSON.parse(bodyText({ packs: [{ id: "x" }] }))).toEqual({ packs: [{ id: "x" }] });
+    expect(bodyText([1, 2])).toBe("[1,2]");
+    expect(bodyText(null)).toBe("");
+  });
+
+  it("an index that CapacitorHttp hands over parsed still shows the new route, and pack JSON downloads byte for byte", async () => {
+    const a = await A_V1(), b = await B_V1();
+    const r = rig({ builtIn: [a] });
+    expect(r.dev.parsesJson).toBe(true);
+    putIndex(r.dev, [a, b]); putSite(r.dev, b);
+    // the old device read a parsed body as "": the index never parsed and the new route never appeared
+    const index = await r.dev.getText(`${SITE}packs/index.json`);
+    expect(JSON.parse(index.text).packs.map((e: PackIndexEntry) => e.id)).toEqual(["alpha", "bravo"]);
+    await r.store.start();
+    expect(r.status().bravo).toMatchObject({ kind: "on-phone", source: "downloaded", version: b.entry.version });
+    // pack.json is checked against its sha256: only exact bytes get through
+    expect(b64ToText(r.dev.files.get(`packs/bravo/${b.entry.version}/pack.json`)!)).toBe(b.files["pack.json"]);
+  });
+
+  it("tells the Updates panel when a check starts and how it ended", async () => {
+    const a = await A_V1();
+    const r = rig({ builtIn: [a] });
+    putIndex(r.dev, [a]);
+    await r.store.start();
+    expect(r.checks[0]).toMatchObject({ checking: true });
+    expect(r.checks.at(-1)).toEqual({ checking: false, at: r.ctl.clock, ok: true });
+    r.dev.site.set(`${SITE}packs/index.json`, () => { throw new Error("offline"); });
+    r.ctl.clock += 120_000;
+    await r.store.check(true);
+    expect(r.checks.at(-1)).toEqual({ checking: false, at: r.ctl.clock, ok: false });
+    // the routes on the phone are untouched by a failed look
+    expect(r.status().alpha).toMatchObject({ kind: "on-phone", source: "built-in" });
   });
 });

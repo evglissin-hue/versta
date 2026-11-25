@@ -6,6 +6,7 @@ import "@fontsource/newsreader/400-italic.css";
 import { render } from "preact";
 import { App } from "./app";
 import { initNative } from "./native";
+import { isNative } from "./native/platform";
 import { closeTopOverlay } from "./ui/back";
 import "./styles/tokens.css";
 import "./styles/app.css";
@@ -15,3 +16,5 @@ initNative();
 window.addEventListener("versta:back", (e) => { if (closeTopOverlay()) e.preventDefault(); });
 
 render(<App />, document.getElementById("app")!);
+// Inside the Android app: tell the native side this code started, so a new version is not rolled back.
+if (isNative()) void import("./update/native").then((m) => m.markReady()).catch(() => {});

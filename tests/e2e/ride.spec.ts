@@ -86,6 +86,24 @@ for (const entry of PACKS) test.describe(entry.id, () => {
     expect(arrivals.length, "arrivals from the joining stop onwards").toBeGreaterThanOrEqual(s.stops.length - from - 1);
   });
 
+  // the class check of iteration 7: a phone's GPS in a city jumps about, and that must never raise a false alarm
+  test("a ride with city GPS jitter raises no false alarm and still reaches every stop", async ({ page }) => {
+    test.setTimeout(300_000);
+    const s = await ride(page, entry, "sim=1&speed=5&scale=60&virtual=1&jitter=urban&seed=7");
+    expect(s.status).toBe("finished");
+    expect(s.arrived).toEqual([...Array(s.stops.length).keys()]);
+    for (const what of ["off_route", "wrong_way", "detour"]) {
+      expect(s.log.filter((e) => e.what === what).map((e) => e.id), `no ${what} from GPS jitter`).toEqual([]);
+    }
+    const started = s.log.filter((e) => e.what === "story_start").map((e) => e.id);
+    const core = s.stops.flatMap((st) => st.stories.filter((x) => x.kind === "core").map((x) => x.id));
+    expect(core.filter((id) => !started.includes(id)), "core stories never played").toEqual([]);
+    // a turn reached during a gap in the fixes stays unsaid (saying it late would mislead): a few at most
+    const spoken = s.log.filter((e) => e.what === "cue_spoken").map((e) => e.id!);
+    const unsaid = s.cues.filter((c) => !c.quiet && !spoken.includes(c.id)).map((c) => c.id);
+    expect(unsaid.length, `turns unsaid in GPS gaps: ${unsaid.join(", ")}`).toBeLessThanOrEqual(3);
+  });
+
   test("a fast rider still gets every turn", async ({ page }) => {
     test.setTimeout(240_000);
     const s = await ride(page, entry, "sim=1&speed=9&scale=60&virtual=1");
